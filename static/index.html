@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Deal Hunter</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Deal Hunter</h1>
+    <nav>
+      <button data-tab="finds" class="active">Finds <span id="new-badge" class="badge" hidden></span></button>
+      <button data-tab="watches">Watches</button>
+      <button data-tab="hardware">My hardware</button>
+      <button data-tab="settings">Settings</button>
+    </nav>
+    <div class="status" id="poll-status"></div>
+  </header>
+
+  <main>
+    <!-- FINDS -->
+    <section id="tab-finds" class="tab">
+      <div class="toolbar">
+        <select id="f-watch"><option value="">All watches</option></select>
+        <select id="f-status">
+          <option value="active">New + seen + starred</option>
+          <option value="new">New only</option>
+          <option value="starred">Starred</option>
+          <option value="dismissed">Dismissed</option>
+          <option value="all">Everything</option>
+        </select>
+        <select id="f-sort">
+          <option value="newest">Newest first</option>
+          <option value="price">Cheapest first</option>
+          <option value="deal">Best deal first</option>
+        </select>
+        <span class="spacer"></span>
+        <button id="mark-seen">Mark all seen</button>
+        <button id="poll-now" class="primary">Check now</button>
+      </div>
+      <div id="listings" class="cards"></div>
+    </section>
+
+    <!-- WATCHES -->
+    <section id="tab-watches" class="tab" hidden>
+      <div class="panel" id="ai-draft" hidden>
+        <h2>Describe what you want <span class="pill">AI</span></h2>
+        <div class="row">
+          <input id="ai-desc" placeholder="e.g. low-power mini PC for Frigate with an Intel iGPU, under $200">
+          <button id="ai-draft-btn" class="primary">Suggest watches</button>
+        </div>
+        <div id="ai-draft-results"></div>
+      </div>
+
+      <div class="panel">
+        <h2 id="watch-form-title">New watch</h2>
+        <form id="watch-form">
+          <input type="hidden" name="id">
+          <div class="grid">
+            <label>Name <input name="name" required placeholder="i9-10980XE for X299 box"></label>
+            <label>Query <input name="query" required placeholder='10980xe   or   n100|n150 "mini pc"'></label>
+            <label>Exclude (comma separated) <input name="exclude" placeholder="xeon, laptop, rdimm"></label>
+            <label>Linked machine <select name="machine_id"><option value="">None</option></select></label>
+            <label>Min price (incl. shipping) <input name="min_price" type="number" step="1" min="0"></label>
+            <label>Max price (incl. shipping) <input name="max_price" type="number" step="1" min="0"></label>
+            <label>Condition
+              <select name="condition"><option value="any">Any</option><option value="used">Used</option><option value="new">New</option></select>
+            </label>
+            <div class="checks">
+              <span>Sources</span>
+              <label><input type="checkbox" name="src-ebay" checked> eBay</label>
+              <label><input type="checkbox" name="src-reddit" checked> Reddit</label>
+              <label><input type="checkbox" name="src-bestbuy"> Best Buy open-box</label>
+              <label><input type="checkbox" name="include_auctions"> Include eBay auctions</label>
+            </div>
+          </div>
+          <details class="help">
+            <summary>Query tips</summary>
+            <p>Every word must be in the listing title. <code>a|b</code> means either one. <code>"exact phrase"</code> in quotes.
+              <code>-word</code> excludes. Matching ignores case, dashes and spaces, so <code>10980xe</code> finds "i9-10980 XE".
+              Model numbers work better than full product names. Junk like "for parts" or "bent pins" is always filtered (edit the list in Settings).</p>
+          </details>
+          <div class="row">
+            <button type="submit" class="primary">Save &amp; check now</button>
+            <button type="button" id="watch-cancel" hidden>Cancel edit</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="panel">
+        <h2>Your watches</h2>
+        <div id="watch-list"></div>
+      </div>
+    </section>
+
+    <!-- HARDWARE -->
+    <section id="tab-hardware" class="tab" hidden>
+      <div class="panel">
+        <p class="muted">Add your machines and their parts, then press <b>Find upgrades</b>. Built-in rules recognise desktop
+          platforms from about 2015 on and suggest drop-in CPUs and RAM. With AI on, you also get GPU/storage ideas and
+          support for anything the rules don't know.</p>
+        <button id="add-machine" class="primary">Add machine</button>
+      </div>
+      <div id="machines"></div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section id="tab-settings" class="tab" hidden>
+      <form id="settings-form">
+        <div class="panel">
+          <h2>Checking</h2>
+          <div class="grid">
+            <label>Check every (minutes) <input name="poll_minutes" type="number" min="5"></label>
+            <label>Your ZIP code (eBay shipping estimates) <input name="zip_code"></label>
+          </div>
+          <label>Junk words, always filtered (one per line) <textarea name="junk_terms" rows="6"></textarea></label>
+        </div>
+
+        <div class="panel">
+          <h2>eBay</h2>
+          <label class="toggle"><input type="checkbox" name="src_ebay"> Enabled</label>
+          <p class="muted">Free key: sign up at developer.ebay.com, create an application keyset (Production), and paste the
+            App ID and Cert ID here.</p>
+          <div class="grid">
+            <label>App ID (Client ID) <input name="ebay_client_id"></label>
+            <label>Cert ID (Client Secret) <input name="ebay_client_secret" type="password" autocomplete="off"></label>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Reddit</h2>
+          <label class="toggle"><input type="checkbox" name="src_reddit"> Enabled</label>
+          <label>Subreddits (one per line) <textarea name="reddit_subs" rows="3"></textarea></label>
+          <p class="muted">No key needed. Only "selling" posts are matched: [H] item [W] PayPal/cash, or [FS].
+            Prices are guessed from the post text, so check the post.</p>
+        </div>
+
+        <div class="panel">
+          <h2>Best Buy open-box <span class="pill">experimental</span></h2>
+          <label class="toggle"><input type="checkbox" name="src_bestbuy"> Enabled</label>
+          <p class="muted">Free key from developer.bestbuy.com.</p>
+          <label>API key <input name="bestbuy_api_key" type="password" autocomplete="off"></label>
+        </div>
+
+        <div class="panel">
+          <h2>Discord</h2>
+          <label class="toggle"><input type="checkbox" name="discord_enabled"> Post new finds to Discord</label>
+          <label class="toggle"><input type="checkbox" name="discord_deals_only"> Only when it's a deal (10%+ under this watch's typical price)</label>
+          <label>Webhook URL <input name="discord_webhook" type="password" autocomplete="off"></label>
+          <button type="button" id="test-discord">Send test message</button>
+        </div>
+
+        <div class="panel">
+          <h2>AI</h2>
+          <p class="muted">Off by default. When on, AI only runs when you press an AI button, never in the background.</p>
+          <div class="grid">
+            <label>Mode
+              <select name="ai_provider">
+                <option value="off">Off (rules only)</option>
+                <option value="ollama">Ollama (free, local)</option>
+                <option value="claude">Claude API (paid, best)</option>
+              </select>
+            </label>
+            <label>Ollama URL <input name="ollama_url"></label>
+            <label>Ollama model <input name="ollama_model"></label>
+            <label>Claude model <input name="claude_model"></label>
+            <label>Anthropic API key <input name="anthropic_api_key" type="password" autocomplete="off" placeholder="or set ANTHROPIC_API_KEY"></label>
+          </div>
+        </div>
+
+        <div class="row sticky-save">
+          <button type="submit" class="primary">Save settings</button>
+          <span id="settings-msg" class="muted"></span>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <div id="toast" hidden></div>
+  <script src="app.js"></script>
+</body>
+</html>
