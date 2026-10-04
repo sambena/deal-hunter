@@ -454,10 +454,11 @@ def create_watch(data: dict) -> int:
     return execute(f"INSERT INTO watches ({cols}) VALUES ({', '.join('?' * len(vals))})", tuple(vals.values()))
 
 
-def update_watch(watch_id: int, data: dict) -> bool:
+def update_watch(watch_id: int, data: dict) -> int | None:
+    """Returns None if there's no such watch, else how many new finds turning it off marked seen."""
     old = get_watch(watch_id)
     if not old:
-        return False
+        return None
     vals = _watch_values(data)
     if any(f in vals and _watch_values({f: old[f]})[f] != vals[f] for f in MATCH_FIELDS):
         # New criteria find a new backlog; treat it like a fresh watch so it isn't sent to Discord.
@@ -465,7 +466,11 @@ def update_watch(watch_id: int, data: dict) -> bool:
     if vals:
         sets = ", ".join(f"{k} = ?" for k in vals)
         execute(f"UPDATE watches SET {sets} WHERE id = ? AND user_id = ?", (*vals.values(), watch_id, old["user_id"]))
-    return True
+    if old["enabled"] and vals.get("enabled") == 0:
+        # Turning a watch off: its unread finds count as viewed, so they stop showing as new everywhere.
+        return execute_count("UPDATE listings SET status = 'seen' WHERE watch_id = ? AND status = 'new'",
+                             (watch_id,))
+    return 0
 
 
 def prune_cheapest(watch: dict, fresh: set | None = None) -> int:
