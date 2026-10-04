@@ -62,6 +62,15 @@ class RadarTest(unittest.TestCase):
         self.assertEqual([(i["machine_id"], i["query"], i["machine_name"]) for i in tv],
                          [(self.tv, "oled65c4", "Living room TV")])  # the unknown device_id is dropped
 
+    def test_no_watch_without_a_search(self):
+        # LGA1700 boards take DDR4 or DDR5, so the rules can't name a RAM kit.
+        db.save_machine({"name": "Rosie", "kind": "pc", "parts": [{"category": "cpu", "model": "Intel Core i7-12700"}]},
+                        self.empty_pc)
+        res = self.server.deal_radar({}, {})
+        rosie = [i for i in res["items"] if i["machine_id"] == self.empty_pc]
+        self.assertEqual([i["category"] for i in rosie], ["cpu"])
+        self.assertTrue(all(i["query"] for i in res["items"]))
+
     def test_already_watched_is_flagged(self):
         db.create_watch({"name": "x", "query": "5800X3D ", "sources": ["ebay"]})
         res = self.server.deal_radar({}, {})

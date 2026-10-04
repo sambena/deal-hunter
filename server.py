@@ -178,8 +178,8 @@ def deal_radar(body, params):
             skipped.append({"machine_id": m["id"], "name": m["name"],
                             "why": "needs specs (press Get specs)" if not m["parts"] else rules["explanation"]})
             continue
-        picks = [s for s in rules["suggestions"] if s["category"] == "cpu"][:1] + \
-                [s for s in rules["suggestions"] if s["category"] == "ram"][:1]
+        usable = [s for s in rules["suggestions"] if s["query"].strip()]  # "RAM: DDR4 or DDR5?" has no query
+        picks = [s for s in usable if s["category"] == "cpu"][:1] + [s for s in usable if s["category"] == "ram"][:1]
         if not picks:
             skipped.append({"machine_id": m["id"], "name": m["name"], "why": "already has the best drop-in CPU"})
         for s in picks:
