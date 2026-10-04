@@ -41,6 +41,7 @@ def get_state(body, params):
         "watches": db.list_watches(),
         "machines": db.list_machines(),
         "settings": db.public_settings(),
+        "ai": {**ai.catalog(), "budget": ai.budget(db.get_settings())},
         "poller": poller.state,
         "now": time.time(),
     }
@@ -116,15 +117,42 @@ def mark_all_seen(body, params):
     return {"ok": True}
 
 
+def _ai_prompt(action: str, body: dict, ref: str | None = None) -> tuple[str, dict, dict]:
+    """The prompt for an AI button, plus what's needed to use its answer."""
+    if action == "judge":
+        rows = db.query("SELECT * FROM listings WHERE id = ?", (int(ref or body.get("listing_id")),))
+        if not rows:
+            raise HTTPError(404, "listing not found")
+        watch = db.get_watch(rows[0]["watch_id"])
+        machine = db.get_machine(watch["machine_id"]) if watch.get("machine_id") else None
+        return (*ai.judge_prompt(rows[0], watch, machine), {"listing": rows[0]})
+    if action == "upgrades":
+        machine = db.get_machine(int(ref or body.get("machine_id")))
+        if not machine:
+            raise HTTPError(404, "machine not found")
+        return (*ai.upgrades_prompt(machine), {"machine": machine})
+    if action == "draft":
+        if not str(body.get("description", "")).strip():
+            raise HTTPError(400, "Describe what you're looking for")
+        return (*ai.draft_prompt(body["description"], db.list_machines()), {})
+    raise HTTPError(400, "unknown AI action")
+
+
+@route("POST", "/api/ai/estimate")
+def ai_estimate(body, params):
+    prompt, schema, _ = _ai_prompt(body.get("action"), body)
+    return ai.estimate(db.get_settings(), body["action"], prompt, schema)
+
+
+@route("GET", "/api/ai/usage")
+def ai_usage(body, params):
+    return ai.usage_summary(db.get_settings())
+
+
 @route("POST", r"/api/listings/(\d+)/ask-ai")
 def ask_ai_listing(body, params, lid):
-    rows = db.query("SELECT * FROM listings WHERE id = ?", (int(lid),))
-    if not rows:
-        raise HTTPError(404, "listing not found")
-    listing = rows[0]
-    watch = db.get_watch(listing["watch_id"])
-    machine = db.get_machine(watch["machine_id"]) if watch.get("machine_id") else None
-    result = ai.judge_listing(db.get_settings(), listing, watch, machine)
+    prompt, schema, _ = _ai_prompt("judge", body, lid)
+    result = ai.run(db.get_settings(), "judge", prompt, schema)
     note = f"{result['verdict'].upper()}: {result['note']}"
     db.execute("UPDATE listings SET ai_note = ? WHERE id = ?", (note, int(lid)))
     return {"ai_note": note}
@@ -154,16 +182,16 @@ def suggest_upgrades(body, params, mid):
         raise HTTPError(404, "machine not found")
     rules = hardware.suggest(machine)
     if body.get("use_ai"):
+        prompt, schema, _ = _ai_prompt("upgrades", body, mid)
         return {"platform": rules["platform"], "explanation": "suggested by AI",
-                "suggestions": ai.suggest_upgrades(db.get_settings(), machine)}
+                "suggestions": ai.run(db.get_settings(), "upgrades", prompt, schema)["suggestions"]}
     return rules
 
 
 @route("POST", "/api/ai/draft-watches")
 def draft_watches(body, params):
-    if not body.get("description", "").strip():
-        raise HTTPError(400, "Describe what you're looking for")
-    return {"suggestions": ai.draft_watches(db.get_settings(), body["description"], db.list_machines())}
+    prompt, schema, _ = _ai_prompt("draft", body)
+    return {"suggestions": ai.run(db.get_settings(), "draft", prompt, schema)["suggestions"]}
 
 
 @route("PUT", "/api/settings")

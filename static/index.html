@@ -163,20 +163,33 @@
 
         <div class="panel">
           <h2>AI</h2>
-          <p class="muted">Off by default. When on, AI only runs when you press an AI button, never in the background.</p>
+          <p class="muted">Off by default. AI only runs when you press an AI button, never in the background.
+            Paid models show the cost and ask first, and stop working once a request could take you past your monthly limit.</p>
+          <div class="spend" id="ai-spend"></div>
           <div class="grid">
             <label>Mode
-              <select name="ai_provider">
-                <option value="off">Off (rules only)</option>
-                <option value="ollama">Ollama (free, local)</option>
-                <option value="claude">Claude API (paid, best)</option>
-              </select>
+              <select name="ai_provider"><option value="off">Off (rules only)</option></select>
             </label>
+            <label>Monthly limit (US $) <input name="ai_monthly_limit" type="number" min="0" step="0.5"></label>
+          </div>
+          <label class="toggle"><input type="checkbox" name="ai_confirm"> Show the cost and ask before every paid AI request</label>
+          <div class="grid" data-provider="claude">
+            <label>Claude model <select name="claude_model" data-models="claude"></select></label>
+            <label>Anthropic API key <input name="anthropic_api_key" type="password" autocomplete="off" data-ph="from console.anthropic.com"></label>
+          </div>
+          <div class="grid" data-provider="openai">
+            <label>OpenAI model <select name="openai_model" data-models="openai"></select></label>
+            <label>OpenAI API key <input name="openai_api_key" type="password" autocomplete="off" data-ph="from platform.openai.com"></label>
+          </div>
+          <div class="grid" data-provider="gemini">
+            <label>Gemini model <select name="gemini_model" data-models="gemini"></select></label>
+            <label>Gemini API key <input name="gemini_api_key" type="password" autocomplete="off" data-ph="from aistudio.google.com"></label>
+          </div>
+          <div class="grid" data-provider="ollama">
             <label>Ollama URL <input name="ollama_url"></label>
             <label>Ollama model <input name="ollama_model"></label>
-            <label>Claude model <input name="claude_model"></label>
-            <label>Anthropic API key <input name="anthropic_api_key" type="password" autocomplete="off" placeholder="or set ANTHROPIC_API_KEY"></label>
           </div>
+          <p class="muted" id="ai-price-note"></p>
         </div>
 
         <div class="row sticky-save">
