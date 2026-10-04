@@ -91,6 +91,15 @@ def full_model(make: str, model: str) -> str:
     return f"{make} {model}".strip()
 
 
+def split_make_model(make: str, model: str) -> tuple[str, str]:
+    """("Google Inc.", "Google Nest Hub") -> ("Google", "Nest Hub"); ("LGE", "OLED65B2AUA") -> ("LG", "OLED65B2AUA")."""
+    full = full_model(make, model)
+    tidy = full_model(make, "")
+    if tidy and full.lower().startswith(tidy.lower() + " "):
+        return tidy, full[len(tidy) + 1:]
+    return tidy, full if not tidy else model
+
+
 def clean_model(model: str) -> str:
     # LG ThinQ appends the device type: "T1789EFH_F (DEVICE_WASHER)".
     return re.sub(r"\s*\(DEVICE_[A-Z_]+\)$", "", model or "").strip()

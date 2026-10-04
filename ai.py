@@ -359,9 +359,17 @@ Used-market sellers write titles inconsistently, so prefer model numbers over fu
 def _describe_machine(machine: dict) -> str:
     kind = machine.get("kind") or "pc"
     lines = [f"{'Machine' if kind in ('pc', 'server') else kind.capitalize()}: {machine['name']}"]
-    if machine.get("model"):
-        lines.append(f"Make/model: {machine['model']}")
+    make_model = " ".join(x for x in (machine.get("make"), machine.get("model")) if x)
+    if make_model:
+        lines.append(f"Make/model: {make_model}")
+    if machine.get("year"):
+        lines.append(f"Year: {machine['year']}")
+    if machine.get("msrp"):
+        lines.append(f"MSRP: ${machine['msrp']:,.0f}")
+    if machine.get("price_paid"):
+        lines.append(f"Paid: ${machine['price_paid']:,.0f}" + (f" ({machine['purchased']})" if machine.get("purchased") else ""))
     lines += [f"- {p.get('category', 'other')}: {p.get('model', '')}" for p in machine.get("parts", [])]
+    lines += [f"{f['label']}: {f['value']}" for f in machine.get("custom") or [] if f.get("value")]
     if machine.get("notes"):
         lines.append(f"Notes: {machine['notes']}")
     return "\n".join(lines)

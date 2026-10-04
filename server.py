@@ -92,7 +92,12 @@ def list_listings(body, params):
     if params.get("watch"):
         where.append("l.watch_id = ?")
         args.append(int(params["watch"]))
-    status = params.get("status", "active")
+    since = params.get("since_id")
+    if since is not None:
+        # For apps that alert: only finds added after the last one they saw, oldest first, any status unless asked.
+        where.append("l.id > ?")
+        args.append(int(since))
+    status = params.get("status", "all" if since is not None else "active")
     if status == "active":
         where.append("l.status IN ('new', 'seen', 'starred')")
     elif status != "all":
@@ -102,7 +107,7 @@ def list_listings(body, params):
         "newest": "l.first_seen DESC",
         "price": "l.total IS NULL, l.total ASC",
         "deal": "l.deal_pct IS NULL, l.deal_pct DESC",
-    }.get(params.get("sort"), "l.first_seen DESC")
+    }.get(params.get("sort"), "l.id ASC" if since is not None else "l.first_seen DESC")
     sql = f"""SELECT l.*, w.name AS watch_name FROM listings l JOIN watches w ON w.id = l.watch_id
               {'WHERE ' + ' AND '.join(where) if where else ''} ORDER BY {order} LIMIT 500"""
     return {"listings": db.query(sql, tuple(args))}
@@ -286,11 +291,11 @@ def ha_import(body, params):
                              "source_ref": " ".join(dict.fromkeys(mine + refs))}, match["id"])
             linked += 1
             continue
-        model = homeassistant.full_model(d.get("make") or "", d.get("model") or "")
+        make, model = homeassistant.split_make_model(d.get("make") or "", d.get("model") or "")
         note = "Imported from Home Assistant" + (f" ({d['area']})" if d.get("area") else "") + "."
         if d.get("computer"):
             note += " Press Get specs to fill in its parts."
-        db.save_machine({"name": d.get("name") or model or "Device", "kind": d.get("kind"), "model": model,
+        db.save_machine({"name": d.get("name") or model or "Device", "kind": d.get("kind"), "make": make, "model": model,
                          "parts": d.get("parts") or [], "notes": note, "source_ref": " ".join(refs)})
         added += 1
     return {"added": added, "linked": linked}

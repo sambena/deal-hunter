@@ -477,7 +477,15 @@ $("#ha-import").addEventListener("click", e => busy(e.target, async () => {
 }));
 
 // A PC or server with no CPU listed yet (e.g. just imported from Home Assistant).
-const specsNeeded = m => ["pc", "server"].includes(m.kind || "pc") && !m.parts.some(p => p.category === "cpu") && !m.model;
+const specsNeeded = m => ["pc", "server"].includes(m.kind || "pc") && !m.parts.some(p => p.category === "cpu");
+
+// The user's own fields on a device (serial number, warranty, where it lives...).
+function customRow(f = { label: "", value: "" }) {
+  return `<div class="custom-row">
+    <input data-f="label" value="${esc(f.label)}" placeholder="Field, e.g. Serial number">
+    <input data-f="value" value="${esc(f.value)}" placeholder="Value">
+    <button class="small danger" data-act="rm-custom">✕</button></div>`;
+}
 
 function machineCard(m) {
   const kind = m.kind || "pc";
@@ -486,13 +494,20 @@ function machineCard(m) {
     <div class="grid">
       <label>Name <input data-f="name" value="${esc(m.name)}" placeholder="X299 box, Living room TV…"></label>
       <label>Kind <select data-f="kind">${kindOptions(kind)}</select></label>
-      <label class="gear-only">Make and model <input data-f="model" value="${esc(m.model || "")}" placeholder="LG OLED65B2AUA"></label>
+      <label>Make <input data-f="make" value="${esc(m.make || "")}" placeholder="LG, Dell, Apple…"></label>
+      <label>Model <input data-f="model" value="${esc(m.model || "")}" placeholder="OLED65B2AUA, OptiPlex 7050…"></label>
+      <label>Year <input data-f="year" type="number" min="1950" max="2100" value="${m.year ?? ""}" placeholder="2022"></label>
+      <label>MSRP ($) <input data-f="msrp" type="number" min="0" step="0.01" value="${m.msrp ?? ""}"></label>
+      <label>Purchased <input data-f="purchased" type="date" value="${esc(m.purchased || "")}"></label>
+      <label>Price paid ($) <input data-f="price_paid" type="number" min="0" step="0.01" value="${m.price_paid ?? ""}"></label>
       <label>Notes <input data-f="notes" value="${esc(m.notes)}" placeholder="use, size, PSU wattage, limits…"></label>
     </div>
+    <div class="custom">${(m.custom || []).map(customRow).join("")}</div>
     ${needed ? `<p class="specs-needed parts-only">Specs needed: press <b>Get specs</b> to fill in this computer's parts.</p>` : ""}
     <div class="parts parts-only">${(m.parts.length ? m.parts : [{ category: "cpu", model: "" }, { category: "motherboard", model: "" }, { category: "ram", model: "" }]).map(partRow).join("")}</div>
     <div class="row">
       <button class="small parts-only" data-act="add-part">+ Part</button>
+      <button class="small" data-act="add-custom">+ Custom field</button>
       <span class="spacer"></span>
       <button data-act="save">Save</button>
       <button class="parts-only ${needed ? "primary" : ""}" data-act="get-specs">Get specs</button>
@@ -556,7 +571,14 @@ function machineFromCard(card) {
   return {
     name: $("[data-f=name]", card).value.trim() || "Untitled",
     kind: $("[data-f=kind]", card).value,
+    make: $("[data-f=make]", card).value.trim(),
     model: $("[data-f=model]", card).value.trim(),
+    year: $("[data-f=year]", card).value,
+    msrp: $("[data-f=msrp]", card).value,
+    purchased: $("[data-f=purchased]", card).value,
+    price_paid: $("[data-f=price_paid]", card).value,
+    custom: $$(".custom-row", card).map(r => ({ label: $("[data-f=label]", r).value.trim(), value: $("[data-f=value]", r).value.trim() }))
+      .filter(f => f.label),
     notes: $("[data-f=notes]", card).value.trim(),
     parts: $$(".part-row", card).map(r => ({ category: $("[data-f=category]", r).value, model: $("[data-f=model]", r).value.trim() })),
   };
@@ -588,16 +610,19 @@ $("#machines").addEventListener("click", async e => {
   if (act === "fill-specs") return fillSpecs(card, btn);
   if (act === "watch-model") {
     const data = machineFromCard(card);
-    if (!data.model) return toast("Add the make and model first", true);
+    if (!data.model) return toast("Add the model first", true);
+    const fullName = [data.make, data.model].filter(Boolean).join(" ");
     const id = await saveMachine(card);
     editWatch(null);
     const f = $("#watch-form");
-    f.name.value = data.model;
-    f.query.value = data.model.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
+    f.name.value = fullName;
+    f.query.value = fullName.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
     f.machine_id.value = id;
     toast("Check the query and price, then save the watch");
     return;
   }
+  if (act === "add-custom") return $(".custom", card).insertAdjacentHTML("beforeend", customRow());
+  if (act === "rm-custom") return btn.closest(".custom-row").remove();
   if (act === "add-part") return $(".parts", card).insertAdjacentHTML("beforeend", partRow({ category: "other", model: "" }));
   if (act === "rm-part") return btn.closest(".part-row").remove();
   if (act === "delete") {

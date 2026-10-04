@@ -113,8 +113,8 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(self.server.ha_import({"devices": picked}, {}), {"added": 1, "linked": 0})
         self.assertEqual(self.server.ha_import({"devices": picked}, {}), {"added": 0, "linked": 0})  # same ref
         m = db.list_machines()[0]
-        self.assertEqual((m["name"], m["kind"], m["model"], m["source_ref"]),
-                         ("Living room TV", "tv", "LG OLED65B2AUA", "tv1"))
+        self.assertEqual((m["name"], m["kind"], m["make"], m["model"], m["source_ref"]),
+                         ("Living room TV", "tv", "LG", "OLED65B2AUA", "tv1"))
         self.assertIn("Living Room", m["notes"])
 
     def test_rules_only_for_pcs(self):
