@@ -60,6 +60,7 @@ ACTIONS = {
     "draft": {"label": "Suggest watches", "typical_out": 2500, "max_out": 8000},
     "upgrades": {"label": "Find upgrades with AI", "typical_out": 3000, "max_out": 8000},
     "specs": {"label": "Read specs with AI", "typical_out": 300, "max_out": 2000},
+    "radar": {"label": "Deal radar", "typical_out": 2500, "max_out": 8000},
 }
 
 
@@ -380,6 +381,48 @@ sensible used-market ceiling in USD, or null if you're unsure. Only suggest part
 are confident are compatible. Give 3 to 10 suggestions, best value first.
 
 {QUERY_RULES}""", SUGGESTION_SCHEMA
+
+
+RADAR_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "suggestions": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "device_id": {"type": "integer"},
+                    "name": {"type": "string"},
+                    "category": {"type": "string"},
+                    "query": {"type": "string"},
+                    "exclude": {"type": "array", "items": {"type": "string"}},
+                    "max_price": {"type": ["number", "null"]},
+                    "reason": {"type": "string"},
+                },
+                "required": ["device_id", "name", "category", "query", "exclude", "max_price", "reason"],
+                "additionalProperties": False,
+            },
+        }
+    },
+    "required": ["suggestions"],
+    "additionalProperties": False,
+}
+
+
+def radar_prompt(devices: list[dict]) -> tuple[str, dict]:
+    """One request for the whole deal radar: the single best upgrade to watch for each device."""
+    listing = "\n\n".join(f"[device_id {d['id']}]\n{_describe_machine(d)}" for d in devices)
+    return f"""You help someone keep an eye out for deals that would upgrade the things they own.
+
+For EACH device below, suggest the single most worthwhile upgrade or replacement to watch for
+(one per device, using its device_id): a clearly better model that's now affordable used or on
+sale, or a genuinely useful accessory if the device is already excellent. Skip a device (leave
+it out) if nothing is worth watching for. Set max_price to a good-deal price in USD, or null if
+unsure, and explain in `reason` why it's a real step up. Use the device kind as `category`.
+
+{listing}
+
+{QUERY_RULES}""", RADAR_SCHEMA
 
 
 def gear_prompt(device: dict) -> tuple[str, dict]:
