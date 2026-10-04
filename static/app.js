@@ -458,7 +458,9 @@ function fillAiChoices() {
 function showAiProvider() {
   const f = $("#settings-form"), p = f.ai_provider.value;
   $$("[data-provider]", f).forEach(g => (g.hidden = g.dataset.provider !== p));
-  $("#ai-price-note").textContent = p === "off" || p === "ollama" ? "" :
+  $("#ai-price-note").textContent = p === "off"
+    ? "Pick a mode above to see where its API key and model go, with setup steps."
+    : p === "ollama" ? "" :
     "Prices are per million tokens (about 750,000 words). Thinking counts as output. " +
     "Estimates run a little high on purpose; you're charged what the provider reports.";
 }

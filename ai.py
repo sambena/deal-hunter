@@ -55,7 +55,8 @@ PROVIDERS = {
 
 # Token allowances per button. `max_out` is a hard cap sent to the provider, so it also caps the cost.
 ACTIONS = {
-    "judge": {"label": "Ask AI", "typical_out": 700, "max_out": 3000},
+    # typical_out: first real Haiku answer was 60 tokens; 250 leaves room for models that think a little.
+    "judge": {"label": "Ask AI", "typical_out": 250, "max_out": 3000},
     "draft": {"label": "Suggest watches", "typical_out": 2500, "max_out": 8000},
     "upgrades": {"label": "Find upgrades with AI", "typical_out": 3000, "max_out": 8000},
 }
