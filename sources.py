@@ -491,6 +491,71 @@ def ksl(watch: dict, settings: dict) -> list[dict]:
     return out
 
 
+# ---- KSL Cars (Utah; dealers and private sellers) ---------------------------
+# Same site family and page format as KSL Classifieds: results in the Next.js payload. Filters go in the
+# path as key/value pairs; a keyword like "toyota tacoma" is read by KSL as make + model. Page 1 is the
+# newest listings (plus a featured one or two, which matching drops if they don't fit).
+
+def ksl_cars(watch: dict, settings: dict) -> list[dict]:
+    zip_code = str(settings.get("zip_code") or "").strip()
+    if not zip_code:
+        raise SourceError("set your ZIP code in Settings > Local area")
+    terms = search_terms(watch["query"])
+    if not terms:
+        return []
+    radius = max(1, int(float(settings.get("local_radius_miles") or 50)))
+    parts = [("keyword", terms)]
+    for key, field in (("yearFrom", "year_min"), ("yearTo", "year_max"), ("mileageTo", "max_miles"),
+                       ("priceFrom", "min_price"), ("priceTo", "max_price")):
+        if watch.get(field):
+            parts.append((key, str(int(math.ceil(watch[field])))))
+    parts += [("zip", zip_code), ("miles", str(radius))]
+    url = "https://cars.ksl.com/search/" + "/".join(f"{k}/{urllib.parse.quote(v, safe='')}" for k, v in parts)
+    wait = KSL_GAP_SECONDS - (time.time() - _ksl_last["at"])
+    if wait > 0:
+        time.sleep(wait)
+    req = urllib.request.Request(url, headers=KSL_HEADERS)
+    try:
+        with urllib.request.urlopen(req, timeout=25) as resp:
+            page = resp.read().decode("utf-8", "replace")
+    except urllib.error.HTTPError as e:
+        if e.code in (403, 429):
+            raise SourceError(f"KSL's bot protection blocked the request (HTTP {e.code}); "
+                              "it usually clears on a later check") from e
+        raise SourceError(f"HTTP {e.code} from KSL Cars") from e
+    except urllib.error.URLError as e:
+        raise SourceError(f"Network error reaching KSL Cars: {e.reason}") from e
+    finally:
+        _ksl_last["at"] = time.time()  # shares the gap with KSL Classifieds (same site family)
+    out, seen = [], set()
+    for r in _ksl_results(page):
+        if not r.get("id") or r["id"] in seen or r.get("listingType", "CAR") != "CAR":
+            continue
+        seen.add(r["id"])
+        loc = r.get("location") or {}
+        dealer = (r.get("dealer") or {}).get("name")
+        seller = "dealer" if (r.get("sellerType") or "").lower().startswith("dealer") else "private seller"
+        title = r.get("title") or " ".join(str(x) for x in (r.get("makeYear"), r.get("make"), r.get("model"),
+                                                          r.get("trim")) if x)
+        out.append({
+            "source": "ksl_cars",
+            "source_id": str(r["id"]),
+            "title": title,
+            "price": float(r["price"]) if r.get("price") else None,
+            "shipping": 0.0,
+            "currency": "USD",
+            "url": f"https://cars.ksl.com/listing/{r['id']}",
+            "image": (r.get("primaryImage") or {}).get("url"),
+            "location": ", ".join(x for x in (loc.get("city"), loc.get("state")) if x),
+            "condition": (r.get("newUsed") or "used").lower(),
+            "buying": f"KSL Cars · {dealer}" if dealer else f"KSL Cars · {seller}",
+            "text": "",
+            "year": r.get("makeYear"),
+            "miles": r.get("mileage") or None,  # private sellers sometimes leave 0
+        })
+    return out
+
+
 # ---- Craigslist (local; the search page's own JSON API) ---------------------
 # sapi.craigslist.org answers the search page with packed rows: offsets from a base id/date, the price,
 # "area:place~lat~lon", then tagged lists ([4, images...], [6, slug], [13, uuid]) and the title last.
@@ -705,7 +770,7 @@ def offerup(watch: dict, settings: dict) -> list[dict]:
 
 SOURCES = {"ebay": ebay, "ebay_local": ebay_local, "reddit": reddit, "bestbuy": bestbuy,
            "slickdeals": slickdeals, "buildapcsales": buildapcsales, "ksl": ksl, "craigslist": craigslist,
-           "offerup": offerup}
+           "offerup": offerup, "ksl_cars": ksl_cars}
 
 # Sources that see the same items under the same ids; a listing is stored once per family.
 SOURCE_FAMILY = {"ebay_local": "ebay"}
