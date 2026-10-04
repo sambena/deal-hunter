@@ -165,6 +165,11 @@ function esc(s) {
   return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+// Listing links come from other sites; only http(s) ones are followed (no javascript: links).
+function safeUrl(u) {
+  return /^https?:\/\//i.test(u || "") ? u : "#";
+}
+
 // Listing images come from other sites; keep them to http(s) and out of the CSS string.
 function cssUrl(u) {
   return /^https?:\/\//i.test(u || "") ? `url("${encodeURI(u).replace(/["()\\]/g, c => "%" + c.charCodeAt(0).toString(16))}")` : "none";
@@ -280,10 +285,10 @@ async function loadListings() {
     const deal = label ? `<span class="deal ${label}">${Math.round(pct * 100)}% under typical</span>` : "";
     const ship = l.shipping ? ` <span class="meta">(${money(l.price)} + ${money(l.shipping)} ship)</span>` : "";
     return `<div class="card ${l.status}" data-id="${l.id}">
-      ${l.image ? `<a href="${esc(l.url)}" target="_blank" rel="noopener" class="img" style="background-image:${esc(cssUrl(l.image))}"></a>`
-        : `<a href="${esc(l.url)}" target="_blank" rel="noopener" class="img none">${esc(l.buying || l.source)}</a>`}
+      ${l.image ? `<a href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener" class="img" style="background-image:${esc(cssUrl(l.image))}"></a>`
+        : `<a href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener" class="img none">${esc(l.buying || l.source)}</a>`}
       <div class="body">
-        <a class="title" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.title)}</a>
+        <a class="title" href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener">${esc(l.title)}</a>
         <div><span class="price">${l.source === "reddit" && l.total != null ? "≈" : ""}${money(l.total)}</span>${ship}${deal}
           ${l.source === "reddit" ? `<span class="meta">${l.total == null ? "see post" : "guessed from post"}</span>` : ""}</div>
         <div class="meta">${esc(sourceName(l.source))} · ${esc(l.condition || "")} ${l.location ? "· " + esc(l.location) : ""}</div>

@@ -108,6 +108,11 @@ class AccountsOverHttpTest(unittest.TestCase):
         legacy = Client(self.api.server_port, body["api_key"])
         self.assertEqual(legacy.call("GET", "/api/me")[1]["role"], "admin")
         self.assertEqual(Client(self.api.server_port, "dh_wrong").call("GET", "/api/me")[0], 401)
+        # ...but it can't manage people, make reset links or see sign-ins; a real sign-in can.
+        self.assertEqual(legacy.call("POST", "/api/admin/users/1/reset", {})[0], 403)
+        self.assertEqual(legacy.call("GET", "/api/admin/users")[0], 403)
+        self.assertEqual(legacy.call("GET", "/api/tokens")[0], 403)
+        self.assertEqual(app.call("GET", "/api/tokens")[0], 200)
 
         # Sign out clears the cookie and kills that session.
         status, _, headers = browser.call("POST", "/api/auth/logout", {})

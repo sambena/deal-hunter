@@ -27,6 +27,7 @@ import urllib.error
 import urllib.request
 
 import db
+import netguard
 
 
 class AIError(Exception):
@@ -80,14 +81,15 @@ def settings_for(user_id: int | None = None) -> dict:
     s = db.get_settings(uid)
     user = db.query("SELECT role, ai_shared, ai_allowance, ai_daily_cap FROM users WHERE id = ?", (uid,))[0]
     if user["role"] == "admin" or s.get("ai_source") == "own":
-        s["_ai"] = {"source": "own", "user_id": uid, "paid_by": uid}
+        # "trusted": the addresses in these settings are the admin's, so they may be on the home network.
+        s["_ai"] = {"source": "own", "user_id": uid, "paid_by": uid, "trusted": user["role"] == "admin"}
         return s
     admin_id = db.admin_id()
     admin = db.get_settings(admin_id)
     s.update({k: admin[k] for k in AI_KEYS})
     s["ai_monthly_limit"] = float(user["ai_allowance"] or 0)
     owner = db.query("SELECT name FROM users WHERE id = ?", (admin_id,))[0]["name"] or "the admin"
-    s["_ai"] = {"source": "shared", "user_id": uid, "paid_by": admin_id, "owner": owner,
+    s["_ai"] = {"source": "shared", "user_id": uid, "paid_by": admin_id, "owner": owner, "trusted": True,
                 "daily_cap": int(user["ai_daily_cap"] or 0), "pool_limit": float(admin.get("ai_monthly_limit") or 0)}
     if not user["ai_shared"]:
         s["ai_provider"] = "off"
@@ -99,7 +101,11 @@ def settings_for(user_id: int | None = None) -> dict:
 
 def _scope(settings: dict) -> dict:
     # Settings that didn't come through settings_for() are the current person's own.
-    return settings.get("_ai") or {"source": "own", "user_id": db.current_user_id(), "paid_by": db.current_user_id()}
+    if settings.get("_ai"):
+        return settings["_ai"]
+    uid = db.current_user_id()
+    admin = db.query("SELECT role FROM users WHERE id = ?", (uid,))[0]["role"] == "admin"
+    return {"source": "own", "user_id": uid, "paid_by": uid, "trusted": admin}
 
 
 def _day_start(now: float | None = None) -> float:
@@ -304,15 +310,24 @@ def _ollama(settings: dict, info: dict, prompt: str, schema: dict, max_out: int)
         "think": False,
         "options": {"num_predict": max_out},
     }).encode()
-    url = settings["ollama_url"].rstrip("/") + "/api/chat"
-    req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"})
+    base = settings["ollama_url"].strip()
+    if "?" in base or "#" in base:
+        raise AIError("The Ollama address can't contain ? or #")
+    trusted = _scope(settings).get("trusted", False)
+    req = urllib.request.Request(base.rstrip("/") + "/api/chat", data=body, headers={"Content-Type": "application/json"})
     try:
-        with urllib.request.urlopen(req, timeout=300) as resp:
+        with netguard.urlopen(req, 300, local_ok=trusted, what="Ollama address") as resp:
             data = json.loads(resp.read())
+    except netguard.BlockedURL as e:
+        raise AIError(str(e)) from e
     except urllib.error.HTTPError as e:
-        raise AIError(f"Ollama returned HTTP {e.code}: {e.read().decode('utf-8', 'replace')[:200]}") from e
-    except urllib.error.URLError as e:
-        raise AIError(f"Can't reach Ollama at {settings['ollama_url']} ({e.reason}). Is it running?") from e
+        detail = f": {e.read().decode('utf-8', 'replace')[:200]}" if trusted else ""
+        raise AIError(f"Ollama returned HTTP {e.code}{detail}") from e
+    except (urllib.error.URLError, OSError) as e:
+        raise AIError(f"Can't reach Ollama at {base} ({getattr(e, 'reason', e)}). Is it running?" if trusted
+                      else "Can't reach Ollama at that address") from e
+    except ValueError as e:
+        raise AIError("Ollama's answer wasn't readable") from e
     text = (data.get("message") or {}).get("content", "")
     return text, data.get("prompt_eval_count", 0), data.get("eval_count", 0), None
 

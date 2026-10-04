@@ -91,9 +91,44 @@ def check_rate(address: str) -> None:
             raise AuthError("Too many failed sign-ins; try again in a few minutes")
 
 
+FAIL_KEYS_MAX = 5000  # random emails can't grow the table without bound
+
+
 def note_failure(address: str) -> None:
     with _fail_lock:
-        _fails.setdefault(address, []).append(time.time())
+        now = time.time()
+        _fails.setdefault(address, []).append(now)
+        if len(_fails) > FAIL_KEYS_MAX:
+            for key in [k for k, ts in _fails.items() if not ts or now - ts[-1] >= FAIL_WINDOW]:
+                del _fails[key]
+            if len(_fails) > FAIL_KEYS_MAX:  # all recent: keep the newest half
+                for key in sorted(_fails, key=lambda k: _fails[k][-1])[:len(_fails) // 2]:
+                    del _fails[key]
+
+
+# A browser that has signed in to an account before carries a signed "known device" mark for it. Signing
+# in from a known device skips the per-email limit (the per-address one still applies), so a stranger
+# failing on purpose can lock an account against new devices but not against its owner's.
+_device_key: list[bytes] = []
+
+
+def _key() -> bytes:
+    if not _device_key:
+        path = db.DB_PATH.parent / "device.key"
+        if not path.is_file():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(secrets.token_bytes(32))
+        _device_key.append(path.read_bytes())
+    return _device_key[0]
+
+
+def device_mark(user_id: int) -> str:
+    sig = hmac.new(_key(), f"device:{user_id}".encode(), hashlib.sha256).hexdigest()
+    return f"{user_id}.{sig}"
+
+
+def is_device_mark(mark: str | None, user_id: int) -> bool:
+    return bool(mark) and hmac.compare_digest(mark, device_mark(user_id))
 
 
 # Checked against when the email doesn't exist, so a wrong email takes as long as a wrong password and
@@ -101,16 +136,19 @@ def note_failure(address: str) -> None:
 _DUMMY_HASH = hash_password("not-a-real-password")
 
 
-def sign_in(email: str, password: str, address: str) -> dict:
+def sign_in(email: str, password: str, address: str, mark: str | None = None) -> dict:
     email_key = "email:" + (email or "").strip().lower()
     check_rate(address)
-    check_rate(email_key)  # guessing one account from many addresses is limited too
     rows = db.query("SELECT * FROM users WHERE lower(email) = lower(?)", ((email or "").strip(),))
     user = rows[0] if rows else None
+    known = bool(user) and is_device_mark(mark, user["id"])
+    if not known:
+        check_rate(email_key)  # guessing one account from many addresses is limited too
     ok = verify_password(password, user["password_hash"] if user else _DUMMY_HASH)
     if not user or user["disabled"] or not ok:
         note_failure(address)
-        note_failure(email_key)
+        if not known:
+            note_failure(email_key)
         raise AuthError("Wrong email or password")
     return user
 

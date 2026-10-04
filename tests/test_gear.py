@@ -50,7 +50,7 @@ HA_DEVICES = [
 
 class ClassifyTest(unittest.TestCase):
     def cands(self, machines=()):
-        with mock.patch.object(ha, "fetch_devices", lambda url, token: HA_DEVICES):
+        with mock.patch.object(ha, "fetch_devices", lambda url, token, local_ok=True: HA_DEVICES):
             return {c["refs"][0]: c for c in ha.candidates("http://ha", "t", list(machines))}
 
     def test_kinds_and_ticks(self):

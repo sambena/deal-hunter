@@ -12,6 +12,8 @@ import re
 import urllib.error
 import urllib.request
 
+import netguard
+
 DEVICE_TEMPLATE = """
 {%- set ns = namespace(ids=[]) -%}
 {%- for s in states -%}{%- set d = device_id(s.entity_id) -%}
@@ -52,16 +54,21 @@ class HAError(Exception):
     pass
 
 
-def fetch_devices(url: str, token: str) -> list[dict]:
+def fetch_devices(url: str, token: str, local_ok: bool = True) -> list[dict]:
+    """local_ok: the admin's Home Assistant may be on the home network; anyone else's must be public."""
     if not url or not token:
         raise HAError("Add your Home Assistant address and token in Settings > Home Assistant")
-    req = urllib.request.Request(url.rstrip("/") + "/api/template",
+    if "?" in url or "#" in url:
+        raise HAError("The Home Assistant address can't contain ? or #")
+    req = urllib.request.Request(url.strip().rstrip("/") + "/api/template",
                                  json.dumps({"template": DEVICE_TEMPLATE}).encode(),
                                  {"Authorization": f"Bearer {token}", "Content-Type": "application/json",
                                   "User-Agent": "deal-hunter/0.1 (Home Assistant device import)"})
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with netguard.urlopen(req, 30, local_ok=local_ok, what="Home Assistant address") as resp:
             return json.loads(resp.read())
+    except netguard.BlockedURL as e:
+        raise HAError(str(e)) from e
     except urllib.error.HTTPError as e:
         if e.code == 401:
             raise HAError("Home Assistant rejected the token") from e
@@ -70,8 +77,9 @@ def fetch_devices(url: str, token: str) -> list[dict]:
             raise HAError("Access was refused (HTTP 403). If the address goes through Cloudflare or another proxy, "
                           "use Home Assistant's local address instead, e.g. http://192.168.1.10:8123") from e
         raise HAError(f"Home Assistant returned HTTP {e.code}") from e
-    except urllib.error.URLError as e:
-        raise HAError(f"Can't reach Home Assistant at {url} ({e.reason})") from e
+    except (urllib.error.URLError, OSError) as e:
+        raise HAError(f"Can't reach Home Assistant at {url} ({getattr(e, 'reason', e)})" if local_ok
+                      else "Can't reach Home Assistant at that address") from e
     except json.JSONDecodeError as e:
         raise HAError("Home Assistant's answer wasn't a device list") from e
 
@@ -218,10 +226,10 @@ def tidy_vendor(make: str) -> str:
     return {"micro-star intl": "MSI", "micro-star int'l": "MSI", "intel corporate": "Intel"}.get(make.lower(), make)
 
 
-def candidates(url: str, token: str, machines: list[dict]) -> list[dict]:
+def candidates(url: str, token: str, machines: list[dict], local_ok: bool = True) -> list[dict]:
     known_refs = {r for m in machines for r in (m.get("source_ref") or "").split()}
     known_names = {m["name"].lower() for m in machines}
-    devices = [d for d in fetch_devices(url, token) if d.get("id") not in known_refs]
+    devices = [d for d in fetch_devices(url, token, local_ok) if d.get("id") not in known_refs]
     out, used = _computers(devices, machines)
     seen = set()
     for d in devices:
