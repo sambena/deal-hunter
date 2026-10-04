@@ -125,5 +125,34 @@ class DefaultModelTest(unittest.TestCase):
             self.assertTrue(ai.model_info(s)["id"], provider)  # raises if the default has no price
 
 
+
+class GeminiFreeTierTest(unittest.TestCase):
+    setUp, tearDown = BudgetTest.setUp, BudgetTest.tearDown
+
+    def gemini(self, **kw):
+        return settings(ai_provider="gemini", gemini_model="gemini-3.5-flash-lite", gemini_api_key="g", **kw)
+
+    def test_free_tier_costs_nothing_and_ignores_the_limit(self):
+        s = self.gemini(gemini_free_tier=True, ai_monthly_limit=0)
+        est = ai.estimate(s, "judge", PROMPT, SCHEMA)
+        self.assertTrue(est["free"])
+        self.assertTrue(est["allowed"])
+        self.assertEqual(est["max"], 0)
+        fake = FakeClaude(tokens_in=150, tokens_out=69)
+        with mock.patch.dict(ai.CALLERS, {"gemini": fake}):
+            ai.run(s, "judge", PROMPT, SCHEMA)
+        self.assertEqual(db.query("SELECT cost FROM ai_usage")[0]["cost"], 0)
+
+    def test_unticked_is_paid_and_capped(self):
+        est = ai.estimate(self.gemini(gemini_free_tier=False, ai_monthly_limit=0), "judge", PROMPT, SCHEMA)
+        self.assertFalse(est["free"])
+        self.assertFalse(est["allowed"])
+        self.assertGreater(est["max"], 0)
+
+    def test_free_tier_switch_only_affects_gemini(self):
+        est = ai.estimate(settings(gemini_free_tier=True), "judge", PROMPT, SCHEMA)  # Claude
+        self.assertFalse(est["free"])
+
+
 if __name__ == "__main__":
     unittest.main()

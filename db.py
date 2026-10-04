@@ -39,6 +39,7 @@ DEFAULT_SETTINGS = {
     "openai_model": "gpt-6-luna",  # a model is always selected, so picking a Mode is enough
     "gemini_api_key": "",
     "gemini_model": "gemini-3.5-flash-lite",
+    "gemini_free_tier": False,  # key has no billing in Google, so requests cost $0 and skip the monthly limit
     "ai_monthly_limit": 5.0,  # US dollars; AI buttons stop working once a request could pass it
     "ai_confirm": True,  # show the cost and ask before each paid AI request
     "claude_model": "claude-opus-5-5",
