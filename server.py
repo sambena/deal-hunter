@@ -21,6 +21,7 @@ import auth
 import db
 import hardware
 import homeassistant
+import netguard
 import poller
 import specs
 
@@ -307,7 +308,7 @@ def suggest_upgrades(body, params, mid):
 def ha_candidates(body, params):
     s = db.get_settings()
     try:
-        devices = homeassistant.candidates(s["ha_url"], s["ha_token"], db.list_machines())
+        devices = homeassistant.candidates(s["ha_url"], s["ha_token"], db.list_machines(), local_ok=is_admin())
     except homeassistant.HAError as e:
         raise HTTPError(400, str(e)) from e
     return {"devices": devices, "kinds": db.DEVICE_KINDS}
@@ -380,6 +381,16 @@ def draft_watches(body, params):
 def put_settings(body, params):
     # Blank secret fields in the form mean "keep the current value".
     changes = {k: v for k, v in body.items() if not (k in db.SECRET_KEYS and v in ("", None, True))}
+    # Addresses the server will fetch: Discord only for webhooks, and public addresses only for members.
+    current = db.get_settings()
+    try:
+        if changes.get("discord_webhook") and changes["discord_webhook"] != current["discord_webhook"]:
+            netguard.check_discord(changes["discord_webhook"])
+        for key, what in (("ollama_url", "Ollama address"), ("ha_url", "Home Assistant address")):
+            if changes.get(key) and changes[key] != current[key]:
+                netguard.check(changes[key], local_ok=is_admin(), what=what)
+    except netguard.BlockedURL as e:
+        raise HTTPError(400, str(e)) from e
     db.update_settings(changes, shared_allowed=is_admin())  # members can only change their own settings
     return db.public_settings()
 
@@ -399,7 +410,12 @@ def test_discord(body, params):
     s = db.get_settings()
     if not s["discord_webhook"]:
         raise HTTPError(400, "No Discord webhook saved")
-    poller.send_discord(s["discord_webhook"], {"content": "Deal Hunter test message: notifications work."})
+    try:
+        poller.send_discord(s["discord_webhook"], {"content": "Deal Hunter test message: notifications work."})
+    except netguard.BlockedURL as e:
+        raise HTTPError(400, str(e)) from e
+    except OSError as e:
+        raise HTTPError(502, "Discord didn't accept the message; check the webhook address") from e
     return {"ok": True}
 
 
@@ -409,6 +425,7 @@ def test_discord(body, params):
 
 COOKIE = "dh_session"
 COOKIE_DAYS = 365
+DEVICE_COOKIE = "dh_device"  # "this browser has signed in to this account before" (see auth.device_mark)
 
 
 def _setup_needed() -> bool:
@@ -420,6 +437,7 @@ def _signed_in(user: dict, kind: str, name: str) -> dict:
     out = {"user": auth.public_user(user)}
     if kind == "web":
         out["__set_cookie__"] = token  # the handler turns this into the cookie; never sent to page scripts
+        out["__device_mark__"] = auth.device_mark(user["id"])
     else:
         out["token"] = token
     return out
@@ -458,7 +476,8 @@ def auth_setup(body, params):
 def auth_login(body, params):
     req = _request.get() or {}
     try:
-        user = auth.sign_in(str(body.get("email") or ""), str(body.get("password") or ""), req.get("address", "?"))
+        user = auth.sign_in(str(body.get("email") or ""), str(body.get("password") or ""), req.get("address", "?"),
+                            req.get("device_mark"))
     except auth.AuthError as e:
         raise HTTPError(429 if "Too many" in str(e) else 401, str(e)) from e
     device = str(body.get("device_name") or "").strip()
@@ -584,6 +603,9 @@ def auth_accept(body, params):
             raise HTTPError(400, "Enter your email address")
         if db.query("SELECT 1 FROM users WHERE lower(email) = lower(?)", (email,)):
             raise HTTPError(409, "That email already has an account; sign in instead")
+    if not db.execute_count("UPDATE invites SET used_at = ? WHERE id = ? AND used_at IS NULL", (time.time(), inv["id"])):
+        raise HTTPError(410, "This link has expired or was already used; ask for a new one")
+    if inv["kind"] == "invite":
         uid = db.execute("""INSERT INTO users (email, name, password_hash, role, watch_limit, created_at)
                             VALUES (?, ?, ?, 'member', ?, ?)""",
                          (email, str(body.get("name") or "").strip()[:60] or email.split("@")[0], password,
@@ -592,7 +614,6 @@ def auth_accept(body, params):
         uid = inv["user_id"]
         db.execute("UPDATE users SET password_hash = ? WHERE id = ?", (password, uid))
         db.execute("DELETE FROM tokens WHERE user_id = ?", (uid,))  # a reset signs out everywhere else
-    db.execute("UPDATE invites SET used_at = ? WHERE id = ?", (time.time(), inv["id"]))
     user = db.query("SELECT * FROM users WHERE id = ?", (uid,))[0]
     device = str(body.get("device_name") or "").strip()
     return _signed_in(user, "device" if device else "web", device or "web browser")
@@ -677,7 +698,7 @@ def admin_reset_link(body, params, uid):
 
 # ---- HTTP plumbing ----------------------------------------------------------
 
-SIGNED_OUT_FILES = {"login.html", "style.css"}
+SIGNED_OUT_FILES = {"login.html", "login.js", "style.css"}
 OPEN_ROUTES = {("GET", "/api/auth/status"), ("POST", "/api/auth/setup"), ("POST", "/api/auth/login"),
                ("GET", "/api/auth/link"), ("POST", "/api/auth/accept"), ("GET", "/api/app/android")}
 
@@ -719,13 +740,20 @@ MAX_BODY = 1_000_000  # bytes; pasted specs and imports are far smaller
 SECURITY_HEADERS = [  # for when the site faces the internet
     ("X-Content-Type-Options", "nosniff"),
     ("X-Frame-Options", "DENY"),
-    ("Content-Security-Policy", "frame-ancestors 'none'"),
+    # Scripts only from this site (no inline ones), so injected markup can't run code. Listing images come
+    # from the shops' sites; inline style attributes are used for image backgrounds and meters.
+    ("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+                                "img-src 'self' https: data:; connect-src 'self'; object-src 'none'; "
+                                "base-uri 'none'; form-action 'self'; frame-ancestors 'none'"),
     ("Referrer-Policy", "same-origin"),
 ]
 
 # The API port (config "api_port") is a second door for other apps on the network: API only, every call
 # needs the API key, and it can't read or change settings or keys. The web page's own port is unchanged.
 API_PORT_BLOCKED = ("/api/settings", "/api/api-key", "/api/test-discord")
+# The old single key acts as the admin, but only for reading and watches: it can't manage people, make
+# invite or reset links, or see and end sign-ins. Those need a real sign-in.
+LEGACY_KEY_BLOCKED = ("/api/admin/", "/api/tokens")
 API_PORT = {"port": None}
 
 
@@ -782,9 +810,15 @@ class Handler(BaseHTTPRequestHandler):
     def _json(self, status: int, payload, headers: list[tuple[str, str]] = ()) -> None:
         self._send(status, json.dumps(payload).encode(), "application/json", headers)
 
-    def _cookie(self, value: str, max_age: int) -> tuple[str, str]:
+    def _cookie(self, value: str, max_age: int, name: str = COOKIE) -> tuple[str, str]:
         secure = "; Secure" if self._https() else ""
-        return ("Set-Cookie", f"{COOKIE}={value}; Path=/; Max-Age={max_age}; HttpOnly; SameSite=Lax{secure}")
+        return ("Set-Cookie", f"{name}={value}; Path=/; Max-Age={max_age}; HttpOnly; SameSite=Lax{secure}")
+
+    def _cookie_value(self, name: str) -> str | None:
+        if self.api_only:
+            return None
+        cookie = SimpleCookie(self.headers.get("Cookie") or "")
+        return cookie[name].value if name in cookie else None
 
     def _dispatch(self, method: str) -> None:
         url = urlparse(self.path)
@@ -801,6 +835,8 @@ class Handler(BaseHTTPRequestHandler):
         # Signed out, everything but sign-in answers the same way, so nobody can map the API from outside.
         if not user and (method, url.path) not in OPEN_ROUTES:
             return self._json(401, {"error": "Sign in to Deal Hunter"})
+        if user and token is None and url.path.startswith(LEGACY_KEY_BLOCKED):  # the old single key
+            return self._json(403, {"error": "the old API key can't do that; sign in instead"})
         for m, pattern, fn in ROUTES:
             match = pattern.match(url.path)
             if m == method and match:
@@ -812,7 +848,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(415, {"error": "send JSON"})
         host = self.headers.get("X-Forwarded-Host") or self.headers.get("Host") or "localhost"
         req = {"user": user, "token": token, "token_id": user.get("token_id") if user else None,
-               "api_port": self.api_only, "address": self._address(),
+               "api_port": self.api_only, "address": self._address(), "device_mark": self._cookie_value(DEVICE_COOKIE),
                "base_url": f"{'https' if self._https() else 'http'}://{host}"}
         req_token, user_token = _request.set(req), db.set_user(user["id"] if user else None)
         try:
@@ -825,13 +861,16 @@ class Handler(BaseHTTPRequestHandler):
             headers = []
             if isinstance(result, dict) and "__set_cookie__" in result:
                 headers.append(self._cookie(result.pop("__set_cookie__"), COOKIE_DAYS * 86400))
+            if isinstance(result, dict) and "__device_mark__" in result:
+                headers.append(self._cookie(result.pop("__device_mark__"), COOKIE_DAYS * 86400, DEVICE_COOKIE))
             if isinstance(result, dict) and result.pop("__clear_cookie__", None):
                 headers.append(self._cookie("", 0))
             self._json(200, result, headers)
         except HTTPError as e:
             self._json(e.status, {"error": str(e)})
         except (ValueError, TypeError) as e:  # bad numbers or JSON from the client
-            self._json(400, {"error": f"bad request: {e}"})
+            print(f"bad request to {url.path}: {e!r}")
+            self._json(400, {"error": "bad request: a value sent was the wrong type or format"})
         except ai.AIError as e:
             self._json(400, {"error": str(e)})
         except Exception as e:  # noqa: BLE001

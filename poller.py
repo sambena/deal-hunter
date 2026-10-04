@@ -9,6 +9,7 @@ import traceback
 import urllib.request
 
 import db
+import netguard
 import matching
 from sources import SOURCES, SourceError, USER_AGENT, family
 
@@ -39,6 +40,7 @@ def notify_discord(settings: dict, watch: dict, listings: list[dict]) -> None:
 
 
 def send_discord(webhook: str, payload: dict) -> None:
+    netguard.check_discord(webhook)
     req = urllib.request.Request(webhook, data=json.dumps(payload).encode(),
                                  headers={"Content-Type": "application/json", "User-Agent": USER_AGENT})
     urllib.request.urlopen(req, timeout=15).close()
