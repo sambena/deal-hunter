@@ -74,6 +74,9 @@ def model_info(settings: dict) -> dict:
                 "effort": False, "free": True}
     for m in MODELS:
         if m["provider"] == provider and m["id"] == model:
+            if provider == "gemini" and settings.get("gemini_free_tier"):
+                # Google bills nothing on a key without billing; its replies don't say which tier, so the user does.
+                return {**m, "label": f"{m['label']}, free tier", "in": 0.0, "out": 0.0, "free": True}
             return {**m, **_price_today(m), "free": False}
     raise AIError(f"Pick a model from the list in Settings > AI (\"{model}\" has no known price, "
                   "so its cost can't be capped).")

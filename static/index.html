@@ -237,6 +237,10 @@
             <label>Gemini model <select name="gemini_model" data-models="gemini"></select></label>
             <label>Gemini API key <input name="gemini_api_key" type="password" autocomplete="off" data-ph="from aistudio.google.com"></label>
           </div>
+          <label class="toggle"><input type="checkbox" name="gemini_free_tier"> My Gemini key is on the free tier (no billing set up in Google)</label>
+          <p class="muted">When ticked, Gemini requests count as $0 and don't use up the monthly limit. Untick it if you
+            turn on billing in Google, so real costs are tracked and capped again. Your key's tier is shown on
+            aistudio.google.com/apikey under "Billing Tier".</p>
           <details class="help guide">
             <summary>How to get a Google Gemini key: free tier, then pay as you go</summary>
             <ol>
