@@ -776,6 +776,7 @@ function machineCard(m) {
       <button class="primary parts-only" data-act="suggest">Find upgrades</button>
       <button class="primary gear-only" data-act="watch-model">Watch this model</button>
       <button class="vehicle-only" data-act="recalls">Recalls</button>
+      <button class="primary vehicle-only" data-act="find-parts" title="Watch eBay for a part that fits this vehicle">Find parts</button>
       ${aiOn() ? `<button data-act="suggest-ai">Find upgrades with AI</button>` : ""}
       ${m.id ? `<button class="danger" data-act="delete">Delete</button>` : ""}
     </div>
@@ -911,6 +912,23 @@ $("#machines").addEventListener("click", async e => {
   if (act === "fill-specs") return fillSpecs(card, btn);
   if (act === "vin") return lookUpVin(card, btn).catch(err => toast(err.message, true));
   if (act === "recalls") return showRecalls(card, btn).catch(err => toast(err.message, true));
+  if (act === "find-parts") {
+    const data = machineFromCard(card);
+    if (!(data.make && data.model && data.year)) return toast("Fill in make, model and year first (or look up the VIN)", true);
+    const part = (prompt(`What part for the ${data.year} ${data.make} ${data.model}?
+e.g. brake pads, tires 265/70R17, tonneau cover`) || "").trim();
+    if (!part) return;
+    const id = await saveMachine(card);
+    editWatch(null);
+    const f = $("#watch-form");
+    f.name.value = `${part} for ${data.name}`;
+    f.query.value = part.toLowerCase().replace(/[^a-z0-9/ ]+/g, " ").replace(/\s+/g, " ").trim();
+    f.machine_id.value = id;
+    // eBay checks which parts fit this year/make/model; the other sources can't, so they start off.
+    Object.keys(SOURCES).forEach(s => (f["src-" + s].checked = s === "ebay" || s === "ebay_local"));
+    toast("eBay will only show parts listed as fitting it. Check the price, then save the watch");
+    return;
+  }
   if (act === "watch-model") {
     const data = machineFromCard(card);
     if (!data.model) return toast("Add the model first", true);

@@ -66,6 +66,9 @@ def _ebay_access_token(settings: dict) -> str:
     return tok["access_token"]
 
 
+EBAY_MOTORS_PARTS = "6028"  # eBay Motors > Parts & Accessories: the categories eBay checks fitment in
+
+
 def ebay(watch: dict, settings: dict) -> list[dict]:
     return _ebay_search(watch, settings, local=False)
 
@@ -99,6 +102,10 @@ def _ebay_search(watch: dict, settings: dict, local: bool) -> list[dict]:
         filters += ["deliveryOptions:{SELLER_ARRANGED_LOCAL_PICKUP}", "pickupCountry:US",
                     f"pickupPostalCode:{zip_code}", f"pickupRadius:{radius}", "pickupRadiusUnit:mi"]
     params = {"q": q, "limit": "50", "sort": "newlyListed"}
+    fits = watch.get("fits")  # a parts watch linked to one of the person's vehicles
+    if fits:
+        params["category_ids"] = EBAY_MOTORS_PARTS
+        params["compatibility_filter"] = f"Year:{fits['year']};Make:{fits['make']};Model:{fits['model']}"
     if filters:
         params["filter"] = ",".join(filters)
     headers = {
@@ -131,7 +138,9 @@ def _ebay_search(watch: dict, settings: dict, local: bool) -> list[dict]:
             "location": ", ".join(x for x in (loc.get("city"), loc.get("stateOrProvince"), loc.get("country")) if x),
             "condition": it.get("condition", ""),
             "buying": ("local pickup · " if local else "")
-                      + "/".join(it.get("buyingOptions", [])).lower().replace("_", " "),
+                      + "/".join(it.get("buyingOptions", [])).lower().replace("_", " ")
+                      + (" · fits your " + fits["model"] if fits and it.get("compatibilityMatch") == "EXACT" else "")
+                      + (" · may fit" if fits and it.get("compatibilityMatch") == "POSSIBLE" else ""),
             # eBay keeps "For parts or not working" in the condition, not the title; junk words check this too.
             "text": it.get("condition", ""),
         })
