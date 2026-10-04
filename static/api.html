@@ -39,7 +39,8 @@ curl -X POST -H "Authorization: Bearer YOUR_KEY" -H "Content-Type: application/j
       <div class="table-wrap"><table>
         <tr><th>Call</th><th>What it does</th></tr>
         <tr><td><code>GET /api/listings</code></td><td>Finds, newest first (max 500). Options: <code>watch=ID</code>,
-          <code>status=active|new|seen|starred|dismissed|all</code> (default active), <code>sort=newest|price|deal</code>.
+          <code>status=active|new|seen|starred|dismissed|all</code> (default active), <code>sort=newest|price|deal</code>,
+          <code>since_id=N</code> (only finds added after id N, oldest first, any status unless you pass one: for apps that alert, so nothing is announced twice).
           Each has title, price, shipping, total, url, image, location, condition, source, deal_pct (0.25 = 25% under typical), first_seen, seen_at.</td></tr>
         <tr><td><code>POST /api/listings/ID</code></td><td>Set status: <code>{"status": "seen"|"starred"|"dismissed"|"new"}</code>.</td></tr>
         <tr><td><code>POST /api/listings/mark-seen</code></td><td>Mark all new finds seen; <code>{"watch": ID}</code> for one watch.</td></tr>
@@ -65,7 +66,9 @@ curl -X POST -H "Authorization: Bearer YOUR_KEY" -H "Content-Type: application/j
       <div class="table-wrap"><table>
         <tr><th>Call</th><th>What it does</th></tr>
         <tr><td><code>POST /api/machines</code></td><td>Add a device: <code>name</code>, <code>kind</code> (pc, server, tv, monitor, phone, tablet, audio, network, console, printer, appliance, smart home, vehicle, other),
-          <code>model</code> (non-PCs), <code>parts</code> (PCs: list of <code>{"category", "model"}</code>), <code>notes</code>.</td></tr>
+          <code>make</code>, <code>model</code>, <code>year</code>, <code>msrp</code>, <code>purchased</code> (YYYY-MM-DD), <code>price_paid</code>,
+          <code>custom</code> (your own fields: list of <code>{"label", "value"}</code>), <code>parts</code> (PCs: list of <code>{"category", "model"}</code>), <code>notes</code>.
+          All but <code>name</code> are optional; new fields may be added over time, so ignore ones you don't know.</td></tr>
         <tr><td><code>PUT /api/machines/ID</code> / <code>DELETE</code></td><td>Change (send the whole device) or delete.</td></tr>
         <tr><td><code>POST /api/machines/ID/specs</code></td><td>Fill in a PC's parts from <code>{"text": ...}</code>: the Get specs command's output, or other text with <code>"use_ai": true</code>.</td></tr>
         <tr><td><code>POST /api/machines/ID/suggest</code></td><td>Upgrade ideas; <code>{"use_ai": true}</code> for AI.</td></tr>

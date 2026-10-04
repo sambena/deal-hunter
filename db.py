@@ -114,7 +114,13 @@ CREATE TABLE IF NOT EXISTS machines (
     parts TEXT NOT NULL DEFAULT '[]',
     kind TEXT NOT NULL DEFAULT 'pc',
     model TEXT NOT NULL DEFAULT '',
-    source_ref TEXT
+    source_ref TEXT,
+    make TEXT NOT NULL DEFAULT '',
+    year INTEGER,
+    msrp REAL,
+    purchased TEXT NOT NULL DEFAULT '',  -- purchase date, as the user typed it (YYYY-MM-DD from the form)
+    price_paid REAL,
+    custom TEXT NOT NULL DEFAULT '[]'  -- the user's own fields: [{"label": "Serial number", "value": "..."}]
 );
 """
 
@@ -143,7 +149,10 @@ def conn() -> sqlite3.Connection:
                     (SELECT json_group_array(DISTINCT source) FROM listings WHERE listings.watch_id = watches.id)""")
             mcols = {r["name"] for r in _conn.execute("PRAGMA table_info(machines)")}
             for col, ddl in (("kind", "TEXT NOT NULL DEFAULT 'pc'"), ("model", "TEXT NOT NULL DEFAULT ''"),
-                             ("source_ref", "TEXT")):  # devices other than PCs, and where they were imported from
+                             ("source_ref", "TEXT"),  # devices other than PCs, and where they were imported from
+                             ("make", "TEXT NOT NULL DEFAULT ''"), ("year", "INTEGER"), ("msrp", "REAL"),
+                             ("purchased", "TEXT NOT NULL DEFAULT ''"), ("price_paid", "REAL"),
+                             ("custom", "TEXT NOT NULL DEFAULT '[]'")):
                 if col not in mcols:
                     _conn.execute(f"ALTER TABLE machines ADD COLUMN {col} {ddl}")
             if "seen_at" not in {r["name"] for r in _conn.execute("PRAGMA table_info(listings)")}:
@@ -171,6 +180,15 @@ def conn() -> sqlite3.Connection:
                         srcs.insert(srcs.index("ebay_local") + 1 if "ebay_local" in srcs else len(srcs), "ksl")
                         _conn.execute("UPDATE watches SET sources = ? WHERE id = ?", (json.dumps(srcs), r["id"]))
                 _conn.execute("PRAGMA user_version = 3")
+            if _conn.execute("PRAGMA user_version").fetchone()[0] < 4:
+                # Make got its own field: imported devices had "LG OLED65B2AUA" in model; split off the maker.
+                # Hand-entered devices (no source_ref) are left as typed.
+                for r in _conn.execute("""SELECT id, model FROM machines WHERE source_ref IS NOT NULL
+                                          AND make = '' AND kind NOT IN ('pc', 'server')""").fetchall():
+                    words = (r["model"] or "").split(" ", 1)
+                    if len(words) == 2:
+                        _conn.execute("UPDATE machines SET make = ?, model = ? WHERE id = ?", (*words, r["id"]))
+                _conn.execute("PRAGMA user_version = 4")
             _conn.commit()
         return _conn
 
@@ -302,6 +320,7 @@ def list_machines() -> list[dict]:
     rows = query("SELECT * FROM machines ORDER BY name")
     for r in rows:
         r["parts"] = json.loads(r["parts"])
+        r["custom"] = json.loads(r.get("custom") or "[]")
     return rows
 
 
@@ -310,16 +329,30 @@ def get_machine(machine_id: int) -> dict | None:
     return rows[0] if rows else None
 
 
+def _number(v, kind=float):
+    try:
+        return kind(str(v).replace("$", "").replace(",", "").strip()) if v not in (None, "") else None
+    except ValueError:
+        return None
+
+
 def save_machine(data: dict, machine_id: int | None = None) -> int:
     parts = json.dumps([p for p in data.get("parts", []) if str(p.get("model", "")).strip()])
     kind = data.get("kind") if data.get("kind") in DEVICE_KINDS else "pc"
+    year = _number(data.get("year"), int)
     vals = (data.get("name", "Untitled"), data.get("notes", ""), parts, kind,
-            str(data.get("model", "")).strip(), data.get("source_ref") or None)
+            str(data.get("make") or "").strip(), str(data.get("model") or "").strip(),
+            year if year and 1950 <= year <= 2100 else None, _number(data.get("msrp")),
+            str(data.get("purchased") or "").strip(), _number(data.get("price_paid")),
+            json.dumps([{"label": str(f.get("label", "")).strip()[:60], "value": str(f.get("value", "")).strip()[:500]}
+                        for f in data.get("custom") or [] if str(f.get("label", "")).strip()]),
+            data.get("source_ref") or None)
     if machine_id is None:
-        return execute("INSERT INTO machines (name, notes, parts, kind, model, source_ref) VALUES (?, ?, ?, ?, ?, ?)",
-                       vals)
-    execute("UPDATE machines SET name = ?, notes = ?, parts = ?, kind = ?, model = ?, "
-            "source_ref = COALESCE(?, source_ref) WHERE id = ?", (*vals, machine_id))
+        return execute("""INSERT INTO machines (name, notes, parts, kind, make, model, year, msrp, purchased, price_paid,
+                          custom, source_ref) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", vals)
+    execute("""UPDATE machines SET name = ?, notes = ?, parts = ?, kind = ?, make = ?, model = ?, year = ?, msrp = ?,
+               purchased = ?, price_paid = ?, custom = ?, source_ref = COALESCE(?, source_ref) WHERE id = ?""",
+            (*vals, machine_id))
     return machine_id
 
 

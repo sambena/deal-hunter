@@ -98,3 +98,5 @@ table.import input[data-f=name] { min-width: 12em; }
 table.radar input[data-f=query] { min-width: 12em; }
 table.radar input[data-f=max] { width: 6em; }
 #radar-box h3 { margin: 14px 0 4px; }
+.custom-row { display: flex; gap: 6px; margin: 4px 0; }
+.custom-row input { flex: 1; min-width: 0; }
