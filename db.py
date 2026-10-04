@@ -36,6 +36,7 @@ DEFAULT_SETTINGS = {
     "ai_provider": "off",  # off | ollama | claude
     "ollama_url": "http://192.168.86.82:11434",  # the home Ollama gateway on the Frigate box (LAN/VPN only)
     "ollama_model": "qwen3.5:4b",
+    "api_key": "",  # for other apps calling the API port; made in Settings > API
     "ha_url": "",  # Home Assistant, for importing devices into My hardware
     "ha_token": "",
     "anthropic_api_key": "",
@@ -50,7 +51,7 @@ DEFAULT_SETTINGS = {
 }
 
 SECRET_KEYS = {"ebay_client_secret", "bestbuy_api_key", "discord_webhook", "anthropic_api_key",
-               "openai_api_key", "gemini_api_key", "ha_token"}
+               "openai_api_key", "gemini_api_key", "ha_token", "api_key"}
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);

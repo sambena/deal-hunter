@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import hmac
 import json
 import mimetypes
+import secrets
+import threading
 import re
 import sys
 import time
@@ -43,6 +46,7 @@ def get_state(body, params):
         "watches": db.list_watches(),
         "machines": db.list_machines(),
         "settings": db.public_settings(),
+        "api_port": API_PORT["port"],
         "ai": {**ai.catalog(), "budget": ai.budget(db.get_settings())},
         "poller": poller.state,
         "now": time.time(),
@@ -335,6 +339,14 @@ def put_settings(body, params):
     return db.public_settings()
 
 
+@route("POST", "/api/api-key")
+def new_api_key(body, params):
+    """Make a new API key (the old one stops working). Shown once; afterwards Settings only says it's set."""
+    key = "dh_" + secrets.token_urlsafe(32)
+    db.update_settings({"api_key": key})
+    return {"api_key": key}
+
+
 @route("POST", "/api/test-discord")
 def test_discord(body, params):
     s = db.get_settings()
@@ -346,7 +358,24 @@ def test_discord(body, params):
 
 # ---- HTTP plumbing ----------------------------------------------------------
 
+# The API port (config "api_port") is a second door for other apps on the network: API only, every call
+# needs the API key, and it can't read or change settings or keys. The web page's own port is unchanged.
+API_PORT_BLOCKED = ("/api/settings", "/api/api-key", "/api/test-discord")
+API_PORT = {"port": None}
+
+
 class Handler(BaseHTTPRequestHandler):
+    api_only = False
+
+    def _api_key_ok(self) -> str | None:
+        """None when the request may proceed, else the error to return."""
+        expected = db.get_settings().get("api_key") or ""
+        if not expected:
+            return "The API is off: create an API key in Deal Hunter's Settings > API"
+        auth = self.headers.get("Authorization") or ""
+        given = auth[7:].strip() if auth.lower().startswith("bearer ") else (self.headers.get("X-API-Key") or "").strip()
+        return None if given and hmac.compare_digest(given, expected) else "Missing or wrong API key"
+
     def log_message(self, format, *args):  # noqa: A002 - stdlib signature
         if not self.path.startswith("/api/state"):
             print(f"{self.address_string()} - {format % args}")
@@ -364,6 +393,14 @@ class Handler(BaseHTTPRequestHandler):
 
     def _dispatch(self, method: str) -> None:
         url = urlparse(self.path)
+        if self.api_only:
+            if not url.path.startswith("/api/"):
+                return self._json(404, {"error": "API only on this port; see /api.html on the web address"})
+            if url.path.startswith(API_PORT_BLOCKED):
+                return self._json(403, {"error": "not available through the API port"})
+            problem = self._api_key_ok()
+            if problem:
+                return self._json(401, {"error": problem})
         if method == "GET" and not url.path.startswith("/api/"):
             return self._static(url.path)
         for m, pattern, fn in ROUTES:
@@ -420,9 +457,18 @@ def main() -> None:
     db.conn()
     if "--no-poll" not in sys.argv:
         poller.start()
+    if config.get("api_port"):
+        API_PORT["port"] = int(config["api_port"])
+        api = ThreadingHTTPServer((config.get("api_host", "0.0.0.0"), API_PORT["port"]), ApiHandler)
+        threading.Thread(target=api.serve_forever, name="api", daemon=True).start()
+        print(f"Deal Hunter API (key required) on port {API_PORT['port']}")
     server = ThreadingHTTPServer((host, port), Handler)
     print(f"Deal Hunter running at http://{'localhost' if host in ('127.0.0.1', '0.0.0.0') else host}:{port}")
     server.serve_forever()
+
+
+class ApiHandler(Handler):
+    api_only = True
 
 
 if __name__ == "__main__":

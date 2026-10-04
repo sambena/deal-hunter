@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Deal Hunter API</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    main { max-width: 900px; }
+    pre { white-space: pre-wrap; word-break: break-word; background: var(--panel2); padding: 10px; border-radius: 6px; }
+    td code { white-space: nowrap; }
+    h2 { margin-top: 28px; }
+  </style>
+</head>
+<body>
+  <header><h1>Deal Hunter API</h1><nav><a href="./">Back to Deal Hunter</a></nav></header>
+  <main>
+    <div class="panel">
+      <p>Everything the Deal Hunter page does is available to your own apps and scripts as JSON.</p>
+      <ul>
+        <li><b>Address:</b> the API port on the machine running Deal Hunter, e.g. <code>http://192.168.86.82:8781</code>.
+          It's meant for your home network or VPN, not the internet.</li>
+        <li><b>Key:</b> create one in <b>Settings &gt; API</b> and send it with every call as
+          <code>Authorization: Bearer YOUR_KEY</code> (or <code>X-API-Key: YOUR_KEY</code>).</li>
+        <li><b>Writes</b> (POST/PUT/DELETE) send a JSON body with <code>Content-Type: application/json</code>.</li>
+        <li>Errors come back as <code>{"error": "..."}</code> with an HTTP status (401 = missing or wrong key).</li>
+        <li>The API port can't read or change settings or keys; do that on the Deal Hunter page.</li>
+      </ul>
+      <pre>curl -H "Authorization: Bearer YOUR_KEY" http://192.168.86.82:8781/api/listings?status=new
+
+curl -X POST -H "Authorization: Bearer YOUR_KEY" -H "Content-Type: application/json" \
+  -d '{"name": "RTX 3060 12GB", "query": "rtx 3060 12gb -8gb", "max_price": 250}' \
+  http://192.168.86.82:8781/api/watches</pre>
+      <p class="muted">PowerShell: <code>Invoke-RestMethod -Headers @{Authorization="Bearer YOUR_KEY"} http://192.168.86.82:8781/api/state</code></p>
+    </div>
+
+    <div class="panel">
+      <h2>Finds (listings)</h2>
+      <div class="table-wrap"><table>
+        <tr><th>Call</th><th>What it does</th></tr>
+        <tr><td><code>GET /api/listings</code></td><td>Finds, newest first (max 500). Options: <code>watch=ID</code>,
+          <code>status=active|new|seen|starred|dismissed|all</code> (default active), <code>sort=newest|price|deal</code>.
+          Each has title, price, shipping, total, url, image, location, condition, source, deal_pct (0.25 = 25% under typical), first_seen, seen_at.</td></tr>
+        <tr><td><code>POST /api/listings/ID</code></td><td>Set status: <code>{"status": "seen"|"starred"|"dismissed"|"new"}</code>.</td></tr>
+        <tr><td><code>POST /api/listings/mark-seen</code></td><td>Mark all new finds seen; <code>{"watch": ID}</code> for one watch.</td></tr>
+        <tr><td><code>POST /api/listings/ID/ask-ai</code></td><td>AI verdict on a find (uses your AI settings and monthly limit).</td></tr>
+      </table></div>
+
+      <h2>Watches</h2>
+      <div class="table-wrap"><table>
+        <tr><th>Call</th><th>What it does</th></tr>
+        <tr><td><code>GET /api/state</code></td><td>Watches (with new/total counts and best price), My hardware, settings (secrets shown only as true/false), poller status, AI budget.</td></tr>
+        <tr><td><code>POST /api/watches</code></td><td>Create: <code>name</code>, <code>query</code> required; optional <code>exclude</code> (list),
+          <code>min_price</code>, <code>max_price</code>, <code>condition</code> (any|used|new), <code>sources</code> (list), <code>machine_id</code>, <code>notes</code>,
+          <code>check</code> (false = don't search right away). Returns <code>{"id", "new", "errors"}</code>.</td></tr>
+        <tr><td><code>PUT /api/watches/ID</code></td><td>Change any of the fields above, e.g. <code>{"enabled": false}</code>.</td></tr>
+        <tr><td><code>DELETE /api/watches/ID</code></td><td>Delete a watch and its finds.</td></tr>
+        <tr><td><code>POST /api/watches/ID/run</code></td><td>Search this watch now.</td></tr>
+        <tr><td><code>POST /api/poll</code></td><td>Start a check of every watch in the background.</td></tr>
+      </table></div>
+      <p class="muted">Query syntax: every word must be in the title; <code>a|b</code> either; <code>"exact phrase"</code>; <code>-word</code> excludes.
+        Sources: ebay, ebay_local, ksl, reddit, slickdeals, buildapcsales, bestbuy.</p>
+
+      <h2>My hardware</h2>
+      <div class="table-wrap"><table>
+        <tr><th>Call</th><th>What it does</th></tr>
+        <tr><td><code>POST /api/machines</code></td><td>Add a device: <code>name</code>, <code>kind</code> (pc, server, tv, monitor, phone, tablet, audio, network, console, printer, appliance, smart home, vehicle, other),
+          <code>model</code> (non-PCs), <code>parts</code> (PCs: list of <code>{"category", "model"}</code>), <code>notes</code>.</td></tr>
+        <tr><td><code>PUT /api/machines/ID</code> / <code>DELETE</code></td><td>Change (send the whole device) or delete.</td></tr>
+        <tr><td><code>POST /api/machines/ID/specs</code></td><td>Fill in a PC's parts from <code>{"text": ...}</code>: the Get specs command's output, or other text with <code>"use_ai": true</code>.</td></tr>
+        <tr><td><code>POST /api/machines/ID/suggest</code></td><td>Upgrade ideas; <code>{"use_ai": true}</code> for AI.</td></tr>
+        <tr><td><code>POST /api/radar</code></td><td>Deal radar proposals for every device; <code>{"use_ai": true}</code> includes non-PCs.</td></tr>
+      </table></div>
+
+      <h2>AI</h2>
+      <div class="table-wrap"><table>
+        <tr><th>Call</th><th>What it does</th></tr>
+        <tr><td><code>POST /api/ai/estimate</code></td><td>What an AI request would cost before running it: <code>{"action": "judge"|"draft"|"upgrades"|"specs"|"radar", ...}</code>.</td></tr>
+        <tr><td><code>GET /api/ai/usage</code></td><td>This month's AI spend and limit.</td></tr>
+        <tr><td><code>POST /api/ai/draft-watches</code></td><td>Watch ideas from <code>{"description": "..."}</code>.</td></tr>
+      </table></div>
+    </div>
+  </main>
+</body>
+</html>
