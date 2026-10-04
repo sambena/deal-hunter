@@ -34,6 +34,29 @@ function cssUrl(u) {
   return /^https?:\/\//i.test(u || "") ? `url("${encodeURI(u).replace(/["()\\]/g, c => "%" + c.charCodeAt(0).toString(16))}")` : "none";
 }
 
+// Small dollar amounts: "$0.0042", "$0.12", "$3.50".
+function usd(v) {
+  v = Number(v) || 0;
+  if (v === 0) return "$0";
+  return "$" + (v < 0.01 ? v.toPrecision(2) : v.toFixed(2));
+}
+
+// Every AI button asks the server what the request will cost first. It refuses when the
+// worst case would pass the monthly limit, and otherwise shows the cost and asks (Settings > AI).
+async function aiGate(action, body = {}) {
+  const e = await api("POST", "/api/ai/estimate", { action, ...body });
+  if (!e.allowed) throw new Error(e.reason);
+  if (e.free || !state.settings.ai_confirm) return true;
+  return confirm(`${e.action_label} with ${e.model_label}
+
+` +
+    `This will cost about ${usd(e.typical)} (at most ${usd(e.max)}).
+` +
+    `This month: ${usd(e.spent)} of your ${usd(e.limit)} limit used.
+
+Go ahead?`);
+}
+
 function money(v) { return v == null ? "price?" : "$" + Number(v).toFixed(v % 1 ? 2 : 0); }
 
 function ago(ts) {
@@ -154,7 +177,11 @@ $("#listings").addEventListener("click", async e => {
     return;
   }
   if (btn.dataset.act === "ai") {
-    await busy(btn, async () => { await api("POST", `/api/listings/${id}/ask-ai`); await loadListings(); });
+    await busy(btn, async () => {
+      if (!await aiGate("judge", { listing_id: Number(id) })) return;
+      await api("POST", `/api/listings/${id}/ask-ai`);
+      await Promise.all([loadListings(), refresh()]);
+    });
     return;
   }
   await api("POST", `/api/listings/${id}`, { status: btn.dataset.act });
@@ -322,6 +349,7 @@ function renderSuggestions(box, suggestions, machineId) {
 
 $("#ai-draft-btn").addEventListener("click", e => busy(e.target, async () => {
   const box = $("#ai-draft-results");
+  if (!await aiGate("draft", { description: $("#ai-desc").value })) return;
   box.innerHTML = "";
   const { suggestions } = await api("POST", "/api/ai/draft-watches", { description: $("#ai-desc").value });
   renderSuggestions(box, suggestions, null);
@@ -397,6 +425,7 @@ $("#machines").addEventListener("click", async e => {
   await busy(btn, async () => {
     const id = await saveMachine(card);
     if (act === "save") return toast("Saved");
+    if (act === "suggest-ai" && !await aiGate("upgrades", { machine_id: id })) return;
     const res = await api("POST", `/api/machines/${id}/suggest`, { use_ai: act === "suggest-ai" });
     const box = $(".results", card);
     box.innerHTML = `<p class="muted">${res.platform ? `Platform: <b>${esc(res.platform)}</b> (${esc(res.explanation)})` : esc(res.explanation)}</p>`;
@@ -411,8 +440,45 @@ $$("nav button").find(b => b.dataset.tab === "hardware").addEventListener("click
 
 // ---- settings -------------------------------------------------------------------
 
+// Model dropdowns show each model's price and what a typical button press costs with it.
+function fillAiChoices() {
+  const ai = state.ai, f = $("#settings-form");
+  const sel = f.ai_provider;
+  sel.innerHTML = `<option value="off">Off (rules only)</option>` +
+    Object.entries(ai.providers).map(([k, label]) => `<option value="${k}">${esc(label)}</option>`).join("");
+  const typical = (m, action, tokensIn) => (tokensIn * m.in + ai.actions[action].typical_out * m.out) / 1e6;
+  $$("select[data-models]", f).forEach(ms => {
+    const models = ai.models.filter(m => m.provider === ms.dataset.models);
+    ms.innerHTML = `<option value="">Choose a model…</option>` + models.map(m =>
+      `<option value="${esc(m.id)}">${esc(m.label)}: $${m.in} in / $${m.out} out per 1M tokens · ` +
+      `Ask AI ≈ ${usd(typical(m, "judge", 800))}, suggestions ≈ ${usd(typical(m, "draft", 1200))}</option>`).join("");
+  });
+}
+
+function showAiProvider() {
+  const f = $("#settings-form"), p = f.ai_provider.value;
+  $$("[data-provider]", f).forEach(g => (g.hidden = g.dataset.provider !== p));
+  $("#ai-price-note").textContent = p === "off" || p === "ollama" ? "" :
+    "Prices are per million tokens (about 750,000 words). Thinking counts as output. " +
+    "Estimates run a little high on purpose; you're charged what the provider reports.";
+}
+
+async function showAiSpend() {
+  const box = $("#ai-spend");
+  try {
+    const u = await api("GET", "/api/ai/usage");
+    const pct = u.limit ? Math.min(100, (u.spent / u.limit) * 100) : 100;
+    const label = id => (state.ai.models.find(m => m.id === id) || { label: id }).label;
+    box.innerHTML = `<div><b>This month: ${usd(u.spent)}</b> of your ${usd(u.limit)} limit</div>
+      <div class="meter"><span style="width:${pct.toFixed(1)}%"></span></div>
+      ${u.breakdown.length ? `<div class="muted">${u.breakdown.map(r =>
+        `${esc(state.ai.actions[r.action]?.label || r.action)} × ${r.n} with ${esc(label(r.model))}: ${usd(r.cost)}`).join("<br>")}</div>` : ""}`;
+  } catch (e) { box.textContent = e.message; }
+}
+
 function fillSettings() {
   const s = state.settings, f = $("#settings-form");
+  fillAiChoices();
   for (const el of f.elements) {
     if (!el.name) continue;
     if (el.name.startsWith("src_")) { el.checked = !!s.sources_enabled?.[el.name.slice(4)]; continue; }
@@ -422,7 +488,11 @@ function fillSettings() {
     else if (Array.isArray(v)) el.value = v.join("\n");
     else el.value = v ?? "";
   }
+  showAiProvider();
+  showAiSpend();
 }
+
+$("#settings-form [name=ai_provider]").addEventListener("change", showAiProvider);
 
 $("#settings-form").addEventListener("submit", async e => {
   e.preventDefault();

@@ -46,8 +46,17 @@ Settings > AI. It only runs when you press an AI button:
 **Suggest watches** (describe what you want), **Find upgrades with AI**
 (covers GPUs, storage and anything the rules don't know), and **Ask AI** on a listing.
 
-- **Ollama**: free and local. Install from ollama.com, `ollama pull qwen3:8b`.
-- **Claude**: `pip install anthropic`, add an API key. Costs a few cents per use.
+Providers: **Claude**, **OpenAI**, **Google Gemini** (API keys, pay per use) and **Ollama** (free, local).
+Each section in Settings has step-by-step key instructions, and every model shows its price.
+
+Spending is capped:
+- Before each paid request the page shows the expected and maximum cost and asks first (can be turned off).
+- **Monthly limit** (default $5): a request is refused if its worst case could pass it. $0 turns paid AI off.
+- What each request actually cost is recorded, and Settings shows this month's total.
+- Each button has an output cap, which also caps its worst-case cost.
+
+Prices live in `ai.py` (`MODELS`), checked 2026-10-04. A model with no known price can't be used.
+A Claude Pro/Max or ChatGPT subscription can't be used here; these need API keys.
 
 ## Discord
 

@@ -35,10 +35,17 @@ DEFAULT_SETTINGS = {
     "ollama_url": "http://localhost:11434",
     "ollama_model": "qwen3:8b",
     "anthropic_api_key": "",
+    "openai_api_key": "",
+    "openai_model": "",
+    "gemini_api_key": "",
+    "gemini_model": "",
+    "ai_monthly_limit": 5.0,  # US dollars; AI buttons stop working once a request could pass it
+    "ai_confirm": True,  # show the cost and ask before each paid AI request
     "claude_model": "claude-opus-5-5",
 }
 
-SECRET_KEYS = {"ebay_client_secret", "bestbuy_api_key", "discord_webhook", "anthropic_api_key"}
+SECRET_KEYS = {"ebay_client_secret", "bestbuy_api_key", "discord_webhook", "anthropic_api_key",
+               "openai_api_key", "gemini_api_key"}
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -82,6 +89,17 @@ CREATE TABLE IF NOT EXISTS listings (
     UNIQUE (watch_id, source, source_id)
 );
 CREATE INDEX IF NOT EXISTS idx_listings_watch ON listings(watch_id, first_seen);
+CREATE TABLE IF NOT EXISTS ai_usage (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    at REAL NOT NULL,
+    provider TEXT NOT NULL,
+    model TEXT NOT NULL,
+    action TEXT NOT NULL,
+    input_tokens INTEGER NOT NULL,
+    output_tokens INTEGER NOT NULL,
+    cost REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_ai_usage_at ON ai_usage(at);
 CREATE TABLE IF NOT EXISTS machines (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
