@@ -5,9 +5,9 @@ const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 let state = { watches: [], machines: [], settings: {}, poller: {} };
 
 // Source keys, in form order, and how they're shown.
-const SOURCES = { ebay: "eBay", ebay_local: "eBay local pickup", reddit: "Reddit", slickdeals: "Slickdeals",
+const SOURCES = { ebay: "eBay", ebay_local: "eBay local pickup", ksl: "KSL Classifieds", reddit: "Reddit", slickdeals: "Slickdeals",
   buildapcsales: "r/buildapcsales", bestbuy: "Best Buy open-box" };
-const NEW_WATCH_SOURCES = ["ebay", "ebay_local", "reddit", "slickdeals", "buildapcsales"];
+const NEW_WATCH_SOURCES = ["ebay", "ebay_local", "ksl", "reddit", "slickdeals", "buildapcsales"];
 const sourceName = s => SOURCES[s] || s;
 
 const CATEGORIES = ["cpu", "motherboard", "ram", "gpu", "storage", "psu", "cooler", "case", "other"];

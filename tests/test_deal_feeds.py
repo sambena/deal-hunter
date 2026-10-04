@@ -102,7 +102,7 @@ class WatchTest(unittest.TestCase):
         conn.commit()
         conn.close()
         srcs = db.list_watches()[0]["sources"]
-        self.assertEqual(srcs, ["ebay", "ebay_local", "reddit", "slickdeals", "buildapcsales"])
+        self.assertEqual(srcs[-2:], ["slickdeals", "buildapcsales"])  # later migrations may insert others
         self.assertTrue(db.get_settings()["sources_enabled"]["slickdeals"])
 
 
