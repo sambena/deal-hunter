@@ -79,8 +79,8 @@ class IsolationTest(unittest.TestCase):
 
     def test_ai_spend_is_per_person(self):
         with db.as_user(self.admin):
-            db.execute("INSERT INTO ai_usage (at, provider, model, action, input_tokens, output_tokens, cost, user_id) "
-                       "VALUES (?, 'claude', 'claude-haiku-4-5', 'judge', 1, 1, 0.5, ?)", (time.time(), self.admin))
+            db.execute("INSERT INTO ai_usage (at, provider, model, action, input_tokens, output_tokens, cost, user_id, paid_by) "
+                       "VALUES (?, 'claude', 'claude-haiku-4-5', 'judge', 1, 1, 0.5, ?, ?)", (time.time(), self.admin, self.admin))
             self.assertEqual(ai.budget(db.get_settings())["spent"], 0.5)
         with self.as_member():
             self.assertEqual(ai.budget(db.get_settings())["spent"], 0)

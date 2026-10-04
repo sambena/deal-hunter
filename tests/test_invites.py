@@ -85,8 +85,8 @@ class InviteTest(unittest.TestCase):
         uid = self.accept(self.code(self.s.admin_invite({}, {})), name="Sis", email="sis@example.com")["user"]["id"]
         with db.as_user(uid):
             db.create_watch({"name": "secret wishlist", "query": "x", "sources": ["ebay"]})
-        db.execute("INSERT INTO ai_usage (at, provider, model, action, input_tokens, output_tokens, cost, user_id) "
-                   "VALUES (?, 'claude', 'm', 'judge', 1, 1, 0.25, ?)", (time.time(), uid))
+        db.execute("INSERT INTO ai_usage (at, provider, model, action, input_tokens, output_tokens, cost, user_id, paid_by) "
+                   "VALUES (?, 'claude', 'm', 'judge', 1, 1, 0.25, ?, ?)", (time.time(), uid, self.admin))  # on Sam's AI
         people = {u["name"]: u for u in self.s.admin_users({}, {})["users"]}
         self.assertEqual((people["Sis"]["watches"], people["Sis"]["ai_spent"]), (1, 0.25))
         self.assertNotIn("secret wishlist", str(people))

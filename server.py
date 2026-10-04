@@ -67,7 +67,8 @@ def get_state(body, params):
         "settings": db.public_settings(),
         "me": auth.public_user(me()),
         "api_port": API_PORT["port"],
-        "ai": {**ai.catalog(), "budget": ai.budget(db.get_settings())},
+        "ai": {**ai.catalog(), "budget": ai.budget(ai.settings_for()),
+               "owner": db.query("SELECT name FROM users WHERE id = ?", (db.admin_id(),))[0]["name"]},
         "poller": poller.state,
         "now": time.time(),
     }
@@ -232,7 +233,7 @@ def deal_radar(body, params):
     if gear and body.get("use_ai"):
         prompt, schema, _ = _ai_prompt("radar", body)
         names = {m["id"]: m["name"] for m in gear}
-        for s in ai.run(db.get_settings(), "radar", prompt, schema)["suggestions"]:
+        for s in ai.run(ai.settings_for(), "radar", prompt, schema)["suggestions"]:
             if s.get("device_id") in names and s.get("query", "").strip():
                 items.append({**{k: v for k, v in s.items() if k != "device_id"}, "machine_id": s["device_id"],
                               "machine_name": names[s["device_id"]], "from": "ai"})
@@ -247,18 +248,18 @@ def deal_radar(body, params):
 @route("POST", "/api/ai/estimate")
 def ai_estimate(body, params):
     prompt, schema, _ = _ai_prompt(body.get("action"), body)
-    return ai.estimate(db.get_settings(), body["action"], prompt, schema)
+    return ai.estimate(ai.settings_for(), body["action"], prompt, schema)
 
 
 @route("GET", "/api/ai/usage")
 def ai_usage(body, params):
-    return ai.usage_summary(db.get_settings())
+    return ai.usage_summary(ai.settings_for())
 
 
 @route("POST", r"/api/listings/(\d+)/ask-ai")
 def ask_ai_listing(body, params, lid):
     prompt, schema, _ = _ai_prompt("judge", body, lid)
-    result = ai.run(db.get_settings(), "judge", prompt, schema)
+    result = ai.run(ai.settings_for(), "judge", prompt, schema)
     note = f"{result['verdict'].upper()}: {result['note']}"
     db.execute("UPDATE listings SET ai_note = ? WHERE id = ?", (note, int(lid)))
     return {"ai_note": note}
@@ -298,7 +299,7 @@ def suggest_upgrades(body, params, mid):
     if body.get("use_ai"):
         prompt, schema, _ = _ai_prompt("upgrades", body, mid)
         return {"platform": rules["platform"], "explanation": "suggested by AI",
-                "suggestions": ai.run(db.get_settings(), "upgrades", prompt, schema)["suggestions"]}
+                "suggestions": ai.run(ai.settings_for(), "upgrades", prompt, schema)["suggestions"]}
     return rules
 
 
@@ -358,7 +359,7 @@ def fill_specs(body, params, mid):
         parts, method = specs.parse_report(text), "report"
     elif body.get("use_ai"):
         prompt, schema, _ = _ai_prompt("specs", body, mid)
-        parts, method = ai.run(db.get_settings(), "specs", prompt, schema)["parts"], "ai"
+        parts, method = ai.run(ai.settings_for(), "specs", prompt, schema)["parts"], "ai"
     else:
         raise HTTPError(422, "need_ai")
     parts = [p for p in parts if str(p.get("model", "")).strip()]
@@ -372,7 +373,7 @@ def fill_specs(body, params, mid):
 @route("POST", "/api/ai/draft-watches")
 def draft_watches(body, params):
     prompt, schema, _ = _ai_prompt("draft", body)
-    return {"suggestions": ai.run(db.get_settings(), "draft", prompt, schema)["suggestions"]}
+    return {"suggestions": ai.run(ai.settings_for(), "draft", prompt, schema)["suggestions"]}
 
 
 @route("PUT", "/api/settings")
@@ -607,9 +608,16 @@ def admin_users(body, params):
     users = db.query("""SELECT u.id, u.name, u.email, u.role, u.disabled, u.watch_limit, u.created_at,
                           u.password_hash IS NOT NULL AS has_password,
                           (SELECT COUNT(*) FROM watches w WHERE w.user_id = u.id) AS watches,
-                          (SELECT COALESCE(SUM(cost), 0) FROM ai_usage a WHERE a.user_id = u.id AND a.at >= ?) AS ai_spent,
+                          u.ai_shared, u.ai_allowance, u.ai_daily_cap,
+                          (SELECT COALESCE(SUM(cost), 0) FROM ai_usage a
+                             WHERE a.user_id = u.id AND a.paid_by = ? AND a.at >= ?) AS ai_spent,
+                          (SELECT COUNT(*) FROM ai_usage a WHERE a.user_id = u.id AND a.paid_by = ? AND a.at >= ?)
+                             AS ai_today,
+                          COALESCE((SELECT json_extract(value, '$') FROM user_settings s
+                             WHERE s.user_id = u.id AND s.key = 'ai_source'), 'shared') AS ai_source,
                           (SELECT MAX(last_used) FROM tokens t WHERE t.user_id = u.id) AS last_active
-                        FROM users u ORDER BY u.role = 'admin' DESC, u.name""", (month,))
+                        FROM users u ORDER BY u.role = 'admin' DESC, u.name""",
+                     (db.admin_id(), month, db.admin_id(), ai._day_start()))
     invites = db.query("""SELECT id, kind, note, user_id, watch_limit, created_at, expires_at FROM invites
                           WHERE used_at IS NULL AND expires_at > ? ORDER BY created_at DESC""", (time.time(),))
     return {"users": users, "invites": invites, "default_watch_limit": db.DEFAULT_WATCH_LIMIT}
@@ -647,6 +655,14 @@ def admin_update_user(body, params, uid):
         limit = body["watch_limit"]
         db.execute("UPDATE users SET watch_limit = ? WHERE id = ?",
                    (None if limit in (None, "") else max(0, int(limit)), uid))
+    # Their use of the admin's AI: allowed at all, requests a day, and dollars a month of paid models.
+    if "ai_shared" in body:
+        db.execute("UPDATE users SET ai_shared = ? WHERE id = ?", (1 if body["ai_shared"] else 0, uid))
+    if "ai_daily_cap" in body:
+        db.execute("UPDATE users SET ai_daily_cap = ? WHERE id = ?", (max(0, int(body["ai_daily_cap"] or 0)), uid))
+    if "ai_allowance" in body:
+        db.execute("UPDATE users SET ai_allowance = ? WHERE id = ?",
+                   (max(0.0, round(float(body["ai_allowance"] or 0), 2)), uid))
     return {"ok": True}
 
 

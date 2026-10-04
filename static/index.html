@@ -278,6 +278,13 @@
           <p class="muted">Off by default. AI only runs when you press an AI button, never in the background.
             Paid models show the cost and ask first, and stop working once a request could take you past your monthly limit.</p>
           <div class="spend" id="ai-spend"></div>
+          <label data-member>Whose AI
+            <select name="ai_source">
+              <option value="shared" id="ai-source-shared">Use the shared AI</option>
+              <option value="own">Use my own key</option>
+            </select>
+          </label>
+          <div id="ai-own">
           <div class="grid">
             <label>Mode
               <select name="ai_provider"><option value="off">Off (rules only)</option></select>
@@ -355,6 +362,7 @@
           </details>
           </div>
           <p class="muted" id="ai-price-note"></p>
+          </div>
         </div>
 
         <div class="row sticky-save">

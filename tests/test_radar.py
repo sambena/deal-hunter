@@ -52,7 +52,7 @@ class RadarTest(unittest.TestCase):
             {"device_id": 999, "name": "made up", "category": "tv", "query": "x", "exclude": [], "max_price": None,
              "reason": "not a real device"}]})
         calls = []
-        with mock.patch.object(db, "get_settings", lambda: settings), \
+        with mock.patch.object(db, "get_settings", lambda *a: settings), \
              mock.patch.dict(ai.CALLERS, {"gemini": lambda *a: calls.append(a[2]) or (answer, 500, 200, None)}):
             res = self.server.deal_radar({"use_ai": True}, {})
         self.assertEqual(len(calls), 1)
