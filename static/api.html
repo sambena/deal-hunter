@@ -20,8 +20,13 @@
       <ul>
         <li><b>Address:</b> the API port on the machine running Deal Hunter, e.g. <code>http://192.168.86.82:8781</code>.
           It's meant for your home network or VPN, not the internet.</li>
-        <li><b>Key:</b> create one in <b>Settings &gt; API</b> and send it with every call as
-          <code>Authorization: Bearer YOUR_KEY</code> (or <code>X-API-Key: YOUR_KEY</code>).</li>
+        <li><b>Sign in:</b> <code>POST /api/auth/login</code> with <code>{"email", "password", "device_name": "Pixel 10"}</code>
+          (no header needed) returns <code>{"token": "dht_…", "user": {"id", "name", "email", "role"}}</code>. Send the token with
+          every call as <code>Authorization: Bearer TOKEN</code>. Each device gets its own token; see and revoke them in
+          <b>Settings &gt; Your account</b>. <code>POST /api/auth/logout</code> revokes the one in use; <code>GET /api/me</code> says who you are.</li>
+        <li>Everything is per person: you only ever see and change your own watches, finds and devices.</li>
+        <li>Wrong email or password gives 401 and repeated failures 429, both with a readable <code>{"error"}</code>.</li>
+        <li><b>Old single key:</b> the admin's key from <b>Settings &gt; API</b> still works as a Bearer token (acting as the admin) while apps move to sign-in.</li>
         <li><b>Writes</b> (POST/PUT/DELETE) send a JSON body with <code>Content-Type: application/json</code>.</li>
         <li>Errors come back as <code>{"error": "..."}</code> with an HTTP status (401 = missing or wrong key).</li>
         <li>The API port can't read or change settings or keys; do that on the Deal Hunter page.</li>

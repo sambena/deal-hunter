@@ -122,27 +122,44 @@ def run_all() -> None:
     with _run_lock:
         state["running"] = True
         try:
-            settings = db.get_settings()
-            for w in db.list_watches():
+            for w in db.list_watches(all_users=True):
                 if w["enabled"]:
-                    try:
-                        run_watch(w, settings)
-                    except Exception:  # noqa: BLE001
-                        traceback.print_exc()
-                        db.execute("UPDATE watches SET last_error = ? WHERE id = ?",
-                                   ("internal error, see console", w["id"]))
+                    _run_as_owner(w)
             purge_expired()
         finally:
             state["running"] = False
             state["last_cycle"] = time.time()
 
 
+def _run_as_owner(w: dict) -> dict:
+    """Each watch runs with its owner's settings (ZIP, junk words, Discord...)."""
+    with db.as_user(w["user_id"]):
+        try:
+            return run_watch(w, db.get_settings())
+        except Exception:  # noqa: BLE001
+            traceback.print_exc()
+            db.execute("UPDATE watches SET last_error = ? WHERE id = ?", ("internal error, see console", w["id"]))
+            return {"new": 0, "errors": ["internal error"]}
+
+
 def run_one(watch_id: int) -> dict:
+    """Check one of the current user's watches now."""
     with _run_lock:
         w = db.get_watch(watch_id)
         if not w:
             return {"new": 0, "errors": ["watch not found"]}
         return run_watch(w, db.get_settings())
+
+
+def poll_user(user_id: int) -> None:
+    """Check one person's watches in the background (a member's "Check now" shouldn't check everyone's)."""
+    def work():
+        with _run_lock:
+            with db.as_user(user_id):
+                for w in db.list_watches():
+                    if w["enabled"]:
+                        _run_as_owner(w)
+    threading.Thread(target=work, name=f"poll-user-{user_id}", daemon=True).start()
 
 
 def _loop() -> None:

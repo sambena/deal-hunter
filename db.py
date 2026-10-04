@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import contextlib
+import contextvars
 import json
 import sqlite3
 import threading
@@ -52,6 +54,13 @@ DEFAULT_SETTINGS = {
 
 SECRET_KEYS = {"ebay_client_secret", "bestbuy_api_key", "discord_webhook", "anthropic_api_key",
                "openai_api_key", "gemini_api_key", "ha_token", "api_key"}
+
+# Each person's own settings. Everything else (source keys, check interval, Reddit subs...) is shared and
+# only the admin can change it.
+USER_KEYS = {"zip_code", "local_radius_miles", "junk_terms", "discord_enabled", "discord_webhook",
+             "discord_deals_only", "ai_provider", "ollama_url", "ollama_model", "anthropic_api_key", "claude_model",
+             "openai_api_key", "openai_model", "gemini_api_key", "gemini_model", "gemini_free_tier",
+             "ai_monthly_limit", "ai_confirm", "ha_url", "ha_token"}
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -122,7 +131,59 @@ CREATE TABLE IF NOT EXISTS machines (
     price_paid REAL,
     custom TEXT NOT NULL DEFAULT '[]'  -- the user's own fields: [{"label": "Serial number", "value": "..."}]
 );
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL DEFAULT '',
+    name TEXT NOT NULL DEFAULT '',
+    password_hash TEXT,              -- NULL until the person sets one (the first admin, or an invite)
+    role TEXT NOT NULL DEFAULT 'member',  -- admin | member
+    disabled INTEGER NOT NULL DEFAULT 0,
+    watch_limit INTEGER,             -- NULL = no limit
+    created_at REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS tokens (    -- one per signed-in browser or device; only a hash is kept
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash TEXT NOT NULL UNIQUE,
+    kind TEXT NOT NULL,              -- web | device
+    name TEXT NOT NULL,
+    created_at REAL NOT NULL,
+    last_used REAL
+);
+CREATE TABLE IF NOT EXISTS user_settings (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    key TEXT NOT NULL,
+    value TEXT NOT NULL,
+    PRIMARY KEY (user_id, key)
+);
 """
+
+# Who the current request (or poller pass) is acting for. Unset means the first admin, which is what
+# scripts, tests and single-user installs want; the web server always sets it after signing someone in.
+_current_user: contextvars.ContextVar[int | None] = contextvars.ContextVar("deal_hunter_user", default=None)
+
+
+def admin_id() -> int:
+    rows = query("SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1")
+    return rows[0]["id"]
+
+
+def current_user_id() -> int:
+    uid = _current_user.get()
+    return uid if uid is not None else admin_id()
+
+
+@contextlib.contextmanager
+def as_user(user_id: int):
+    token = _current_user.set(user_id)
+    try:
+        yield
+    finally:
+        _current_user.reset(token)
+
+
+def set_user(user_id: int | None):
+    return _current_user.set(user_id)
 
 
 def connect() -> sqlite3.Connection:
@@ -189,6 +250,25 @@ def conn() -> sqlite3.Connection:
                     if len(words) == 2:
                         _conn.execute("UPDATE machines SET make = ?, model = ? WHERE id = ?", (*words, r["id"]))
                 _conn.execute("PRAGMA user_version = 4")
+            for table in ("watches", "machines", "ai_usage"):  # every row belongs to someone
+                if "user_id" not in {r["name"] for r in _conn.execute(f"PRAGMA table_info({table})")}:
+                    _conn.execute(f"ALTER TABLE {table} ADD COLUMN user_id INTEGER")
+            if not _conn.execute("SELECT 1 FROM users WHERE role = 'admin'").fetchone():
+                # The first admin: on an existing install that's the owner of everything so far.
+                _conn.execute("INSERT INTO users (name, role, created_at) VALUES ('Admin', 'admin', ?)", (time.time(),))
+            if _conn.execute("PRAGMA user_version").fetchone()[0] < 5:
+                # Accounts arrived: existing data and personal settings move into the first admin's account.
+                admin = _conn.execute("SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1").fetchone()[0]
+                for table in ("watches", "machines", "ai_usage"):
+                    _conn.execute(f"UPDATE {table} SET user_id = ? WHERE user_id IS NULL", (admin,))
+                for r in _conn.execute("SELECT key, value FROM settings").fetchall():
+                    if r["key"] in USER_KEYS:
+                        _conn.execute("INSERT OR REPLACE INTO user_settings (user_id, key, value) VALUES (?, ?, ?)",
+                                      (admin, r["key"], r["value"]))
+                        _conn.execute("DELETE FROM settings WHERE key = ?", (r["key"],))
+                _conn.execute("PRAGMA user_version = 5")
+            _conn.execute("CREATE INDEX IF NOT EXISTS idx_watches_user ON watches(user_id)")
+            _conn.execute("CREATE INDEX IF NOT EXISTS idx_machines_user ON machines(user_id)")
             _conn.commit()
         return _conn
 
@@ -215,24 +295,34 @@ def execute_count(sql: str, args: tuple = ()) -> int:
 
 # ---- settings -------------------------------------------------------------
 
-def get_settings() -> dict:
-    stored = {r["key"]: json.loads(r["value"]) for r in query("SELECT key, value FROM settings")}
-    merged = {**DEFAULT_SETTINGS, **stored}
+def get_settings(user_id: int | None = None) -> dict:
+    """Shared settings plus one person's own (the current user's unless given)."""
+    uid = user_id if user_id is not None else current_user_id()
+    shared = {r["key"]: json.loads(r["value"]) for r in query("SELECT key, value FROM settings")}
+    mine = {r["key"]: json.loads(r["value"])
+            for r in query("SELECT key, value FROM user_settings WHERE user_id = ?", (uid,))}
+    merged = {**DEFAULT_SETTINGS, **{k: v for k, v in shared.items() if k not in USER_KEYS}, **mine}
     # Sources added after the settings were saved start at their default on/off.
-    merged["sources_enabled"] = {**DEFAULT_SETTINGS["sources_enabled"], **stored.get("sources_enabled", {})}
+    merged["sources_enabled"] = {**DEFAULT_SETTINGS["sources_enabled"], **shared.get("sources_enabled", {})}
     return merged
 
 
-def update_settings(changes: dict) -> None:
+def update_settings(changes: dict, user_id: int | None = None, shared_allowed: bool = True) -> None:
+    """Personal keys go to the person's own settings; shared keys only when allowed (the admin)."""
+    uid = user_id if user_id is not None else current_user_id()
     for key, value in changes.items():
         if key not in DEFAULT_SETTINGS:
             continue
-        execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, json.dumps(value)))
+        if key in USER_KEYS:
+            execute("INSERT OR REPLACE INTO user_settings (user_id, key, value) VALUES (?, ?, ?)",
+                    (uid, key, json.dumps(value)))
+        elif shared_allowed:
+            execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, json.dumps(value)))
 
 
-def public_settings() -> dict:
+def public_settings(user_id: int | None = None) -> dict:
     """Settings safe to send to the browser: secrets become booleans."""
-    s = get_settings()
+    s = get_settings(user_id)
     for key in SECRET_KEYS:
         s[key] = bool(s[key])
     return s
@@ -255,18 +345,23 @@ def _watch_row(r: dict) -> dict:
     return r
 
 
-def list_watches() -> list[dict]:
-    rows = query("""
+def list_watches(all_users: bool = False) -> list[dict]:
+    """The current user's watches (everyone's only for the poller)."""
+    where, args = ("", ()) if all_users else ("WHERE w.user_id = ?", (current_user_id(),))
+    rows = query(f"""
         SELECT w.*,
           (SELECT COUNT(*) FROM listings l WHERE l.watch_id = w.id AND l.status = 'new') AS new_count,
           (SELECT COUNT(*) FROM listings l WHERE l.watch_id = w.id) AS total_count,
           (SELECT MIN(total) FROM listings l WHERE l.watch_id = w.id AND l.status != 'dismissed') AS best_price
-        FROM watches w ORDER BY w.created_at DESC""")
+        FROM watches w {where} ORDER BY w.created_at DESC""", args)
     return [_watch_row(r) for r in rows]
 
 
-def get_watch(watch_id: int) -> dict | None:
-    rows = query("SELECT * FROM watches WHERE id = ?", (watch_id,))
+def get_watch(watch_id: int, any_user: bool = False) -> dict | None:
+    if any_user:
+        rows = query("SELECT * FROM watches WHERE id = ?", (watch_id,))
+    else:
+        rows = query("SELECT * FROM watches WHERE id = ? AND user_id = ?", (watch_id, current_user_id()))
     return _watch_row(rows[0]) if rows else None
 
 
@@ -282,6 +377,8 @@ def _watch_values(data: dict) -> dict:
             v = 1 if v else 0
         elif f in ("min_price", "max_price"):
             v = float(v) if v not in (None, "") else None
+        elif f == "machine_id" and v is not None and not get_machine(int(v)):
+            v = None  # only link to your own devices
         out[f] = v
     return out
 
@@ -289,23 +386,27 @@ def _watch_values(data: dict) -> dict:
 def create_watch(data: dict) -> int:
     vals = _watch_values(data)
     vals["created_at"] = time.time()
+    vals["user_id"] = current_user_id()
     cols = ", ".join(vals)
     return execute(f"INSERT INTO watches ({cols}) VALUES ({', '.join('?' * len(vals))})", tuple(vals.values()))
 
 
-def update_watch(watch_id: int, data: dict) -> None:
-    vals = _watch_values(data)
+def update_watch(watch_id: int, data: dict) -> bool:
     old = get_watch(watch_id)
-    if old and any(f in vals and _watch_values({f: old[f]})[f] != vals[f] for f in MATCH_FIELDS):
+    if not old:
+        return False
+    vals = _watch_values(data)
+    if any(f in vals and _watch_values({f: old[f]})[f] != vals[f] for f in MATCH_FIELDS):
         # New criteria find a new backlog; treat it like a fresh watch so it isn't sent to Discord.
         vals["polled_sources"] = "[]"
     if vals:
         sets = ", ".join(f"{k} = ?" for k in vals)
-        execute(f"UPDATE watches SET {sets} WHERE id = ?", (*vals.values(), watch_id))
+        execute(f"UPDATE watches SET {sets} WHERE id = ? AND user_id = ?", (*vals.values(), watch_id, old["user_id"]))
+    return True
 
 
-def delete_watch(watch_id: int) -> None:
-    execute("DELETE FROM watches WHERE id = ?", (watch_id,))
+def delete_watch(watch_id: int) -> bool:
+    return execute_count("DELETE FROM watches WHERE id = ? AND user_id = ?", (watch_id, current_user_id())) > 0
 
 
 # ---- machines -------------------------------------------------------------
@@ -316,17 +417,24 @@ DEVICE_KINDS = ["pc", "server", "tv", "monitor", "phone", "tablet", "audio", "ne
 PARTS_KINDS = {"pc", "server"}
 
 
+def _machine_row(r: dict) -> dict:
+    r["parts"] = json.loads(r["parts"])
+    r["custom"] = json.loads(r.get("custom") or "[]")
+    return r
+
+
 def list_machines() -> list[dict]:
-    rows = query("SELECT * FROM machines ORDER BY name")
-    for r in rows:
-        r["parts"] = json.loads(r["parts"])
-        r["custom"] = json.loads(r.get("custom") or "[]")
-    return rows
+    """The current user's devices."""
+    return [_machine_row(r) for r in query("SELECT * FROM machines WHERE user_id = ? ORDER BY name",
+                                           (current_user_id(),))]
 
 
-def get_machine(machine_id: int) -> dict | None:
-    rows = [m for m in list_machines() if m["id"] == machine_id]
-    return rows[0] if rows else None
+def get_machine(machine_id: int, any_user: bool = False) -> dict | None:
+    if any_user:
+        rows = query("SELECT * FROM machines WHERE id = ?", (machine_id,))
+    else:
+        rows = query("SELECT * FROM machines WHERE id = ? AND user_id = ?", (machine_id, current_user_id()))
+    return _machine_row(rows[0]) if rows else None
 
 
 def _number(v, kind=float):
@@ -347,15 +455,19 @@ def save_machine(data: dict, machine_id: int | None = None) -> int:
             json.dumps([{"label": str(f.get("label", "")).strip()[:60], "value": str(f.get("value", "")).strip()[:500]}
                         for f in data.get("custom") or [] if str(f.get("label", "")).strip()]),
             data.get("source_ref") or None)
+    uid = current_user_id()
     if machine_id is None:
         return execute("""INSERT INTO machines (name, notes, parts, kind, make, model, year, msrp, purchased, price_paid,
-                          custom, source_ref) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", vals)
-    execute("""UPDATE machines SET name = ?, notes = ?, parts = ?, kind = ?, make = ?, model = ?, year = ?, msrp = ?,
-               purchased = ?, price_paid = ?, custom = ?, source_ref = COALESCE(?, source_ref) WHERE id = ?""",
-            (*vals, machine_id))
+                          custom, source_ref, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", (*vals, uid))
+    changed = execute_count("""UPDATE machines SET name = ?, notes = ?, parts = ?, kind = ?, make = ?, model = ?,
+               year = ?, msrp = ?, purchased = ?, price_paid = ?, custom = ?, source_ref = COALESCE(?, source_ref)
+               WHERE id = ? AND user_id = ?""", (*vals, machine_id, uid))
+    if not changed:
+        raise LookupError("device not found")
     return machine_id
 
 
-def delete_machine(machine_id: int) -> None:
-    execute("UPDATE watches SET machine_id = NULL WHERE machine_id = ?", (machine_id,))
-    execute("DELETE FROM machines WHERE id = ?", (machine_id,))
+def delete_machine(machine_id: int) -> bool:
+    uid = current_user_id()
+    execute("UPDATE watches SET machine_id = NULL WHERE machine_id = ? AND user_id = ?", (machine_id, uid))
+    return execute_count("DELETE FROM machines WHERE id = ? AND user_id = ?", (machine_id, uid)) > 0
