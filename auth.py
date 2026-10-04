@@ -96,12 +96,21 @@ def note_failure(address: str) -> None:
         _fails.setdefault(address, []).append(time.time())
 
 
+# Checked against when the email doesn't exist, so a wrong email takes as long as a wrong password and
+# timing can't reveal who has an account.
+_DUMMY_HASH = hash_password("not-a-real-password")
+
+
 def sign_in(email: str, password: str, address: str) -> dict:
+    email_key = "email:" + (email or "").strip().lower()
     check_rate(address)
+    check_rate(email_key)  # guessing one account from many addresses is limited too
     rows = db.query("SELECT * FROM users WHERE lower(email) = lower(?)", ((email or "").strip(),))
     user = rows[0] if rows else None
-    if not user or user["disabled"] or not verify_password(password, user["password_hash"]):
+    ok = verify_password(password, user["password_hash"] if user else _DUMMY_HASH)
+    if not user or user["disabled"] or not ok:
         note_failure(address)
+        note_failure(email_key)
         raise AuthError("Wrong email or password")
     return user
 

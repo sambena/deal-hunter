@@ -522,6 +522,13 @@ def revoke_token(body, params, tid):
 # ---- HTTP plumbing ----------------------------------------------------------
 
 OPEN_ROUTES = {("GET", "/api/auth/status"), ("POST", "/api/auth/setup"), ("POST", "/api/auth/login")}
+MAX_BODY = 1_000_000  # bytes; pasted specs and imports are far smaller
+SECURITY_HEADERS = [  # for when the site faces the internet
+    ("X-Content-Type-Options", "nosniff"),
+    ("X-Frame-Options", "DENY"),
+    ("Content-Security-Policy", "frame-ancestors 'none'"),
+    ("Referrer-Policy", "same-origin"),
+]
 
 # The API port (config "api_port") is a second door for other apps on the network: API only, every call
 # needs the API key, and it can't read or change settings or keys. The web page's own port is unchanged.
@@ -554,7 +561,11 @@ class Handler(BaseHTTPRequestHandler):
         return None, None
 
     def _address(self) -> str:
-        return self.headers.get("Cf-Connecting-Ip") or self.client_address[0]
+        # Cloudflare's header is only trustworthy on the web port, which is reachable only through the tunnel;
+        # on the API port a LAN client could set it to dodge the sign-in limit.
+        if not self.api_only and self.headers.get("Cf-Connecting-Ip"):
+            return self.headers["Cf-Connecting-Ip"]
+        return self.client_address[0]
 
     def _https(self) -> bool:
         return "https" in (self.headers.get("X-Forwarded-Proto") or "") or "https" in (self.headers.get("Cf-Visitor") or "")
@@ -568,6 +579,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
+        for k, v in SECURITY_HEADERS:
+            self.send_header(k, v)
         for k, v in headers:
             self.send_header(k, v)
         self.end_headers()
@@ -606,6 +619,8 @@ class Handler(BaseHTTPRequestHandler):
         req_token, user_token = _request.set(req), db.set_user(user["id"] if user else None)
         try:
             length = int(self.headers.get("Content-Length") or 0)
+            if length > MAX_BODY:
+                raise HTTPError(413, "request too large")
             body = json.loads(self.rfile.read(length) or b"{}") if length else {}
             params = {k: v[0] for k, v in parse_qs(url.query).items()}
             result = fn(body, params, *match.groups())
@@ -624,7 +639,7 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as e:  # noqa: BLE001
             import traceback
             traceback.print_exc()
-            self._json(500, {"error": f"{type(e).__name__}: {e}"})
+            self._json(500, {"error": "Something went wrong on the server"})  # details stay in the log
         finally:
             _request.reset(req_token)
             db._current_user.reset(user_token)
