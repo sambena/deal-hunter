@@ -23,7 +23,8 @@ DEFAULT_SETTINGS = {
         "looking for", "read description",
     ],
     "sources_enabled": {"ebay": True, "ebay_local": True, "reddit": True, "bestbuy": False,
-                        "slickdeals": True, "buildapcsales": True, "ksl": True},
+                        "slickdeals": True, "buildapcsales": True, "ksl": True,
+                        "craigslist": True},
     "ebay_client_id": "",
     "ebay_client_secret": "",
     "ebay_marketplace": "EBAY_US",
@@ -74,7 +75,7 @@ CREATE TABLE IF NOT EXISTS watches (
     max_price REAL,
     condition TEXT NOT NULL DEFAULT 'any',
     include_auctions INTEGER NOT NULL DEFAULT 0,
-    sources TEXT NOT NULL DEFAULT '["ebay","ebay_local","ksl","reddit","slickdeals","buildapcsales"]',
+    sources TEXT NOT NULL DEFAULT '["ebay","ebay_local","ksl","craigslist","reddit","slickdeals","buildapcsales"]',
     enabled INTEGER NOT NULL DEFAULT 1,
     notes TEXT NOT NULL DEFAULT '',
     machine_id INTEGER,
@@ -297,6 +298,14 @@ def conn() -> sqlite3.Connection:
                 # Shared AI arrived: everything so far ran on the person's own key.
                 _conn.execute("UPDATE ai_usage SET paid_by = user_id WHERE paid_by IS NULL")
                 _conn.execute("PRAGMA user_version = 6")
+            if _conn.execute("PRAGMA user_version").fetchone()[0] < 7:
+                # Craigslist arrived: watches that search locally (KSL) search Craigslist too.
+                for r in _conn.execute("SELECT id, sources FROM watches").fetchall():
+                    srcs = json.loads(r["sources"])
+                    if "ksl" in srcs and "craigslist" not in srcs:
+                        srcs.insert(srcs.index("ksl") + 1, "craigslist")
+                        _conn.execute("UPDATE watches SET sources = ? WHERE id = ?", (json.dumps(srcs), r["id"]))
+                _conn.execute("PRAGMA user_version = 7")
             _conn.execute("CREATE INDEX IF NOT EXISTS idx_watches_user ON watches(user_id)")
             _conn.execute("CREATE INDEX IF NOT EXISTS idx_machines_user ON machines(user_id)")
             _conn.commit()

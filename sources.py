@@ -12,6 +12,7 @@ import base64
 import email.utils
 import html
 import json
+import math
 import re
 import threading
 import time
@@ -483,8 +484,109 @@ def ksl(watch: dict, settings: dict) -> list[dict]:
     return out
 
 
+# ---- Craigslist (local; the search page's own JSON API) ---------------------
+# sapi.craigslist.org answers the search page with packed rows: offsets from a base id/date, the price,
+# "area:place~lat~lon", then tagged lists ([4, images...], [6, slug], [13, uuid]) and the title last.
+# Searches spill into nearby areas, so rows farther than the radius are dropped here.
+
+CRAIGSLIST_URL = "https://sapi.craigslist.org/web/v8/postings/search/full"
+CRAIGSLIST_GAP_SECONDS = 3
+_craigslist_last = {"at": 0.0}
+_places: dict = {}  # ZIP -> {lat, lon, city, state}, from Craigslist's answers (OfferUp needs it too)
+
+
+def _miles(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    a = math.sin((p2 - p1) / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(math.radians(lon2 - lon1) / 2) ** 2
+    return 3958.8 * 2 * math.asin(math.sqrt(a))
+
+
+def _craigslist_search(zip_code: str, radius: int, query: str, lo=None, hi=None) -> dict:
+    params = {"batch": "1-0-360-0-0", "cc": "US", "lang": "en", "searchPath": "sss",
+              "postal": zip_code, "search_distance": str(radius), "query": query}
+    if lo:
+        params["min_price"] = str(int(lo))
+    if hi:
+        params["max_price"] = str(int(math.ceil(hi)))
+    wait = CRAIGSLIST_GAP_SECONDS - (time.time() - _craigslist_last["at"])
+    if wait > 0:
+        time.sleep(wait)
+    try:
+        data = _http(CRAIGSLIST_URL + "?" + urllib.parse.urlencode(params),
+                     headers={**KSL_HEADERS, "Accept": "application/json", "Referer": "https://www.craigslist.org/"})
+    finally:
+        _craigslist_last["at"] = time.time()
+    data = data.get("data") or {}
+    loc = data.get("location") or {}
+    if loc.get("lat") is not None:
+        _places[zip_code] = {"lat": loc["lat"], "lon": loc["lon"], "city": loc.get("city", ""),
+                             "state": loc.get("region", "")}
+    return data
+
+
+def zip_place(zip_code: str) -> dict:
+    """Where a ZIP is (lat/lon, city, state), asked of Craigslist once and remembered."""
+    if zip_code not in _places:
+        _craigslist_search(zip_code, 1, "")
+    if zip_code not in _places:
+        raise SourceError(f"couldn't find where ZIP {zip_code} is")
+    return _places[zip_code]
+
+
+def _craigslist_row(row: list, decode: dict) -> dict | None:
+    try:
+        tags = {r[0]: r[1:] for r in row[6:-1] if isinstance(r, list) and r}
+        area, place, lat, lon = re.match(r"(\d+):(\d+)~([-\d.]+)~([-\d.]+)", row[4]).groups()
+        places = decode.get("locationDescriptions") or []
+        return {"id": decode["minPostingId"] + row[0], "posted": decode["minPostedDate"] + row[1],
+                "price": row[3] if row[3] >= 0 else None, "lat": float(lat), "lon": float(lon),
+                "place": places[int(place)] if int(place) < len(places) and places[int(place)] else "",
+                "images": tags.get(4, []), "slug": (tags.get(6) or [""])[0], "uuid": (tags.get(13) or [""])[0],
+                "title": row[-1] if isinstance(row[-1], str) else ""}
+    except (AttributeError, IndexError, KeyError, TypeError, ValueError):
+        return None  # a row in a shape we don't know; skip it rather than fail the whole search
+
+
+def craigslist(watch: dict, settings: dict) -> list[dict]:
+    zip_code = str(settings.get("zip_code") or "").strip()
+    if not zip_code:
+        raise SourceError("set your ZIP code in Settings > Local area")
+    terms = search_terms(watch["query"])
+    if not terms:
+        return []
+    radius = max(1, int(float(settings.get("local_radius_miles") or 50)))
+    data = _craigslist_search(zip_code, radius, terms, watch.get("min_price"), watch.get("max_price"))
+    decode, home = data.get("decode") or {}, data.get("location") or {}
+    if data and "minPostingId" not in decode and data.get("items"):
+        raise SourceError("couldn't read Craigslist's results (did the site change?)")
+    out = []
+    for raw in data.get("items") or []:
+        r = _craigslist_row(raw, decode)
+        if not r or not r["title"]:
+            continue
+        if home.get("lat") is not None and _miles(home["lat"], home["lon"], r["lat"], r["lon"]) > radius:
+            continue
+        img = r["images"][0].split(":", 1)[-1] if r["images"] else None
+        out.append({
+            "source": "craigslist",
+            "source_id": str(r["id"]),
+            "title": r["title"],
+            "price": float(r["price"]) if r["price"] is not None else None,
+            "shipping": 0.0,  # local pickup
+            "currency": "USD",
+            "url": (f"https://www.craigslist.org/view/d/{r['slug']}/{r['uuid']}" if r["uuid"]
+                    else f"https://www.craigslist.org/search/sss?query={urllib.parse.quote(terms)}"),
+            "image": f"https://images.craigslist.org/{img}_300x300.jpg" if img else None,
+            "location": r["place"] if len(r["place"]) <= 40 else "",  # some sellers put ads in this field
+            "condition": "used",
+            "buying": "Craigslist",
+            "text": "",
+        })
+    return out
+
+
 SOURCES = {"ebay": ebay, "ebay_local": ebay_local, "reddit": reddit, "bestbuy": bestbuy,
-           "slickdeals": slickdeals, "buildapcsales": buildapcsales, "ksl": ksl}
+           "slickdeals": slickdeals, "buildapcsales": buildapcsales, "ksl": ksl, "craigslist": craigslist}
 
 # Sources that see the same items under the same ids; a listing is stored once per family.
 SOURCE_FAMILY = {"ebay_local": "ebay"}
