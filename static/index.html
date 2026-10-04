@@ -132,8 +132,25 @@
           </div>
           <div class="row"><button type="button" id="acct-save">Save account</button>
             <span class="spacer"></span><button type="button" class="danger" id="sign-out">Sign out</button></div>
+          <p class="app-link" hidden><a href="/download/android">Get the Android app</a> <span class="muted"></span></p>
           <h3>Signed in on</h3>
           <div id="acct-devices"></div>
+        </div>
+
+        <div class="panel" data-admin>
+          <h2>People</h2>
+          <p class="muted">Invite friends and family. Each person has their own watches, finds, devices and AI settings;
+            you see their name, how many watches they have and their AI spend, not what they're watching.</p>
+          <div class="grid">
+            <label>Who it's for (just a note) <input id="invite-note" placeholder="e.g. Laura"></label>
+            <label>Watch limit <input id="invite-limit" type="number" min="0" value="10"></label>
+          </div>
+          <div class="row"><button type="button" class="primary" id="invite-new">Create invite link</button></div>
+          <div id="invite-result" hidden>
+            <label>Send this link (it works once, for 7 days) <input id="invite-link" readonly></label>
+            <div class="row"><button type="button" class="small" id="invite-copy">Copy link</button></div>
+          </div>
+          <div id="people-list"></div>
         </div>
 
         <div class="panel">
@@ -358,6 +375,7 @@
       <label data-setup>Password again <input name="password2" type="password" autocomplete="new-password"></label>
       <div class="row"><button class="primary" type="submit" id="auth-go">Sign in</button></div>
       <p class="muted" id="auth-error"></p>
+      <p class="app-link" hidden><a href="/download/android">Get the Android app</a> <span class="muted"></span></p>
     </form>
   </div>
 

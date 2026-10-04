@@ -77,6 +77,9 @@ def get_state(body, params):
 def create_watch(body, params):
     if not body.get("name") or not body.get("query"):
         raise HTTPError(400, "A watch needs a name and a query")
+    limit = me().get("watch_limit")
+    if limit is not None and len(db.list_watches()) >= limit:
+        raise HTTPError(403, f"watch limit reached ({limit}); delete one or ask Sam for more")
     wid = db.create_watch(body)
     if body.get("check") is False:  # many at once (deal radar): the caller starts one background check after
         return {"id": wid, "new": 0, "errors": []}
@@ -519,9 +522,173 @@ def revoke_token(body, params, tid):
     return {"ok": True}
 
 
+# ---- invites and password resets ------------------------------------------------
+# The admin makes a one-time link (7 days) and sends it however they like. Opening it lets a friend
+# create an account, or lets someone set a new password. Only a hash of the code is stored.
+
+INVITE_DAYS = 7
+
+
+def _require_admin() -> dict:
+    if not is_admin():
+        raise HTTPError(403, "only the admin can do that")
+    return me()
+
+
+def _make_link(kind: str, note: str = "", user_id: int | None = None, watch_limit: int | None = None) -> dict:
+    code = secrets.token_urlsafe(24)
+    expires = time.time() + INVITE_DAYS * 86400
+    db.execute("""INSERT INTO invites (code_hash, kind, note, user_id, watch_limit, created_by, created_at, expires_at)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+               (auth._hash(code), kind, note[:80], user_id, watch_limit, me()["id"], time.time(), expires))
+    req = _request.get() or {}
+    base = req.get("base_url") or ""
+    return {"link": f"{base}/#{kind}={code}", "expires_at": expires}
+
+
+def _open_invite(code: str) -> dict:
+    rows = db.query("SELECT * FROM invites WHERE code_hash = ?", (auth._hash(code or ""),))
+    inv = rows[0] if rows else None
+    if not inv or inv["used_at"] or inv["expires_at"] < time.time():
+        raise HTTPError(410, "This link has expired or was already used; ask for a new one")
+    return inv
+
+
+@route("GET", "/api/auth/link")
+def auth_link(body, params):
+    """What a link is for, so the page can show the right form."""
+    inv = _open_invite(params.get("code", ""))
+    out = {"kind": inv["kind"], "note": inv["note"]}
+    if inv["kind"] == "reset":
+        out["email"] = db.query("SELECT email FROM users WHERE id = ?", (inv["user_id"],))[0]["email"]
+    return out
+
+
+@route("POST", "/api/auth/accept")
+def auth_accept(body, params):
+    """Use an invite (new account) or reset link (new password), then sign in."""
+    req = _request.get() or {}
+    try:
+        auth.check_rate(req.get("address", "?"))
+    except auth.AuthError as e:
+        raise HTTPError(429, str(e)) from e
+    inv = _open_invite(str(body.get("code") or ""))
+    try:
+        password = auth.hash_password(str(body.get("password") or ""))
+    except auth.AuthError as e:
+        raise HTTPError(400, str(e)) from e
+    if inv["kind"] == "invite":
+        email = str(body.get("email") or "").strip()
+        if "@" not in email:
+            raise HTTPError(400, "Enter your email address")
+        if db.query("SELECT 1 FROM users WHERE lower(email) = lower(?)", (email,)):
+            raise HTTPError(409, "That email already has an account; sign in instead")
+        uid = db.execute("""INSERT INTO users (email, name, password_hash, role, watch_limit, created_at)
+                            VALUES (?, ?, ?, 'member', ?, ?)""",
+                         (email, str(body.get("name") or "").strip()[:60] or email.split("@")[0], password,
+                          inv["watch_limit"] if inv["watch_limit"] is not None else db.DEFAULT_WATCH_LIMIT, time.time()))
+    else:
+        uid = inv["user_id"]
+        db.execute("UPDATE users SET password_hash = ? WHERE id = ?", (password, uid))
+        db.execute("DELETE FROM tokens WHERE user_id = ?", (uid,))  # a reset signs out everywhere else
+    db.execute("UPDATE invites SET used_at = ? WHERE id = ?", (time.time(), inv["id"]))
+    user = db.query("SELECT * FROM users WHERE id = ?", (uid,))[0]
+    device = str(body.get("device_name") or "").strip()
+    return _signed_in(user, "device" if device else "web", device or "web browser")
+
+
+# ---- people (admin) -------------------------------------------------------------
+# Names, spend and limits only: the admin doesn't see anyone else's watches, finds or devices.
+
+@route("GET", "/api/admin/users")
+def admin_users(body, params):
+    _require_admin()
+    month = ai.month_start()
+    users = db.query("""SELECT u.id, u.name, u.email, u.role, u.disabled, u.watch_limit, u.created_at,
+                          u.password_hash IS NOT NULL AS has_password,
+                          (SELECT COUNT(*) FROM watches w WHERE w.user_id = u.id) AS watches,
+                          (SELECT COALESCE(SUM(cost), 0) FROM ai_usage a WHERE a.user_id = u.id AND a.at >= ?) AS ai_spent,
+                          (SELECT MAX(last_used) FROM tokens t WHERE t.user_id = u.id) AS last_active
+                        FROM users u ORDER BY u.role = 'admin' DESC, u.name""", (month,))
+    invites = db.query("""SELECT id, kind, note, user_id, watch_limit, created_at, expires_at FROM invites
+                          WHERE used_at IS NULL AND expires_at > ? ORDER BY created_at DESC""", (time.time(),))
+    return {"users": users, "invites": invites, "default_watch_limit": db.DEFAULT_WATCH_LIMIT}
+
+
+@route("POST", "/api/admin/invites")
+def admin_invite(body, params):
+    _require_admin()
+    limit = body.get("watch_limit")
+    limit = db.DEFAULT_WATCH_LIMIT if limit in (None, "") else max(0, int(limit))
+    return _make_link("invite", str(body.get("note") or ""), watch_limit=limit)
+
+
+@route("DELETE", r"/api/admin/invites/(\d+)")
+def admin_cancel_invite(body, params, iid):
+    _require_admin()
+    if not db.execute_count("DELETE FROM invites WHERE id = ? AND used_at IS NULL", (int(iid),)):
+        raise HTTPError(404, "not found")
+    return {"ok": True}
+
+
+@route("PUT", r"/api/admin/users/(\d+)")
+def admin_update_user(body, params, uid):
+    admin = _require_admin()
+    uid = int(uid)
+    if not db.query("SELECT 1 FROM users WHERE id = ?", (uid,)):
+        raise HTTPError(404, "not found")
+    if "disabled" in body:
+        if uid == admin["id"]:
+            raise HTTPError(400, "you can't disable yourself")
+        db.execute("UPDATE users SET disabled = ? WHERE id = ?", (1 if body["disabled"] else 0, uid))
+        if body["disabled"]:
+            db.execute("DELETE FROM tokens WHERE user_id = ?", (uid,))  # signed out everywhere at once
+    if "watch_limit" in body:
+        limit = body["watch_limit"]
+        db.execute("UPDATE users SET watch_limit = ? WHERE id = ?",
+                   (None if limit in (None, "") else max(0, int(limit)), uid))
+    return {"ok": True}
+
+
+@route("POST", r"/api/admin/users/(\d+)/reset")
+def admin_reset_link(body, params, uid):
+    _require_admin()
+    rows = db.query("SELECT name FROM users WHERE id = ?", (int(uid),))
+    if not rows:
+        raise HTTPError(404, "not found")
+    return _make_link("reset", f"password reset for {rows[0]['name']}", user_id=int(uid))
+
+
 # ---- HTTP plumbing ----------------------------------------------------------
 
-OPEN_ROUTES = {("GET", "/api/auth/status"), ("POST", "/api/auth/setup"), ("POST", "/api/auth/login")}
+OPEN_ROUTES = {("GET", "/api/auth/status"), ("POST", "/api/auth/setup"), ("POST", "/api/auth/login"),
+               ("GET", "/api/auth/link"), ("POST", "/api/auth/accept"), ("GET", "/api/app/android")}
+
+# The Android app's latest build. The Android project publishes it into a folder (config "downloads_dir";
+# on the Frigate box ~/deal-hunter-app mounted read-only) with android.json beside it:
+# {"versionName", "versionCode", "sha256"}. Public, so an invited friend can install it before signing in.
+DOWNLOADS = {"dir": None}
+ANDROID_APK = "deal-hunter.apk"
+
+
+def _downloads() -> Path:
+    return Path(DOWNLOADS["dir"]) if DOWNLOADS["dir"] else db.DB_PATH.parent / "downloads"
+
+
+@route("GET", "/api/app/android")
+def android_app(body, params):
+    apk = _downloads() / ANDROID_APK
+    if not apk.is_file():
+        return {"available": False}
+    info_path = _downloads() / "android.json"
+    try:
+        info = json.loads(info_path.read_text()) if info_path.is_file() else {}
+    except ValueError:
+        info = {}
+    st = apk.stat()
+    return {"available": True, "url": "/download/android", "version": info.get("versionName") or info.get("version"),
+            "version_code": info.get("versionCode"), "sha256": info.get("sha256"), "size": st.st_size,
+            "published_at": st.st_mtime}
 MAX_BODY = 1_000_000  # bytes; pasted specs and imports are far smaller
 SECURITY_HEADERS = [  # for when the site faces the internet
     ("X-Content-Type-Options", "nosniff"),
@@ -600,6 +767,12 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(404, {"error": "API only on this port; see /api.html on the web address"})
             if url.path.startswith(API_PORT_BLOCKED):
                 return self._json(403, {"error": "not available through the API port"})
+        if method == "GET" and url.path == "/download/android" and not self.api_only:
+            apk = _downloads() / ANDROID_APK
+            if not apk.is_file():
+                return self._send(404, b"The Android app hasn't been published yet", "text/plain")
+            return self._send(200, apk.read_bytes(), "application/vnd.android.package-archive",
+                              [("Content-Disposition", f'attachment; filename="{ANDROID_APK}"')])
         if method == "GET" and not url.path.startswith("/api/"):
             return self._static(url.path)
         for m, pattern, fn in ROUTES:
@@ -614,8 +787,10 @@ class Handler(BaseHTTPRequestHandler):
         user, token = self._identify()
         if not user and (method, url.path) not in OPEN_ROUTES:
             return self._json(401, {"error": "Sign in to Deal Hunter"})
+        host = self.headers.get("X-Forwarded-Host") or self.headers.get("Host") or "localhost"
         req = {"user": user, "token": token, "token_id": user.get("token_id") if user else None,
-               "api_port": self.api_only, "address": self._address()}
+               "api_port": self.api_only, "address": self._address(),
+               "base_url": f"{'https' if self._https() else 'http'}://{host}"}
         req_token, user_token = _request.set(req), db.set_user(user["id"] if user else None)
         try:
             length = int(self.headers.get("Content-Length") or 0)
@@ -671,6 +846,7 @@ def main() -> None:
     host = config.get("host", "127.0.0.1")
     port = int(config.get("port", 8780))
     db.conn()
+    DOWNLOADS["dir"] = config.get("downloads_dir")
     if "--no-poll" not in sys.argv:
         poller.start()
     if config.get("api_port"):
