@@ -31,63 +31,10 @@ async function api(method, path, body) {
     body: write ? JSON.stringify(body || {}) : undefined,
   });
   const data = await res.json().catch(() => ({}));
-  if (res.status === 401 && !path.startsWith("/api/auth/")) { showAuth(false); throw new Error("Please sign in"); }
+  if (res.status === 401) { location.reload(); throw new Error("Please sign in"); }  // the server shows the sign-in page
   if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
   return data;
 }
-
-// ---- sign in ----------------------------------------------------------------
-// First visit after accounts arrived: the admin sets up their name, email and password. After that,
-// everyone signs in with email + password; the browser keeps a long-lived session cookie.
-
-function showAuth(setup, link) {
-  const screen = $("#auth-screen"), f = $("#auth-form");
-  f.dataset.mode = link ? link.kind : setup ? "setup" : "login";
-  if (link) {
-    // Invite: name, email and password for a new account. Reset: a new password for an existing one.
-    const invite = link.kind === "invite";
-    $("#auth-title").textContent = invite ? "Join Deal Hunter" : "Choose a new password";
-    $("#auth-intro").textContent = invite
-      ? "You've been invited to Deal Hunter. Pick a name, your email and a password; your watches and finds are yours alone."
-      : `For ${link.email}. You'll be signed out everywhere else.`;
-    $$("[data-setup]", f).forEach(el => (el.hidden = false));
-    f.name.closest("label").hidden = !invite;
-    f.email.closest("label").hidden = !invite;
-    f.email.required = invite;
-    f.password.autocomplete = "new-password";
-    $("#auth-go").textContent = invite ? "Create my account" : "Save new password";
-    $("#auth-error").textContent = "";
-    screen.hidden = false;
-    document.body.classList.add("signed-out");
-    return;
-  }
-  $("#auth-title").textContent = setup ? "Set up your Deal Hunter account" : "Sign in to Deal Hunter";
-  $("#auth-intro").textContent = setup
-    ? "Deal Hunter now has accounts so friends and family can have their own. Everything you already have becomes yours; pick the email and password you'll sign in with."
-    : "";
-  $$("[data-setup]", f).forEach(el => (el.hidden = !setup));
-  f.password.autocomplete = setup ? "new-password" : "current-password";
-  $("#auth-go").textContent = setup ? "Create my account" : "Sign in";
-  $("#auth-error").textContent = "";
-  screen.hidden = false;
-  document.body.classList.add("signed-out");
-}
-
-$("#auth-form").addEventListener("submit", async e => {
-  e.preventDefault();
-  const f = e.target, mode = f.dataset.mode;
-  if (mode !== "login" && f.password.value !== f.password2.value) return ($("#auth-error").textContent = "The passwords don't match");
-  const fields = { name: f.name.value.trim(), email: f.email.value.trim(), password: f.password.value };
-  try {
-    if (mode === "invite" || mode === "reset") {
-      await api("POST", "/api/auth/accept", { ...fields, code: linkCode().code });
-      history.replaceState(null, "", location.pathname);  // the link is used up
-    } else {
-      await api("POST", mode === "setup" ? "/api/auth/setup" : "/api/auth/login", fields);
-    }
-    location.reload();
-  } catch (err) { $("#auth-error").textContent = err.message; }
-});
 
 // "Get the Android app": shown wherever .app-link appears, once a build has been published.
 async function showAppLinks() {
@@ -98,12 +45,6 @@ async function showAppLinks() {
       app.published_at && `updated ${new Date(app.published_at * 1000).toLocaleDateString()}`].filter(Boolean).join(" · ");
     $$(".app-link").forEach(p => { $(".muted", p).textContent = note ? `(${note})` : ""; p.hidden = false; });
   } catch {}
-}
-
-// An invite or reset link looks like https://deals.cougarcave.dev/#invite=CODE or #reset=CODE.
-function linkCode() {
-  const m = location.hash.match(/^#(invite|reset)=([\w-]+)$/);
-  return m ? { kind: m[1], code: m[2] } : null;
 }
 
 // ---- people (admin) ---------------------------------------------------------------
@@ -931,13 +872,6 @@ $("#test-discord").addEventListener("click", e => busy(e.target, async () => {
 
 (async () => {
   showAppLinks();
-  const link = linkCode();
-  if (link) {
-    try { return showAuth(false, { ...(await api("GET", `/api/auth/link?code=${encodeURIComponent(link.code)}`)) }); }
-    catch (err) { history.replaceState(null, "", location.pathname); toast(err.message, true); }
-  }
-  const status = await api("GET", "/api/auth/status");
-  if (status.setup_needed || !status.user) return showAuth(status.setup_needed);
   await refresh();
   let tab = "finds";
   try { tab = localStorage.getItem("tab") || "finds"; } catch {}

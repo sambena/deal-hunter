@@ -661,12 +661,14 @@ def admin_reset_link(body, params, uid):
 
 # ---- HTTP plumbing ----------------------------------------------------------
 
+SIGNED_OUT_FILES = {"login.html", "style.css"}
 OPEN_ROUTES = {("GET", "/api/auth/status"), ("POST", "/api/auth/setup"), ("POST", "/api/auth/login"),
                ("GET", "/api/auth/link"), ("POST", "/api/auth/accept"), ("GET", "/api/app/android")}
 
 # The Android app's latest build. The Android project publishes it into a folder (config "downloads_dir";
 # on the Frigate box ~/deal-hunter-app mounted read-only) with android.json beside it:
-# {"versionName", "versionCode", "sha256"}. Public, so an invited friend can install it before signing in.
+# {"versionName", "versionCode", "sha256"}. Signed-in people can get it, and so can anyone holding a
+# working invite or reset link, so an invited friend can install it before they have an account.
 DOWNLOADS = {"dir": None}
 ANDROID_APK = "deal-hunter.apk"
 
@@ -675,8 +677,16 @@ def _downloads() -> Path:
     return Path(DOWNLOADS["dir"]) if DOWNLOADS["dir"] else db.DB_PATH.parent / "downloads"
 
 
+def _may_download(params) -> None:
+    req = _request.get()
+    if req is None or req["user"]:  # signed in (or called from inside the server)
+        return
+    _open_invite(params.get("code", ""))  # raises 410 for a missing, used or expired link
+
+
 @route("GET", "/api/app/android")
 def android_app(body, params):
+    _may_download(params)
     apk = _downloads() / ANDROID_APK
     if not apk.is_file():
         return {"available": False}
@@ -767,14 +777,14 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(404, {"error": "API only on this port; see /api.html on the web address"})
             if url.path.startswith(API_PORT_BLOCKED):
                 return self._json(403, {"error": "not available through the API port"})
+        user, token = self._identify()
         if method == "GET" and url.path == "/download/android" and not self.api_only:
-            apk = _downloads() / ANDROID_APK
-            if not apk.is_file():
-                return self._send(404, b"The Android app hasn't been published yet", "text/plain")
-            return self._send(200, apk.read_bytes(), "application/vnd.android.package-archive",
-                              [("Content-Disposition", f'attachment; filename="{ANDROID_APK}"')])
+            return self._download(user, parse_qs(url.query).get("code", [""])[0])
         if method == "GET" and not url.path.startswith("/api/"):
-            return self._static(url.path)
+            return self._static(url.path, user)
+        # Signed out, everything but sign-in answers the same way, so nobody can map the API from outside.
+        if not user and (method, url.path) not in OPEN_ROUTES:
+            return self._json(401, {"error": "Sign in to Deal Hunter"})
         for m, pattern, fn in ROUTES:
             match = pattern.match(url.path)
             if m == method and match:
@@ -784,9 +794,6 @@ class Handler(BaseHTTPRequestHandler):
         if method != "GET" and self.headers.get_content_type() != "application/json":
             # Browsers can send cross-site form/text POSTs without asking first, but not JSON ones.
             return self._json(415, {"error": "send JSON"})
-        user, token = self._identify()
-        if not user and (method, url.path) not in OPEN_ROUTES:
-            return self._json(401, {"error": "Sign in to Deal Hunter"})
         host = self.headers.get("X-Forwarded-Host") or self.headers.get("Host") or "localhost"
         req = {"user": user, "token": token, "token_id": user.get("token_id") if user else None,
                "api_port": self.api_only, "address": self._address(),
@@ -819,8 +826,26 @@ class Handler(BaseHTTPRequestHandler):
             _request.reset(req_token)
             db._current_user.reset(user_token)
 
-    def _static(self, path: str) -> None:
+    def _download(self, user: dict | None, code: str) -> None:
+        if not user:
+            try:
+                _open_invite(code)
+            except HTTPError:
+                return self._send(401, b"Sign in to Deal Hunter to get the app", "text/plain")
+        apk = _downloads() / ANDROID_APK
+        if not apk.is_file():
+            return self._send(404, b"The Android app hasn't been published yet", "text/plain")
+        return self._send(200, apk.read_bytes(), "application/vnd.android.package-archive",
+                          [("Content-Disposition", f'attachment; filename="{ANDROID_APK}"')])
+
+    def _static(self, path: str, user: dict | None) -> None:
         rel = "index.html" if path in ("", "/") else path.lstrip("/")
+        if not user:
+            # Signed out, the site is just its sign-in page: the app, its script and the API docs stay hidden.
+            if rel == "index.html":
+                rel = "login.html"
+            elif rel not in SIGNED_OUT_FILES:
+                return self._send(401, b"Sign in to Deal Hunter", "text/plain")
         target = (STATIC_DIR / rel).resolve()
         if STATIC_DIR not in target.parents or not target.is_file():
             return self._send(404, b"not found", "text/plain")
