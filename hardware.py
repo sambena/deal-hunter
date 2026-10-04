@@ -1,8 +1,8 @@
 """Built-in upgrade rules: work out a machine's platform from its parts and
 suggest drop-in CPU and RAM upgrades. Used when AI is off.
 
-It only knows desktop platforms from roughly 2015 on. Anything it can't place
-(laptops, mini PCs, GPUs) is left to AI mode or manual watches.
+It knows Intel desktop platforms from Sandy Bridge (2011) on and AMD from AM4. Anything it
+can't place (laptops, mini PCs, GPUs) is left to AI mode or manual watches.
 """
 
 from __future__ import annotations
@@ -11,8 +11,30 @@ import re
 
 RAM_EXCLUDES = ["ecc", "rdimm", "lrdimm", "registered", "server", "sodimm", "so dimm", "laptop"]
 
-# Best upgrade first. (display name, query, note)
+# Best upgrade first. (display name, query, note[, chipsets]) where chipsets, if given, is a regex the
+# motherboard must match for that CPU to work (left out when the board isn't known).
 PLATFORMS: dict[str, dict] = {
+    "LGA1155": {
+        "label": "Intel 6/7-series (LGA1155)",
+        "ram": "DDR3", "channels": 2, "kits": ["4x8gb|32gb"],  # 32GB is the most these boards take
+        "cpus": [
+            ("i7-3770K", "3770k", "6-series boards (Z68/P67/H67/H61) need a BIOS update for 3rd gen"),
+            ("i7-3770", "3770 -3770k -3770s -3770t", "6-series boards (Z68/P67/H67/H61) need a BIOS update for 3rd gen"),
+            ("i7-2600K", "2600k", ""),
+        ],
+        "cpu_exclude": ["xeon"],
+    },
+    "LGA1150": {
+        "label": "Intel 8/9-series (LGA1150)",
+        "ram": "DDR3", "channels": 2, "kits": ["4x8gb|32gb"],  # 32GB is the most these boards take
+        "cpus": [
+            ("i7-4790K", "4790k", "Made for 9-series (Z97/H97); only some Z87/H87 boards got a BIOS for it, so check your board's CPU support list"),
+            ("i7-5775C", "5775c", "Broadwell: Z97/H97 only, with a BIOS update", r"\b[zh]97\b"),
+            ("i7-4790", "4790 -4790k -4790s -4790t", "Z87/H87/B85 need a BIOS update for the 4790"),
+            ("i7-4770K", "4770k", ""),
+        ],
+        "cpu_exclude": ["xeon"],
+    },
     "LGA2066": {
         "label": "Intel X299 (LGA2066)",
         "ram": "DDR4", "channels": 4,
@@ -128,6 +150,9 @@ PLATFORMS: dict[str, dict] = {
 }
 
 CHIPSETS = [
+    # Older boards glue the chipset to their name ("P8P67", "B85M-D3H"): no letter before, no digit after.
+    (r"(?<![a-z])(?:z(?:77|75|68)|p67|[hbq](?:77|75|67|65|61))(?!\d)", "LGA1155"),
+    (r"(?<![a-z])(?:[zhq](?:87|97)|b85|h81|q85)(?!\d)", "LGA1150"),
     (r"\bx299\b", "LGA2066"),
     (r"\bx99\b", "LGA2011-3"),
     (r"\b[zbh](?:170|270|250|150|110)\b|\bq[12]70\b", "LGA1151"),
@@ -160,6 +185,12 @@ def cpu_socket(model: str) -> str | None:
         gen = int(num[0])
         if gen in (5, 6) and suffix in ("k", "x") and num[1] in "89":
             return "LGA2011-3"
+        if gen in (2, 3, 4) and num[1] in "89":
+            return None  # LGA2011 HEDT (3930K, 4960X...): not covered
+        if gen in (2, 3):
+            return "LGA1155"
+        if gen == 4 or (gen == 5 and suffix == "c"):
+            return "LGA1150"
         if gen in (7, 9) and hedt:
             return "LGA2066"
         if gen in (6, 7):
@@ -200,8 +231,8 @@ def _cpu_rank(platform: dict, parts: list[dict]) -> int:
     """Index of the machine's current CPU in the upgrade list (len if not found)."""
     current = " ".join(p.get("model", "") for p in parts if p.get("category") == "cpu").lower().replace("-", "")
     current = current.replace(" ", "")
-    for i, (_, query, _) in enumerate(platform["cpus"]):
-        key = query.split()[0]
+    for i, cpu in enumerate(platform["cpus"]):
+        key = cpu[1].split()[0]
         if key in current:
             return i
     return len(platform["cpus"])
@@ -213,8 +244,12 @@ def suggest(machine: dict) -> dict:
     if not key:
         return {"platform": None, "explanation": how, "suggestions": []}
     plat = PLATFORMS[key]
+    board = " ".join(p.get("model", "") for p in parts if p.get("category") == "motherboard").lower()
     suggestions = []
-    for name, query, note in plat["cpus"][:_cpu_rank(plat, parts)]:
+    for cpu in plat["cpus"][:_cpu_rank(plat, parts)]:
+        name, query, note = cpu[:3]
+        if len(cpu) > 3 and board and not re.search(cpu[3], board):
+            continue  # this board's chipset can't run it
         suggestions.append({
             "name": f"{name} for {machine['name']}",
             "category": "cpu",
@@ -224,8 +259,9 @@ def suggest(machine: dict) -> dict:
             "reason": note or f"Drop-in for {plat['label']}",
         })
     ram = plat["ram"]
-    if ram in ("DDR4", "DDR5"):
-        kits = ["4x32gb|128gb", "4x16gb|64gb"] if plat["channels"] == 4 else ["2x32gb|64gb", "2x16gb|32gb"]
+    if ram in ("DDR3", "DDR4", "DDR5"):
+        kits = plat.get("kits") or (["4x32gb|128gb", "4x16gb|64gb"] if plat["channels"] == 4
+                                    else ["2x32gb|64gb", "2x16gb|32gb"])
         for kit in kits:
             suggestions.append({
                 "name": f"{ram} {kit.split('|')[0].upper()} kit for {machine['name']}",
