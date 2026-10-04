@@ -9,6 +9,12 @@ const SOURCES = { ebay: "eBay", ebay_local: "eBay local pickup", ksl: "KSL Class
   buildapcsales: "r/buildapcsales", bestbuy: "Best Buy open-box" };
 const NEW_WATCH_SOURCES = ["ebay", "ebay_local", "ksl", "reddit", "slickdeals", "buildapcsales"];
 const sourceName = s => SOURCES[s] || s;
+// My hardware covers everything owned. PCs and servers list their parts; anything else is a make/model.
+const KINDS = { pc: "PC", server: "Server", tv: "TV", monitor: "Monitor", phone: "Phone", tablet: "Tablet",
+  audio: "Speaker / audio", network: "Network", console: "Game console", printer: "Printer", appliance: "Appliance",
+  "smart home": "Smart home", vehicle: "Vehicle", other: "Other" };
+const kindOptions = cur => Object.entries(KINDS).map(([k, label]) =>
+  `<option value="${esc(k)}" ${k === cur ? "selected" : ""}>${esc(label)}</option>`).join("");
 // Best Buy's API branding guidelines: their logo, linked, wherever their data appears.
 const BESTBUY_CREDIT = `<a class="bby-credit" href="https://developer.bestbuy.com" target="_blank" rel="noopener">
   <img src="https://developer.bestbuy.com/images/bestbuy-logo.png" alt="Best Buy Developer API"></a>`;
@@ -370,23 +376,66 @@ function partRow(p = { category: "cpu", model: "" }) {
 }
 
 function renderMachines() {
-  const box = $("#machines");
-  box.innerHTML = state.machines.map(m => machineCard(m)).join("") ||
-    `<p class="muted">No machines yet.</p>`;
+  const box = $("#machines"), want = $("#kind-filter").value;
+  const order = Object.keys(KINDS);
+  const list = state.machines.filter(m => !want || (m.kind || "pc") === want)
+    .sort((a, b) => order.indexOf(a.kind || "pc") - order.indexOf(b.kind || "pc") || a.name.localeCompare(b.name));
+  box.innerHTML = list.map(m => machineCard(m)).join("") ||
+    `<p class="muted">${state.machines.length ? "Nothing of that kind." : "Nothing here yet. Add a device, or import from Home Assistant."}</p>`;
 }
 
+$("#kind-filter").insertAdjacentHTML("beforeend", kindOptions(""));
+$("#kind-filter").addEventListener("change", renderMachines);
+$("#machines").addEventListener("change", e => {
+  if (e.target.matches("[data-f=kind]")) e.target.closest(".machine").dataset.kind = e.target.value;
+});
+
+// Import from Home Assistant: a ticked list of its devices, sorted into kinds; nothing is added until confirmed.
+$("#ha-import").addEventListener("click", e => busy(e.target, async () => {
+  const box = $("#ha-import-box");
+  const { devices } = await api("GET", "/api/import/ha");
+  if (!devices.length) { box.innerHTML = `<p class="muted">Everything Home Assistant knows about is already here.</p>`; return; }
+  box.innerHTML = `<p class="muted">${devices.length} devices from Home Assistant. Ticked ones look worth tracking;
+      smart plugs, sensors and things already added are left unticked.</p>
+    <div class="table-wrap"><table class="import">
+      <tr><th></th><th>Name</th><th>Kind</th><th>Make / model</th><th>Area</th></tr>
+      ${devices.map((d, i) => `<tr data-i="${i}">
+        <td><input type="checkbox" ${d.checked ? "checked" : ""}></td>
+        <td><input data-f="name" value="${esc(d.name)}"></td>
+        <td><select data-f="kind">${kindOptions(d.kind)}</select></td>
+        <td>${esc([d.make, d.model].filter(Boolean).join(" "))}${d.already ? ` <span class="muted">(already added)</span>` : ""}</td>
+        <td class="muted">${esc(d.area)}</td></tr>`).join("")}
+    </table></div>
+    <div class="row"><button class="primary" id="ha-import-go">Add ticked devices</button>
+      <button id="ha-import-cancel">Cancel</button></div>`;
+  $("#ha-import-cancel").onclick = () => (box.innerHTML = "");
+  $("#ha-import-go").onclick = ev => busy(ev.target, async () => {
+    const picked = $$("tr[data-i]", box).filter(r => $("input[type=checkbox]", r).checked).map(r => ({
+      ...devices[r.dataset.i], name: $("[data-f=name]", r).value.trim(), kind: $("[data-f=kind]", r).value }));
+    const { added } = await api("POST", "/api/import/ha", { devices: picked });
+    box.innerHTML = "";
+    toast(`Added ${added} device${added === 1 ? "" : "s"}`);
+    await refresh();
+    renderMachines();
+  });
+}));
+
 function machineCard(m) {
-  return `<div class="panel machine" data-id="${m.id ?? ""}">
+  const kind = m.kind || "pc";
+  return `<div class="panel machine" data-id="${m.id ?? ""}" data-kind="${esc(kind)}">
     <div class="grid">
-      <label>Name <input data-f="name" value="${esc(m.name)}" placeholder="X299 box"></label>
-      <label>Notes (use, PSU wattage, case limits…) <input data-f="notes" value="${esc(m.notes)}"></label>
+      <label>Name <input data-f="name" value="${esc(m.name)}" placeholder="X299 box, Living room TV…"></label>
+      <label>Kind <select data-f="kind">${kindOptions(kind)}</select></label>
+      <label class="gear-only">Make and model <input data-f="model" value="${esc(m.model || "")}" placeholder="LG OLED65B2AUA"></label>
+      <label>Notes <input data-f="notes" value="${esc(m.notes)}" placeholder="use, size, PSU wattage, limits…"></label>
     </div>
-    <div class="parts">${(m.parts.length ? m.parts : [{ category: "cpu", model: "" }, { category: "motherboard", model: "" }, { category: "ram", model: "" }]).map(partRow).join("")}</div>
+    <div class="parts parts-only">${(m.parts.length ? m.parts : [{ category: "cpu", model: "" }, { category: "motherboard", model: "" }, { category: "ram", model: "" }]).map(partRow).join("")}</div>
     <div class="row">
-      <button class="small" data-act="add-part">+ Part</button>
+      <button class="small parts-only" data-act="add-part">+ Part</button>
       <span class="spacer"></span>
       <button data-act="save">Save</button>
-      <button class="primary" data-act="suggest">Find upgrades</button>
+      <button class="primary parts-only" data-act="suggest">Find upgrades</button>
+      <button class="primary gear-only" data-act="watch-model">Watch this model</button>
       ${aiOn() ? `<button data-act="suggest-ai">Find upgrades with AI</button>` : ""}
       ${m.id ? `<button class="danger" data-act="delete">Delete</button>` : ""}
     </div>
@@ -397,6 +446,8 @@ function machineCard(m) {
 function machineFromCard(card) {
   return {
     name: $("[data-f=name]", card).value.trim() || "Untitled",
+    kind: $("[data-f=kind]", card).value,
+    model: $("[data-f=model]", card).value.trim(),
     notes: $("[data-f=notes]", card).value.trim(),
     parts: $$(".part-row", card).map(r => ({ category: $("[data-f=category]", r).value, model: $("[data-f=model]", r).value.trim() })),
   };
@@ -419,10 +470,22 @@ $("#machines").addEventListener("click", async e => {
   const card = e.target.closest(".machine");
   if (!btn || !card) return;
   const act = btn.dataset.act;
+  if (act === "watch-model") {
+    const data = machineFromCard(card);
+    if (!data.model) return toast("Add the make and model first", true);
+    const id = await saveMachine(card);
+    editWatch(null);
+    const f = $("#watch-form");
+    f.name.value = data.model;
+    f.query.value = data.model.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
+    f.machine_id.value = id;
+    toast("Check the query and price, then save the watch");
+    return;
+  }
   if (act === "add-part") return $(".parts", card).insertAdjacentHTML("beforeend", partRow({ category: "other", model: "" }));
   if (act === "rm-part") return btn.closest(".part-row").remove();
   if (act === "delete") {
-    if (!confirm("Delete this machine? Its watches are kept.")) return;
+    if (!confirm("Delete this device? Its watches are kept.")) return;
     await api("DELETE", `/api/machines/${card.dataset.id}`);
     await refresh();
     return renderMachines();

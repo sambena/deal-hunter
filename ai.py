@@ -355,7 +355,10 @@ Used-market sellers write titles inconsistently, so prefer model numbers over fu
 
 
 def _describe_machine(machine: dict) -> str:
-    lines = [f"Machine: {machine['name']}"]
+    kind = machine.get("kind") or "pc"
+    lines = [f"{'Machine' if kind in ('pc', 'server') else kind.capitalize()}: {machine['name']}"]
+    if machine.get("model"):
+        lines.append(f"Make/model: {machine['model']}")
     lines += [f"- {p.get('category', 'other')}: {p.get('model', '')}" for p in machine.get("parts", [])]
     if machine.get("notes"):
         lines.append(f"Notes: {machine['notes']}")
@@ -363,6 +366,8 @@ def _describe_machine(machine: dict) -> str:
 
 
 def upgrades_prompt(machine: dict) -> tuple[str, dict]:
+    if (machine.get("kind") or "pc") not in ("pc", "server"):
+        return gear_prompt(machine)
     return f"""You help someone find used PC hardware upgrades.
 
 {_describe_machine(machine)}
@@ -372,6 +377,24 @@ replacing the motherboard (CPU, RAM, GPU, storage, anything else worthwhile). Fo
 mention BIOS, power, cooling or physical-fit caveats in `reason`, and set max_price to a
 sensible used-market ceiling in USD, or null if you're unsure. Only suggest parts you
 are confident are compatible. Give 3 to 10 suggestions, best value first.
+
+{QUERY_RULES}""", SUGGESTION_SCHEMA
+
+
+def gear_prompt(device: dict) -> tuple[str, dict]:
+    """Upgrade/replacement ideas for anything that isn't a PC: TVs, phones, network gear, appliances..."""
+    return f"""You help someone find good deals on things they own, new or used.
+
+{_describe_machine(device)}
+
+Work out what this device is from its make and model (model codes like OLED65B2AUA or U7NHD are
+fine to interpret). Suggest worthwhile upgrades or replacements to watch for: clearly better
+models a generation or two newer that are now affordable, plus genuinely useful accessories
+(e.g. a soundbar for a TV, a case for a phone). For each, say in `reason` why it's a real step up
+from what they have and any compatibility caveats, use the device kind as `category`, and set
+max_price to a sensible deal price in USD (used or on sale), or null if you're unsure.
+Give 3 to 8 suggestions, best value first. If the device is already top of its class, say so in
+the reasons and suggest fewer.
 
 {QUERY_RULES}""", SUGGESTION_SCHEMA
 

@@ -14,6 +14,7 @@ from urllib.parse import parse_qs, urlparse
 import ai
 import db
 import hardware
+import homeassistant
 import poller
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -180,12 +181,43 @@ def suggest_upgrades(body, params, mid):
     machine = db.get_machine(int(mid))
     if not machine:
         raise HTTPError(404, "machine not found")
-    rules = hardware.suggest(machine)
+    if machine.get("kind", "pc") in db.PARTS_KINDS:
+        rules = hardware.suggest(machine)
+    else:
+        rules = {"platform": None, "suggestions": [],
+                 "explanation": "the built-in rules only know PC parts; use AI or Watch this model"}
     if body.get("use_ai"):
         prompt, schema, _ = _ai_prompt("upgrades", body, mid)
         return {"platform": rules["platform"], "explanation": "suggested by AI",
                 "suggestions": ai.run(db.get_settings(), "upgrades", prompt, schema)["suggestions"]}
     return rules
+
+
+@route("GET", "/api/import/ha")
+def ha_candidates(body, params):
+    s = db.get_settings()
+    machines = db.list_machines()
+    try:
+        devices = homeassistant.candidates(s["ha_url"], s["ha_token"], {m["name"].lower() for m in machines},
+                                           {m["source_ref"] for m in machines if m.get("source_ref")})
+    except homeassistant.HAError as e:
+        raise HTTPError(400, str(e)) from e
+    return {"devices": devices, "kinds": db.DEVICE_KINDS}
+
+
+@route("POST", "/api/import/ha")
+def ha_import(body, params):
+    known = {m["source_ref"] for m in db.list_machines() if m.get("source_ref")}
+    added = 0
+    for d in body.get("devices", []):
+        if d.get("ref") and d["ref"] in known:
+            continue
+        model = homeassistant.full_model(d.get("make") or "", d.get("model") or "")
+        db.save_machine({"name": d.get("name") or model or "Device", "kind": d.get("kind"), "model": model,
+                         "notes": f"Imported from Home Assistant{' (' + d['area'] + ')' if d.get('area') else ''}.",
+                         "source_ref": d.get("ref")})
+        added += 1
+    return {"added": added}
 
 
 @route("POST", "/api/ai/draft-watches")
