@@ -32,7 +32,7 @@ DEFAULT_SETTINGS = {
     "discord_webhook": "",
     "discord_deals_only": True,
     "ai_provider": "off",  # off | ollama | claude
-    "ollama_url": "http://ollama.cougarcave.dev:11434",  # the home Ollama gateway (LAN/VPN only)
+    "ollama_url": "http://192.168.86.82:11434",  # the home Ollama gateway on the Frigate box (LAN/VPN only)
     "ollama_model": "qwen3.5:4b",
     "anthropic_api_key": "",
     "openai_api_key": "",
