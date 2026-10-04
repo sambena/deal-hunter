@@ -117,5 +117,13 @@ class BudgetTest(unittest.TestCase):
         self.assertEqual(seen["max_out"], ai.ACTIONS["judge"]["max_out"])
 
 
+
+class DefaultModelTest(unittest.TestCase):
+    def test_every_provider_default_model_has_a_price(self):
+        for provider, p in ai.PROVIDERS.items():
+            s = {**db.DEFAULT_SETTINGS, "ai_provider": provider}
+            self.assertTrue(ai.model_info(s)["id"], provider)  # raises if the default has no price
+
+
 if __name__ == "__main__":
     unittest.main()
