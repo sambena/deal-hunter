@@ -9,6 +9,15 @@ const SOURCES = { ebay: "eBay", ebay_local: "eBay local pickup", ksl: "KSL Class
   buildapcsales: "r/buildapcsales", bestbuy: "Best Buy open-box" };
 const NEW_WATCH_SOURCES = ["ebay", "ebay_local", "ksl", "craigslist", "offerup", "reddit", "slickdeals", "buildapcsales"];
 const sourceName = s => SOURCES[s] || s;
+// Each watch's colour: the one picked, else from this palette by id (the Android app uses the same rule).
+const WATCH_PALETTE = ["#3B82F6", "#F97316", "#A855F7", "#14B8A6", "#EC4899", "#EAB308", "#22C55E", "#EF4444",
+  "#06B6D4", "#8B5CF6"];
+const watchColor = w => (w && w.color) || WATCH_PALETTE[((w ? w.id : 0) % 10 + 10) % 10];
+const colorOf = id => watchColor(state.watches.find(w => w.id === id) || { id });
+function stored(key, fallback) {
+  try { const v = localStorage.getItem(key); return v === null ? fallback : JSON.parse(v); } catch { return fallback; }
+}
+function store(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} }
 // My hardware covers everything owned. PCs and servers list their parts; anything else is a make/model.
 const KINDS = { pc: "PC", server: "Server", tv: "TV", monitor: "Monitor", phone: "Phone", tablet: "Tablet",
   audio: "Speaker / audio", network: "Network", console: "Game console", printer: "Printer", appliance: "Appliance",
@@ -276,38 +285,81 @@ async function loadListings() {
   const q = new URLSearchParams({ watch: $("#f-watch").value, status: $("#f-status").value, sort: $("#f-sort").value });
   const { listings } = await api("GET", "/api/listings?" + q);
   const box = $("#listings");
+  $("#f-group").checked = stored("groupFinds", true);
   if (!listings.length) {
+    box.className = "cards";
     box.innerHTML = `<div class="empty">${state.watches.length ? "Nothing here yet. New matches show up after each check."
       : "No watches yet. Add one on the Watches tab, or add your machines under My hardware to find upgrades."}</div>`;
     return;
   }
-  box.innerHTML = listings.map(l => {
-    const pct = l.deal_pct;
-    const label = pct == null ? "" : pct >= 0.25 ? "great" : pct >= 0.10 ? "good" : "";
-    const deal = label ? `<span class="deal ${label}">${Math.round(pct * 100)}% under typical</span>` : "";
-    const ship = l.shipping ? ` <span class="meta">(${money(l.price)} + ${money(l.shipping)} ship)</span>` : "";
-    return `<div class="card ${l.status}" data-id="${l.id}" data-watch="${l.watch_id}">
-      ${l.image ? `<a href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener" class="img" style="background-image:${esc(cssUrl(l.image))}"></a>`
-        : `<a href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener" class="img none">${esc(l.buying || l.source)}</a>`}
-      <div class="body">
-        <a class="title" href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener">${esc(l.title)}</a>
-        <div><span class="price">${l.source === "reddit" && l.total != null ? "≈" : ""}${money(l.total)}</span>${ship}${deal}
-          ${l.source === "reddit" ? `<span class="meta">${l.total == null ? "see post" : "guessed from post"}</span>` : ""}</div>
-        <div class="meta">${esc(sourceName(l.source))} · ${esc(l.condition || "")} ${l.location ? "· " + esc(l.location) : ""}</div>
-        ${l.source === "bestbuy" ? BESTBUY_CREDIT : ""}
-        <div class="meta"><a href="#" class="watch-link" data-edit-watch="${l.watch_id}" title="Edit this watch">${esc(l.watch_name)} ✎</a> · found ${ago(l.first_seen)}</div>
-        ${l.ai_note ? `<div class="ai-note">${esc(l.ai_note)}</div>` : ""}
-      </div>
-      <div class="actions">
-        <button class="small" data-act="${l.status === "starred" ? "seen" : "starred"}">${l.status === "starred" ? "★ Starred" : "☆ Star"}</button>
-        <button class="small" data-act="${l.status === "dismissed" ? "seen" : "dismissed"}">${l.status === "dismissed" ? "Restore" : "Dismiss"}</button>
-        ${aiOn() ? `<button class="small" data-act="ai">Ask AI</button>` : ""}
-        <button class="small" data-act="exclude" title="Exclude a word from this watch, hiding finds like this one">Not this…</button>
-        <button class="small" data-act="maxprice" title="Set this watch's highest price">Max $…</button>
-      </div>
-    </div>`;
+  if (!$("#f-group").checked || $("#f-watch").value) {
+    box.className = "cards";
+    box.innerHTML = listings.map(findCard).join("");
+    return;
+  }
+  // Grouped: one foldable section per watch, in the order the sort puts their first find.
+  const groups = new Map();
+  for (const l of listings) {
+    if (!groups.has(l.watch_id)) groups.set(l.watch_id, []);
+    groups.get(l.watch_id).push(l);
+  }
+  const folded = new Set(stored("foldedWatches", []));
+  box.className = "groups";
+  box.innerHTML = [...groups].map(([wid, ls]) => {
+    const fresh = ls.filter(l => l.status === "new").length;
+    const shut = folded.has(wid);
+    return `<section class="group" data-group="${wid}">
+      <button type="button" class="group-head" aria-expanded="${!shut}">
+        <span class="fold">${shut ? "▸" : "▾"}</span><span class="dot" style="background:${colorOf(wid)}"></span>
+        <b>${esc(ls[0].watch_name)}</b><span class="meta">${ls.length} find${ls.length === 1 ? "" : "s"}${fresh ? ` · <b class="new-count">${fresh} new</b>` : ""}</span>
+      </button>
+      <div class="cards"${shut ? " hidden" : ""}>${ls.map(findCard).join("")}</div>
+    </section>`;
   }).join("");
 }
+
+function findCard(l) {
+  const pct = l.deal_pct;
+  const label = pct == null ? "" : pct >= 0.25 ? "great" : pct >= 0.10 ? "good" : "";
+  const deal = label ? `<span class="deal ${label}">${Math.round(pct * 100)}% under typical</span>` : "";
+  const ship = l.shipping ? ` <span class="meta">(${money(l.price)} + ${money(l.shipping)} ship)</span>` : "";
+  return `<div class="card ${l.status}" data-id="${l.id}" data-watch="${l.watch_id}" style="border-left-color:${colorOf(l.watch_id)}">
+    ${l.image ? `<a href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener" class="img" style="background-image:${esc(cssUrl(l.image))}"></a>`
+      : `<a href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener" class="img none">${esc(l.buying || l.source)}</a>`}
+    <div class="body">
+      <a class="title" href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener">${esc(l.title)}</a>
+      <div><span class="price">${l.source === "reddit" && l.total != null ? "≈" : ""}${money(l.total)}</span>${ship}${deal}
+        ${l.source === "reddit" ? `<span class="meta">${l.total == null ? "see post" : "guessed from post"}</span>` : ""}</div>
+      <div class="meta">${esc(sourceName(l.source))} · ${esc(l.condition || "")} ${l.location ? "· " + esc(l.location) : ""}</div>
+      ${l.source === "bestbuy" ? BESTBUY_CREDIT : ""}
+      <div class="meta"><a href="#" class="watch-link" data-edit-watch="${l.watch_id}" title="Edit this watch">${esc(l.watch_name)} ✎</a> · found ${ago(l.first_seen)}</div>
+      ${l.ai_note ? `<div class="ai-note">${esc(l.ai_note)}</div>` : ""}
+    </div>
+    <div class="actions">
+      <button class="small" data-act="${l.status === "starred" ? "seen" : "starred"}">${l.status === "starred" ? "★ Starred" : "☆ Star"}</button>
+      <button class="small" data-act="${l.status === "dismissed" ? "seen" : "dismissed"}">${l.status === "dismissed" ? "Restore" : "Dismiss"}</button>
+      ${aiOn() ? `<button class="small" data-act="ai">Ask AI</button>` : ""}
+      <button class="small" data-act="exclude" title="Exclude a word from this watch, hiding finds like this one">Not this…</button>
+      <button class="small" data-act="maxprice" title="Set this watch's highest price">Max $…</button>
+    </div>
+  </div>`;
+}
+
+$("#listings").addEventListener("click", e => {
+  const head = e.target.closest(".group-head");
+  if (!head) return;
+  const group = head.closest(".group");
+  const wid = Number(group.dataset.group);
+  const cards = $(".cards", group);
+  cards.hidden = !cards.hidden;
+  head.setAttribute("aria-expanded", String(!cards.hidden));
+  $(".fold", head).textContent = cards.hidden ? "▸" : "▾";
+  const folded = new Set(stored("foldedWatches", []));
+  cards.hidden ? folded.add(wid) : folded.delete(wid);
+  store("foldedWatches", [...folded]);
+});
+$("#watch-form [name=color]").addEventListener("input", () => { $("#watch-form [name=color_auto]").checked = false; });
+$("#f-group").addEventListener("change", e => { store("groupFinds", e.target.checked); loadListings(); });
 
 $("#listings").addEventListener("click", async e => {
   const btn = e.target.closest("button[data-act]");
@@ -399,7 +451,7 @@ function renderWatches() {
     <tr><th>On</th><th>Name / query</th><th>Price range</th><th>Finds</th><th>Best</th><th>Checked</th><th></th></tr>
     ${state.watches.map(w => `<tr data-id="${w.id}">
       <td><input type="checkbox" data-act="toggle" ${w.enabled ? "checked" : ""}></td>
-      <td><b>${esc(w.name)}</b><br><code>${esc(w.query)}</code>
+      <td><span class="dot" style="background:${watchColor(w)}"></span><b>${esc(w.name)}</b><br><code>${esc(w.query)}</code>
         ${w.exclude.length ? `<span class="muted"> not: ${esc(w.exclude.join(", "))}</span>` : ""}
         ${w.machine_id ? `<br><span class="muted">for ${esc(machineName(w.machine_id) || "?")}</span>` : ""}
         ${w.notes ? `<br><span class="muted">${esc(w.notes)}</span>` : ""}
@@ -470,6 +522,8 @@ function editWatch(w, returnTo = null) {
       f.keep_cheapest.add(new Option(String(w.keep_cheapest), String(w.keep_cheapest)));  // set from the app
     f.keep_cheapest.value = w.keep_cheapest ? String(w.keep_cheapest) : "";
     f.condition.value = w.condition;
+    f.color_auto.checked = !w.color;
+    f.color.value = watchColor(w).toLowerCase();
     f.machine_id.value = w.machine_id ?? "";
     f.include_auctions.checked = w.include_auctions;
     Object.keys(SOURCES).forEach(s => (f["src-" + s].checked = w.sources.includes(s)));
@@ -494,6 +548,7 @@ function formToWatch(f) {
     min_price: f.min_price.value,
     max_price: f.max_price.value,
     keep_cheapest: f.keep_cheapest.value ? Number(f.keep_cheapest.value) : null,
+    color: f.color_auto.checked ? null : f.color.value,
     condition: f.condition.value,
     machine_id: f.machine_id.value ? Number(f.machine_id.value) : null,
     include_auctions: f.include_auctions.checked,
