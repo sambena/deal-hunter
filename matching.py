@@ -51,7 +51,20 @@ def _contains(haystack_norm: str, haystack_compact: str, term: str) -> bool:
     # Fall back to spacing-insensitive match only for terms with digits (model numbers),
     # so "rtx" doesn't match inside "vertx" but "10980xe" matches "10980 xe".
     tc = compact(term)
-    return any(c.isdigit() for c in tc) and len(tc) >= 4 and tc in haystack_compact
+    if not (any(c.isdigit() for c in tc) and len(tc) >= 4 and tc in haystack_compact):
+        return False
+    # The joined-up term must start and end on word edges: "10980 xe" is "10980xe",
+    # but "RX 5700 XT" is not "5700x".
+    words = haystack_norm.split()
+    for i in range(len(words)):
+        joined = ""
+        for w in words[i:]:
+            joined += w
+            if joined == tc:
+                return True
+            if not tc.startswith(joined):
+                break
+    return False
 
 
 def search_terms(query: str) -> str:

@@ -211,6 +211,9 @@ class Handler(BaseHTTPRequestHandler):
                 break
         else:
             return self._json(404, {"error": "not found"})
+        if method != "GET" and self.headers.get_content_type() != "application/json":
+            # Browsers can send cross-site form/text POSTs without asking first, but not JSON ones.
+            return self._json(415, {"error": "send JSON"})
         try:
             length = int(self.headers.get("Content-Length") or 0)
             body = json.loads(self.rfile.read(length) or b"{}") if length else {}
@@ -218,6 +221,8 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, fn(body, params, *match.groups()))
         except HTTPError as e:
             self._json(e.status, {"error": str(e)})
+        except (ValueError, TypeError) as e:  # bad numbers or JSON from the client
+            self._json(400, {"error": f"bad request: {e}"})
         except ai.AIError as e:
             self._json(400, {"error": str(e)})
         except Exception as e:  # noqa: BLE001
