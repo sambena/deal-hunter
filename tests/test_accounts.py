@@ -92,7 +92,7 @@ class IsolationTest(unittest.TestCase):
             db.update_settings({"zip_code": "90210"})
             db.create_watch({"name": "sis", "query": "x", "sources": ["ebay"]})
         real = poller.run_watch
-        poller.run_watch = lambda w, s: seen.setdefault(w["name"], s["zip_code"]) and {"new": 0, "errors": []}
+        poller.run_watch = lambda w, s, shared=None: seen.setdefault(w["name"], s["zip_code"]) and {"new": 0, "errors": []}
         try:
             poller.run_all()
         finally:
