@@ -390,6 +390,57 @@ $("#machines").addEventListener("change", e => {
   if (e.target.matches("[data-f=kind]")) e.target.closest(".machine").dataset.kind = e.target.value;
 });
 
+// Deal radar: a proposed watch for every device (rules for PCs, one AI request for the rest); the user ticks.
+const RADAR_SKIP = ["pc", "server", "smart home", "vehicle"];
+
+$("#radar").addEventListener("click", e => busy(e.target, async () => {
+  const box = $("#radar-box");
+  const gear = state.machines.filter(m => !RADAR_SKIP.includes(m.kind || "pc") && m.model);
+  let useAi = false;
+  if (gear.length && aiOn()) {
+    // If AI is refused (limit, no key), still show the free PC suggestions.
+    try { useAi = await aiGate("radar"); } catch (err) { toast(err.message, true); }
+  }
+  const { items, skipped } = await api("POST", "/api/radar", { use_ai: useAi });
+  if (!items.length && !skipped.length) { box.innerHTML = `<p class="muted">Add some devices first.</p>`; return; }
+  box.innerHTML = `<h3>Deal radar</h3>
+    <p class="muted">One watch per device: the best drop-in upgrade for PCs, and ${useAi ? "AI's pick" : "nothing yet (AI is off or skipped)"}
+      for everything else. Edit the search or price, untick what you don't want, then create them. Each new
+      watch searches all your sources from then on.</p>
+    ${items.length ? `<div class="table-wrap"><table class="radar">
+      <tr><th></th><th>Device</th><th>Watch for</th><th>Search</th><th>Max $</th></tr>
+      ${items.map((s, i) => `<tr data-i="${i}">
+        <td><input type="checkbox" ${s.already ? "" : "checked"}></td>
+        <td>${esc(s.machine_name)}<br><span class="pill">${s.from === "ai" ? "AI" : "rules"}</span></td>
+        <td><b>${esc(s.name.replace(/ for .*$/, ""))}</b><br><span class="muted">${esc(s.reason)}</span>
+          ${s.already ? `<br><span class="muted">(already watching)</span>` : ""}</td>
+        <td><input data-f="query" value="${esc(s.query)}"></td>
+        <td><input data-f="max" type="number" min="0" value="${s.max_price ?? ""}"></td></tr>`).join("")}
+    </table></div>` : ""}
+    ${skipped.length ? `<p class="muted">Skipped: ${skipped.map(k => `${esc(k.name)} (${esc(k.why)})`).join("; ")}</p>` : ""}
+    <div class="row">${items.length ? `<button class="primary" id="radar-go">Create ticked watches</button>` : ""}
+      <button id="radar-cancel">Close</button></div>`;
+  $("#radar-cancel").onclick = () => (box.innerHTML = "");
+  const go = $("#radar-go");
+  if (!go) return;
+  go.onclick = ev => busy(ev.target, async () => {
+    const rows = $$("tr[data-i]", box).filter(r => $("input[type=checkbox]", r).checked);
+    for (const r of rows) {
+      const s = items[r.dataset.i];
+      const label = s.name.includes(s.machine_name) ? s.name : `${s.name} for ${s.machine_name}`;
+      await api("POST", "/api/watches", {
+        name: label, query: $("[data-f=query]", r).value.trim() || s.query, exclude: s.exclude || [],
+        max_price: $("[data-f=max]", r).value, condition: "any", sources: NEW_WATCH_SOURCES,
+        machine_id: s.machine_id, notes: s.reason, check: false,
+      });
+    }
+    if (rows.length) await api("POST", "/api/poll");  // one background check for all of them
+    box.innerHTML = "";
+    toast(`Created ${rows.length} watch${rows.length === 1 ? "" : "es"}; checking them now`);
+    await refresh();
+  });
+}));
+
 // Import from Home Assistant: a ticked list of its devices, sorted into kinds; nothing is added until confirmed.
 $("#ha-import").addEventListener("click", e => busy(e.target, async () => {
   const box = $("#ha-import-box");

@@ -54,6 +54,8 @@ def create_watch(body, params):
     if not body.get("name") or not body.get("query"):
         raise HTTPError(400, "A watch needs a name and a query")
     wid = db.create_watch(body)
+    if body.get("check") is False:  # many at once (deal radar): the caller starts one background check after
+        return {"id": wid, "new": 0, "errors": []}
     return {"id": wid, **poller.run_one(wid)}
 
 
@@ -144,7 +146,58 @@ def _ai_prompt(action: str, body: dict, ref: str | None = None) -> tuple[str, di
         if not str(body.get("description", "")).strip():
             raise HTTPError(400, "Describe what you're looking for")
         return (*ai.draft_prompt(body["description"], db.list_machines()), {})
+    if action == "radar":
+        gear = radar_gear()
+        if not gear:
+            raise HTTPError(400, "No devices with a make and model for AI to look at")
+        return (*ai.radar_prompt(gear), {"gear": gear})
     raise HTTPError(400, "unknown AI action")
+
+
+# ---- deal radar -------------------------------------------------------------
+# One pass over My hardware proposing a watch per device: built-in rules for PCs (free), one AI request
+# for everything else. Nothing is created until the user ticks and confirms.
+
+RADAR_SKIP_KINDS = {"smart home", "vehicle"}  # cheap gadgets and cars: not what this is for
+
+
+def radar_gear() -> list[dict]:
+    return [m for m in db.list_machines()
+            if m.get("kind", "pc") not in db.PARTS_KINDS | RADAR_SKIP_KINDS and m.get("model")]
+
+
+@route("POST", "/api/radar")
+def deal_radar(body, params):
+    watched = {w["query"].strip().lower() for w in db.list_watches()}
+    items, skipped = [], []
+    for m in db.list_machines():
+        if m.get("kind", "pc") not in db.PARTS_KINDS:
+            continue
+        rules = hardware.suggest(m)
+        if not rules["platform"]:
+            skipped.append({"machine_id": m["id"], "name": m["name"],
+                            "why": "needs specs (press Get specs)" if not m["parts"] else rules["explanation"]})
+            continue
+        picks = [s for s in rules["suggestions"] if s["category"] == "cpu"][:1] + \
+                [s for s in rules["suggestions"] if s["category"] == "ram"][:1]
+        if not picks:
+            skipped.append({"machine_id": m["id"], "name": m["name"], "why": "already has the best drop-in CPU"})
+        for s in picks:
+            items.append({**s, "machine_id": m["id"], "machine_name": m["name"], "from": "rules"})
+    gear = radar_gear()
+    if gear and body.get("use_ai"):
+        prompt, schema, _ = _ai_prompt("radar", body)
+        names = {m["id"]: m["name"] for m in gear}
+        for s in ai.run(db.get_settings(), "radar", prompt, schema)["suggestions"]:
+            if s.get("device_id") in names and s.get("query", "").strip():
+                items.append({**{k: v for k, v in s.items() if k != "device_id"}, "machine_id": s["device_id"],
+                              "machine_name": names[s["device_id"]], "from": "ai"})
+    elif gear:
+        skipped += [{"machine_id": m["id"], "name": m["name"], "why": "needs AI (turn it on in Settings)"}
+                    for m in gear]
+    for it in items:
+        it["already"] = it["query"].strip().lower() in watched
+    return {"items": items, "skipped": skipped, "gear_count": len(gear)}
 
 
 @route("POST", "/api/ai/estimate")

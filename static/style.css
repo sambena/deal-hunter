@@ -95,3 +95,6 @@ table.import input[data-f=name] { min-width: 12em; }
 .specs-box { border-top: 1px solid var(--line); margin-top: 10px; padding-top: 10px; }
 .specs-box pre.cmd { white-space: pre-wrap; word-break: break-all; background: var(--panel2); padding: 8px; border-radius: 6px; font-size: 12px; max-height: 9em; overflow: auto; }
 .os-pick label { margin-right: 14px; }
+table.radar input[data-f=query] { min-width: 12em; }
+table.radar input[data-f=max] { width: 6em; }
+#radar-box h3 { margin: 14px 0 4px; }
