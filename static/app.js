@@ -402,7 +402,7 @@ function renderWatches() {
         ${w.machine_id ? `<br><span class="muted">for ${esc(machineName(w.machine_id) || "?")}</span>` : ""}
         ${w.notes ? `<br><span class="muted">${esc(w.notes)}</span>` : ""}
         ${w.last_error ? `<div class="error">${esc(w.last_error)}</div>` : ""}</td>
-      <td>${w.min_price != null ? money(w.min_price) : "$0"} – ${w.max_price != null ? money(w.max_price) : "any"}<br>
+      <td>${w.min_price != null ? money(w.min_price) : "$0"} – ${w.max_price != null ? money(w.max_price) : "any"}${w.keep_cheapest ? ` · cheapest ${w.keep_cheapest}` : ""}<br>
         <span class="muted">${esc(w.condition)} · ${esc(w.sources.map(sourceName).join(", "))}</span></td>
       <td>${w.new_count ? `<b>${w.new_count} new</b> / ` : ""}${w.total_count}</td>
       <td>${w.best_price != null ? money(w.best_price) : "–"}</td>
@@ -461,6 +461,9 @@ function editWatch(w, returnTo = null) {
     f.exclude.value = w.exclude.join(", ");
     f.min_price.value = w.min_price ?? "";
     f.max_price.value = w.max_price ?? "";
+    if (w.keep_cheapest && ![...f.keep_cheapest.options].some(o => o.value === String(w.keep_cheapest)))
+      f.keep_cheapest.add(new Option(String(w.keep_cheapest), String(w.keep_cheapest)));  // set from the app
+    f.keep_cheapest.value = w.keep_cheapest ? String(w.keep_cheapest) : "";
     f.condition.value = w.condition;
     f.machine_id.value = w.machine_id ?? "";
     f.include_auctions.checked = w.include_auctions;
@@ -485,6 +488,7 @@ function formToWatch(f) {
     exclude: f.exclude.value.split(",").map(s => s.trim()).filter(Boolean),
     min_price: f.min_price.value,
     max_price: f.max_price.value,
+    keep_cheapest: f.keep_cheapest.value ? Number(f.keep_cheapest.value) : null,
     condition: f.condition.value,
     machine_id: f.machine_id.value ? Number(f.machine_id.value) : null,
     include_auctions: f.include_auctions.checked,

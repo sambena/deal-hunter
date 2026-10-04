@@ -93,7 +93,8 @@ def create_watch(body, params):
 def update_watch(body, params, wid):
     if not db.update_watch(int(wid), body):
         raise HTTPError(404, "watch not found")
-    return {"ok": True, "removed": _tidy_finds(int(wid))}
+    removed = _tidy_finds(int(wid))
+    return {"ok": True, "removed": removed + db.prune_cheapest(db.get_watch(int(wid)))}
 
 
 def _tidy_finds(watch_id: int) -> int:
@@ -168,6 +169,10 @@ def update_listing(body, params, lid):
                                (body["status"], int(lid), me()["id"]))
     if not changed:
         raise HTTPError(404, "listing not found")
+    # Starring, dismissing or restoring frees or takes a place among a watch's cheapest N.
+    watch = db.query("SELECT * FROM watches WHERE id = (SELECT watch_id FROM listings WHERE id = ?)", (int(lid),))[0]
+    if watch["keep_cheapest"]:
+        db.prune_cheapest(watch)
     return {"ok": True}
 
 

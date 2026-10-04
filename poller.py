@@ -53,6 +53,9 @@ def run_watch(watch: dict, settings: dict) -> dict:
     polled = set(watch["polled_sources"])
     enabled = settings["sources_enabled"]
     new_rows, errors = [], []
+    # With a "keep the cheapest N" limit, new finds are stored hidden and only the ones that make the cut
+    # become 'new' (so nothing reading the database alerts on one that's about to be hidden).
+    limited = bool(watch.get("keep_cheapest"))
     # Local searches go first so an item that is both local and national is stored as local.
     for name in sorted(watch["sources"], key=lambda n: n != "ebay_local"):
         if not enabled.get(name) or name not in SOURCES:
@@ -89,12 +92,18 @@ def run_watch(watch: dict, settings: dict) -> dict:
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (watch["id"], it["source"], it["source_id"], it["title"], it["price"], it["shipping"], total,
                  it["currency"], it["url"], it["image"], it["location"], it["condition"], it["buying"],
-                 time.time(), "new", pct))
+                 time.time(), "pruned" if limited else "new", pct))
             if total is not None:
                 history.append(total)
             new_rows.append({**it, "id": lid, "total": total, "deal_pct": pct, "backlog": first_from_source})
     db.execute("UPDATE watches SET last_polled = ?, last_error = ?, polled_sources = ? WHERE id = ?",
                (time.time(), "; ".join(errors) or None, json.dumps(sorted(polled)), watch["id"]))
+    if limited and new_rows:
+        # Only the cheapest N stay; a new find that didn't make the cut stays hidden and never alerts.
+        db.prune_cheapest(watch, {r["id"] for r in new_rows})
+        kept = {r["id"] for r in db.query("SELECT id FROM listings WHERE watch_id = ? AND status = 'new'",
+                                          (watch["id"],))}
+        new_rows = [r for r in new_rows if r["id"] in kept]
     to_send = [r for r in new_rows if not r["backlog"]]
     if settings["discord_deals_only"]:
         to_send = [r for r in to_send if matching.deal_label(r["deal_pct"])]

@@ -81,7 +81,8 @@ CREATE TABLE IF NOT EXISTS watches (
     created_at REAL NOT NULL,
     last_polled REAL,
     last_error TEXT,
-    polled_sources TEXT NOT NULL DEFAULT '[]'
+    polled_sources TEXT NOT NULL DEFAULT '[]',
+    keep_cheapest INTEGER            -- keep only this many cheapest finds; NULL = keep all
 );
 CREATE TABLE IF NOT EXISTS listings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -227,6 +228,8 @@ def conn() -> sqlite3.Connection:
                 _conn.execute("ALTER TABLE watches ADD COLUMN polled_sources TEXT NOT NULL DEFAULT '[]'")
                 _conn.execute("""UPDATE watches SET polled_sources =
                     (SELECT json_group_array(DISTINCT source) FROM listings WHERE listings.watch_id = watches.id)""")
+            if "keep_cheapest" not in cols:
+                _conn.execute("ALTER TABLE watches ADD COLUMN keep_cheapest INTEGER")
             mcols = {r["name"] for r in _conn.execute("PRAGMA table_info(machines)")}
             for col, ddl in (("kind", "TEXT NOT NULL DEFAULT 'pc'"), ("model", "TEXT NOT NULL DEFAULT ''"),
                              ("source_ref", "TEXT"),  # devices other than PCs, and where they were imported from
@@ -361,7 +364,7 @@ def public_settings(user_id: int | None = None) -> dict:
 # ---- watches --------------------------------------------------------------
 
 WATCH_FIELDS = ("name", "query", "exclude", "min_price", "max_price", "condition",
-                "include_auctions", "sources", "enabled", "notes", "machine_id")
+                "include_auctions", "sources", "enabled", "notes", "machine_id", "keep_cheapest")
 # Changing any of these makes the next check find a fresh backlog of older listings.
 MATCH_FIELDS = ("query", "exclude", "min_price", "max_price", "condition", "include_auctions")
 
@@ -407,6 +410,12 @@ def _watch_values(data: dict) -> dict:
             v = 1 if v else 0
         elif f in ("min_price", "max_price"):
             v = float(v) if v not in (None, "") else None
+        elif f == "keep_cheapest":
+            try:
+                v = int(v) if v not in (None, "", 0, "0") else None
+            except (TypeError, ValueError):
+                v = None
+            v = v if v is None or v > 0 else None
         elif f == "machine_id" and v is not None and not get_machine(int(v)):
             v = None  # only link to your own devices
         out[f] = v
@@ -433,6 +442,27 @@ def update_watch(watch_id: int, data: dict) -> bool:
         sets = ", ".join(f"{k} = ?" for k in vals)
         execute(f"UPDATE watches SET {sets} WHERE id = ? AND user_id = ?", (*vals.values(), watch_id, old["user_id"]))
     return True
+
+
+def prune_cheapest(watch: dict, fresh: set | None = None) -> int:
+    """Keep only the watch's N cheapest finds showing; the rest become 'pruned' (hidden, not deleted, so
+    the next check doesn't find them again as new). Starred finds always stay and don't use up a place.
+    Pruned finds come back if cheaper ones go (dismissed, excluded) or the limit is raised or cleared.
+    `fresh` are finds this check just stored (hidden until now): the ones that make the cut become 'new'.
+    Returns how many finds were newly hidden."""
+    fresh = fresh or set()
+    n = watch.get("keep_cheapest")
+    rows = query("""SELECT id, status FROM listings WHERE watch_id = ? AND status IN ('new', 'seen', 'pruned')
+                    ORDER BY total IS NULL, total, first_seen DESC, id""", (watch["id"],))
+    keep = rows if not n else rows[:n]
+    hide = [] if not n else rows[n:]
+    for r in keep:
+        if r["status"] == "pruned":
+            execute("UPDATE listings SET status = ? WHERE id = ?", ("new" if r["id"] in fresh else "seen", r["id"]))
+    newly = [r["id"] for r in hide if r["status"] != "pruned" and r["id"] not in fresh]
+    for lid in newly:
+        execute("UPDATE listings SET status = 'pruned' WHERE id = ?", (lid,))
+    return len(newly)
 
 
 def delete_watch(watch_id: int) -> bool:
