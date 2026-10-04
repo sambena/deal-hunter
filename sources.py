@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import base64
+import email.utils
 import html
 import json
 import re
@@ -291,7 +292,102 @@ def bestbuy(watch: dict, settings: dict) -> list[dict]:
     return out
 
 
-SOURCES = {"ebay": ebay, "ebay_local": ebay_local, "reddit": reddit, "bestbuy": bestbuy}
+# ---- Retail deal feeds (Slickdeals, r/buildapcsales) ------------------------
+# Posts about store deals (Amazon, Newegg, Walmart, Best Buy...). The price is somewhere in the title.
+
+DEAL_PRICE_RE = re.compile(r"\$\s?(\d{1,3}(?:,\d{3})+|\d+)(\.\d{1,2})?")
+DEAL_CONDITIONS = (("open box", "open box"), ("open-box", "open box"), ("refurb", "refurbished"),
+                   ("renewed", "refurbished"), ("resale", "used"), ("used", "used"), ("pre-owned", "used"))
+
+
+def _first_price(text: str) -> float | None:
+    m = DEAL_PRICE_RE.search(text)
+    return float(m.group(1).replace(",", "") + (m.group(2) or "")) if m else None
+
+
+def _deal_condition(title: str) -> str:
+    low = title.lower()
+    return next((label for word, label in DEAL_CONDITIONS if word in low), "new")
+
+
+def slickdeals(watch: dict, settings: dict) -> list[dict]:
+    terms = search_terms(watch["query"])
+    if not terms:
+        return []
+    url = ("https://slickdeals.net/newsearch.php?searcharea=deals&searchin=first&rss=1&q="
+           + urllib.parse.quote_plus(terms))
+    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    try:
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            root = ET.fromstring(resp.read())
+    except urllib.error.HTTPError as e:
+        raise SourceError(f"HTTP {e.code} from slickdeals") from e
+    except (urllib.error.URLError, ET.ParseError) as e:
+        raise SourceError(f"couldn't read Slickdeals: {e}") from e
+    # Search results reach back years; only recent deals might still be live.
+    max_age = float(settings.get("deal_max_age_days") or 14) * 86400
+    out = []
+    for it in root.findall("./channel/item"):
+        try:
+            posted = email.utils.parsedate_to_datetime(it.findtext("pubDate") or "").timestamp()
+        except (TypeError, ValueError):
+            posted = time.time()
+        if time.time() - posted > max_age:
+            continue
+        title = html.unescape(it.findtext("title") or "").strip()
+        content = it.findtext("{http://purl.org/rss/1.0/modules/content/}encoded") or ""
+        img = re.search(r'<img[^>]+src="([^"]+)"', content)
+        out.append({
+            "source": "slickdeals",
+            "source_id": (it.findtext("guid") or it.findtext("link") or title).removeprefix("thread-"),
+            "title": title,
+            "price": _first_price(title),
+            "shipping": None,
+            "currency": "USD",
+            "url": it.findtext("link"),
+            "image": html.unescape(img.group(1)) if img else None,
+            "location": "",
+            "condition": _deal_condition(title),
+            "buying": "slickdeals",
+            "text": "",
+        })
+    return out
+
+
+_feed_cache: dict = {}  # subreddit -> (fetched at, posts); one fetch per poll cycle, shared by every watch
+
+
+def _cached_feed(sub: str) -> list[dict]:
+    at, posts = _feed_cache.get(sub, (0.0, []))
+    if time.time() - at >= 300:
+        posts = _reddit_feed(sub)
+        _feed_cache[sub] = (time.time(), posts)
+    return posts
+
+
+def buildapcsales(watch: dict, settings: dict) -> list[dict]:
+    out = []
+    for p in _cached_feed("buildapcsales"):
+        title = p["title"]
+        out.append({
+            "source": "buildapcsales",
+            "source_id": p["id"],
+            "title": title,
+            "price": _first_price(title),  # "[GPU] Zotac RTX 3060 12GB - $249.99 (Newegg)"
+            "shipping": None,
+            "currency": "USD",
+            "url": p["url"],
+            "image": p["image"],
+            "location": "",
+            "condition": _deal_condition(title),
+            "buying": "r/buildapcsales",
+            "text": "",
+        })
+    return out
+
+
+SOURCES = {"ebay": ebay, "ebay_local": ebay_local, "reddit": reddit, "bestbuy": bestbuy,
+           "slickdeals": slickdeals, "buildapcsales": buildapcsales}
 
 # Sources that see the same items under the same ids; a listing is stored once per family.
 SOURCE_FAMILY = {"ebay_local": "ebay"}

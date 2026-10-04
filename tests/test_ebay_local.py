@@ -91,7 +91,9 @@ class SettingsAndMigrationTest(TempDb):
         conn.commit()
         conn.close()
         got = {w["name"]: w["sources"] for w in db.list_watches()}
-        self.assertEqual(got, {"a": ["ebay", "ebay_local", "reddit"], "b": ["reddit"]})
+        # Later migrations append more sources; this one only inserts ebay_local after ebay.
+        self.assertEqual(got["a"][:3], ["ebay", "ebay_local", "reddit"])
+        self.assertNotIn("ebay_local", got["b"])
 
 
 

@@ -20,7 +20,8 @@ DEFAULT_SETTINGS = {
         "engineering sample", "qualification sample", "replica", "wtb", "want to buy",
         "looking for", "read description",
     ],
-    "sources_enabled": {"ebay": True, "ebay_local": True, "reddit": True, "bestbuy": False},
+    "sources_enabled": {"ebay": True, "ebay_local": True, "reddit": True, "bestbuy": False,
+                        "slickdeals": True, "buildapcsales": True},
     "ebay_client_id": "",
     "ebay_client_secret": "",
     "ebay_marketplace": "EBAY_US",
@@ -28,6 +29,7 @@ DEFAULT_SETTINGS = {
     "local_radius_miles": 50,
     "bestbuy_api_key": "",
     "reddit_subs": ["hardwareswap", "homelabsales"],
+    "deal_max_age_days": 14,  # Slickdeals search reaches back years; older deals are skipped
     "discord_enabled": False,
     "discord_webhook": "",
     "discord_deals_only": True,
@@ -59,7 +61,7 @@ CREATE TABLE IF NOT EXISTS watches (
     max_price REAL,
     condition TEXT NOT NULL DEFAULT 'any',
     include_auctions INTEGER NOT NULL DEFAULT 0,
-    sources TEXT NOT NULL DEFAULT '["ebay","ebay_local","reddit","bestbuy"]',
+    sources TEXT NOT NULL DEFAULT '["ebay","ebay_local","reddit","slickdeals","buildapcsales"]',
     enabled INTEGER NOT NULL DEFAULT 1,
     notes TEXT NOT NULL DEFAULT '',
     machine_id INTEGER,
@@ -140,6 +142,13 @@ def conn() -> sqlite3.Connection:
                         srcs.insert(srcs.index("ebay") + 1, "ebay_local")
                         _conn.execute("UPDATE watches SET sources = ? WHERE id = ?", (json.dumps(srcs), r["id"]))
                 _conn.execute("PRAGMA user_version = 1")
+            if _conn.execute("PRAGMA user_version").fetchone()[0] < 2:
+                # Retail deal feeds arrived: every existing watch checks them too.
+                for r in _conn.execute("SELECT id, sources FROM watches").fetchall():
+                    srcs = json.loads(r["sources"])
+                    srcs += [s for s in ("slickdeals", "buildapcsales") if s not in srcs]
+                    _conn.execute("UPDATE watches SET sources = ? WHERE id = ?", (json.dumps(srcs), r["id"]))
+                _conn.execute("PRAGMA user_version = 2")
             _conn.commit()
         return _conn
 

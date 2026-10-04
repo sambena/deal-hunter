@@ -72,6 +72,8 @@
               <label><input type="checkbox" name="src-ebay" checked> eBay</label>
               <label><input type="checkbox" name="src-ebay_local" checked> eBay local pickup</label>
               <label><input type="checkbox" name="src-reddit" checked> Reddit</label>
+              <label><input type="checkbox" name="src-slickdeals" checked> Slickdeals</label>
+              <label><input type="checkbox" name="src-buildapcsales" checked> r/buildapcsales</label>
               <label><input type="checkbox" name="src-bestbuy"> Best Buy open-box</label>
               <label><input type="checkbox" name="include_auctions"> Include eBay auctions</label>
             </div>
@@ -153,6 +155,15 @@
           <label>Subreddits (one per line) <textarea name="reddit_subs" rows="3"></textarea></label>
           <p class="muted">No key needed. Only "selling" posts are matched: [H] item [W] PayPal/cash, or [FS].
             Prices are guessed from the post text, so check the post. Nothing to set up.</p>
+        </div>
+
+        <div class="panel">
+          <h2>Retail deals</h2>
+          <label class="toggle"><input type="checkbox" name="src_slickdeals"> Slickdeals</label>
+          <label class="toggle"><input type="checkbox" name="src_buildapcsales"> r/buildapcsales</label>
+          <label>Skip Slickdeals deals older than (days) <input name="deal_max_age_days" type="number" min="1" max="365"></label>
+          <p class="muted">Free, nothing to set up. Community-posted sales from Amazon, Newegg, Walmart, Best Buy,
+            Micro Center and other stores. Prices are read from the post title, so check the post before you buy.</p>
         </div>
 
         <div class="panel">
