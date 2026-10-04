@@ -111,7 +111,7 @@ class CraigslistTest(unittest.TestCase):
         db._conn, db.DB_PATH = None, path
         try:
             got = [json.loads(r["sources"]) for r in db.query("SELECT sources FROM watches ORDER BY id")]
-            self.assertEqual(got, [["ebay", "ebay_local", "ksl", "craigslist", "reddit"], ["ebay"]])
+            self.assertEqual(got, [["ebay", "ebay_local", "ksl", "craigslist", "offerup", "reddit"], ["ebay"]])
         finally:
             db._conn.close()
             db._conn = None

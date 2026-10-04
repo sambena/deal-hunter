@@ -5,9 +5,9 @@ const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 let state = { watches: [], machines: [], settings: {}, poller: {} };
 
 // Source keys, in form order, and how they're shown.
-const SOURCES = { ebay: "eBay", ebay_local: "eBay local pickup", ksl: "KSL Classifieds", craigslist: "Craigslist", reddit: "Reddit", slickdeals: "Slickdeals",
+const SOURCES = { ebay: "eBay", ebay_local: "eBay local pickup", ksl: "KSL Classifieds", craigslist: "Craigslist", offerup: "OfferUp", reddit: "Reddit", slickdeals: "Slickdeals",
   buildapcsales: "r/buildapcsales", bestbuy: "Best Buy open-box" };
-const NEW_WATCH_SOURCES = ["ebay", "ebay_local", "ksl", "craigslist", "reddit", "slickdeals", "buildapcsales"];
+const NEW_WATCH_SOURCES = ["ebay", "ebay_local", "ksl", "craigslist", "offerup", "reddit", "slickdeals", "buildapcsales"];
 const sourceName = s => SOURCES[s] || s;
 // My hardware covers everything owned. PCs and servers list their parts; anything else is a make/model.
 const KINDS = { pc: "PC", server: "Server", tv: "TV", monitor: "Monitor", phone: "Phone", tablet: "Tablet",

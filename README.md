@@ -21,6 +21,7 @@ set `"host": "0.0.0.0"`. There's no login, so only do that on your home network.
 | eBay local pickup | Same eBay key | Listings you can pick up within your radius (Settings > Local area: ZIP + miles). Shown as "eBay local pickup" |
 | KSL Classifieds | None | Utah classifieds near your ZIP (Settings > Local area) |
 | Craigslist | None | Classifieds near your ZIP, anywhere in the US; listings outside your radius are dropped |
+| OfferUp | None | Listings near your ZIP, anywhere in the US; OfferUp's radius tops out at 50 miles |
 | Reddit | None | r/hardwareswap and r/homelabsales by default, via RSS. Prices are guessed from the post text |
 | Best Buy open-box | Free: developer.bestbuy.com | Experimental |
 
