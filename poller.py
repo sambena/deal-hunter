@@ -128,8 +128,12 @@ def run_one(watch_id: int) -> dict:
 
 def _loop() -> None:
     while True:
-        run_all()
-        minutes = max(5, int(db.get_settings()["poll_minutes"]))
+        try:
+            run_all()
+            minutes = max(5, int(db.get_settings()["poll_minutes"]))
+        except Exception:  # noqa: BLE001 - one bad cycle must not stop the poller for good
+            traceback.print_exc()
+            minutes = 15
         state["next_cycle"] = time.time() + minutes * 60
         _wake.wait(minutes * 60)
         _wake.clear()
