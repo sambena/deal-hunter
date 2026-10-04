@@ -6,6 +6,10 @@ Every paid request goes through one gate:
   2. refuse if the worst case would push this month's spend past the limit,
   3. call the provider and record what it actually billed.
 
+Whose AI: the admin uses their own settings. Other people either use their own key ("own") or the
+admin's AI ("shared"), within limits the admin sets per person: requests a day, and dollars a month of
+paid AI. The admin's monthly limit covers everything run on the admin's key, by anyone.
+
 Providers:
   claude  Anthropic API, needs `pip install anthropic` and an API key
   openai  OpenAI API key
@@ -64,12 +68,51 @@ ACTIONS = {
 }
 
 
+# ---- whose AI ---------------------------------------------------------------------
+
+AI_KEYS = ("ai_provider", "ollama_url", "ollama_model", "anthropic_api_key", "claude_model", "openai_api_key",
+           "openai_model", "gemini_api_key", "gemini_model", "gemini_free_tier")
+
+
+def settings_for(user_id: int | None = None) -> dict:
+    """The settings a person's AI requests run with: their own, or the admin's AI on the person's limits."""
+    uid = user_id if user_id is not None else db.current_user_id()
+    s = db.get_settings(uid)
+    user = db.query("SELECT role, ai_shared, ai_allowance, ai_daily_cap FROM users WHERE id = ?", (uid,))[0]
+    if user["role"] == "admin" or s.get("ai_source") == "own":
+        s["_ai"] = {"source": "own", "user_id": uid, "paid_by": uid}
+        return s
+    admin_id = db.admin_id()
+    admin = db.get_settings(admin_id)
+    s.update({k: admin[k] for k in AI_KEYS})
+    s["ai_monthly_limit"] = float(user["ai_allowance"] or 0)
+    owner = db.query("SELECT name FROM users WHERE id = ?", (admin_id,))[0]["name"] or "the admin"
+    s["_ai"] = {"source": "shared", "user_id": uid, "paid_by": admin_id, "owner": owner,
+                "daily_cap": int(user["ai_daily_cap"] or 0), "pool_limit": float(admin.get("ai_monthly_limit") or 0)}
+    if not user["ai_shared"]:
+        s["ai_provider"] = "off"
+        s["_ai"]["blocked"] = f"{owner} hasn't shared their AI with you. Use your own key in Settings > AI."
+    elif s["ai_provider"] not in PROVIDERS:
+        s["_ai"]["blocked"] = f"{owner}'s AI is off. Use your own key in Settings > AI."
+    return s
+
+
+def _scope(settings: dict) -> dict:
+    # Settings that didn't come through settings_for() are the current person's own.
+    return settings.get("_ai") or {"source": "own", "user_id": db.current_user_id(), "paid_by": db.current_user_id()}
+
+
+def _day_start(now: float | None = None) -> float:
+    t = time.localtime(now)
+    return time.mktime((t.tm_year, t.tm_mon, t.tm_mday, 0, 0, 0, 0, 0, -1))
+
+
 # ---- cost and budget ----------------------------------------------------------
 
 def model_info(settings: dict) -> dict:
     provider = settings.get("ai_provider", "off")
     if provider not in PROVIDERS:
-        raise AIError("AI is off. Turn it on in Settings.")
+        raise AIError(_scope(settings).get("blocked") or "AI is off. Turn it on in Settings.")
     model = (settings.get(PROVIDERS[provider]["model"]) or "").strip()
     if provider == "ollama":
         return {"provider": provider, "id": model, "label": f"Ollama {model}", "in": 0.0, "out": 0.0,
@@ -106,11 +149,32 @@ def month_start(now: float | None = None) -> float:
     return time.mktime((t.tm_year, t.tm_mon, 1, 0, 0, 0, 0, 0, -1))
 
 
+def _spent(where: str, args: tuple, since: float) -> float:
+    return db.query(f"SELECT COALESCE(SUM(cost), 0) AS s FROM ai_usage WHERE at >= ? AND {where}",
+                    (since, *args))[0]["s"]
+
+
 def budget(settings: dict) -> dict:
-    spent = db.query("SELECT COALESCE(SUM(cost), 0) AS s FROM ai_usage WHERE at >= ? AND user_id = ?",
-                     (month_start(), db.current_user_id()))[0]["s"]
+    """Own key: everything run on it this month (for the admin, that includes people sharing it).
+    Shared: what this person ran on the admin's AI, against the allowance the admin gave them."""
+    sc = _scope(settings)
+    if sc["source"] == "own":
+        spent = _spent("paid_by = ?", (sc["paid_by"],), month_start())
+    else:
+        spent = _spent("user_id = ? AND paid_by = ?", (sc["user_id"], sc["paid_by"]), month_start())
     limit = max(0.0, float(settings.get("ai_monthly_limit") or 0))
-    return {"spent": round(spent, 6), "limit": limit, "remaining": round(max(0.0, limit - spent), 6)}
+    out = {"spent": round(spent, 6), "limit": limit, "remaining": round(max(0.0, limit - spent), 6),
+           "source": sc["source"]}
+    if sc["source"] == "shared":
+        today = db.query("SELECT COUNT(*) AS n FROM ai_usage WHERE at >= ? AND user_id = ? AND paid_by = ?",
+                         (_day_start(), sc["user_id"], sc["paid_by"]))[0]["n"]
+        out.update(owner=sc["owner"], daily_cap=sc["daily_cap"], today=today, blocked=sc.get("blocked", ""))
+        try:
+            info = model_info(settings)
+            out.update(model_label=info["label"], free=info["free"])
+        except AIError:
+            pass
+    return out
 
 
 def estimate(settings: dict, action: str, prompt: str, schema: dict) -> dict:
@@ -119,15 +183,31 @@ def estimate(settings: dict, action: str, prompt: str, schema: dict) -> dict:
     tokens_in = estimate_input_tokens(prompt, schema)
     typical, worst = cost(info, tokens_in, a["typical_out"]), cost(info, tokens_in, a["max_out"])
     b = budget(settings)
+    sc = _scope(settings)
+    shared = sc["source"] == "shared"
     allowed, reason = True, ""
     key_setting = PROVIDERS[info["provider"]]["key"]
     env_key = info["provider"] == "claude" and os.environ.get("ANTHROPIC_API_KEY")
     if key_setting and not (settings.get(key_setting) or env_key):
-        allowed, reason = False, f"Add your {PROVIDERS[info['provider']]['label']} API key in Settings > AI first."
+        allowed = False
+        reason = (f"{sc['owner']}'s AI has no {PROVIDERS[info['provider']]['label']} key yet." if shared else
+                  f"Add your {PROVIDERS[info['provider']]['label']} API key in Settings > AI first.")
+    elif shared and b["today"] >= b["daily_cap"]:
+        allowed = False
+        reason = (f"You've used today's {b['daily_cap']} AI requests on {sc['owner']}'s AI. More tomorrow, "
+                  "or use your own key in Settings > AI.")
     elif not info["free"] and b["spent"] + worst > b["limit"]:
         allowed = False
-        reason = (f"Monthly AI limit: ${b['spent']:.2f} of ${b['limit']:.2f} used, and this could cost up to "
-                  f"${worst:.3f}. Raise the limit or pick a cheaper model in Settings > AI.")
+        if shared:
+            reason = (f"{sc['owner']} gave you ${b['limit']:.2f} a month of paid AI; ${b['spent']:.2f} is used and "
+                      f"this could cost up to ${worst:.3f}. Ask {sc['owner']} for more, or use your own key.")
+        else:
+            reason = (f"Monthly AI limit: ${b['spent']:.2f} of ${b['limit']:.2f} used, and this could cost up to "
+                      f"${worst:.3f}. Raise the limit or pick a cheaper model in Settings > AI.")
+    elif shared and not info["free"] and (
+            _spent("paid_by = ?", (sc["paid_by"],), month_start()) + worst > sc["pool_limit"]):
+        allowed = False
+        reason = f"{sc['owner']}'s AI budget for this month is used up. Try again next month, or use your own key."
     return {"action": action, "action_label": a["label"], "provider": info["provider"], "model": info["id"],
             "model_label": info["label"], "free": info["free"], "typical": round(typical, 5),
             "max": round(worst, 5), **b, "allowed": allowed, "reason": reason}
@@ -146,9 +226,11 @@ def run(settings: dict, action: str, prompt: str, schema: dict) -> dict:
         text, tokens_in, tokens_out, problem = call(settings, info, prompt, schema, ACTIONS[action]["max_out"])
         # Record before parsing: a cut-off or refused answer is still billed.
         spent = 0.0 if info["free"] else cost(info, tokens_in, tokens_out)
-        db.execute("""INSERT INTO ai_usage (at, provider, model, action, input_tokens, output_tokens, cost, user_id)
-                      VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                   (time.time(), info["provider"], info["id"], action, tokens_in, tokens_out, spent, db.current_user_id()))
+        sc = _scope(settings)
+        db.execute("""INSERT INTO ai_usage (at, provider, model, action, input_tokens, output_tokens, cost, user_id,
+                                           paid_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   (time.time(), info["provider"], info["id"], action, tokens_in, tokens_out, spent,
+                    sc["user_id"], sc["paid_by"]))
     if problem:
         raise AIError(problem)
     try:
@@ -158,9 +240,12 @@ def run(settings: dict, action: str, prompt: str, schema: dict) -> dict:
 
 
 def usage_summary(settings: dict) -> dict:
-    rows = db.query("""SELECT model, action, COUNT(*) AS n, SUM(cost) AS cost FROM ai_usage
-                       WHERE at >= ? AND user_id = ? GROUP BY model, action ORDER BY cost DESC""",
-                    (month_start(), db.current_user_id()))
+    sc = _scope(settings)
+    where, args = (("paid_by = ?", (sc["paid_by"],)) if sc["source"] == "own"
+                   else ("user_id = ? AND paid_by = ?", (sc["user_id"], sc["paid_by"])))
+    rows = db.query(f"""SELECT model, action, COUNT(*) AS n, SUM(cost) AS cost FROM ai_usage
+                        WHERE at >= ? AND {where} GROUP BY model, action ORDER BY cost DESC""",
+                    (month_start(), *args))
     return {**budget(settings), "breakdown": rows}
 
 

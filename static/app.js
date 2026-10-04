@@ -53,12 +53,16 @@ async function fillPeople() {
   if (!state.me || state.me.role !== "admin") return;
   const { users, invites } = await api("GET", "/api/admin/users");
   $("#people-list").innerHTML = `<div class="table-wrap"><table class="people">
-      <tr><th>Person</th><th>Watches</th><th>AI this month</th><th>Last active</th><th></th></tr>
+      <tr><th>Person</th><th>Watches</th><th>Your AI</th><th>Last active</th><th></th></tr>
       ${users.map(u => `<tr data-id="${u.id}">
         <td><b>${esc(u.name)}</b>${u.role === "admin" ? ' <span class="pill">admin</span>' : ""}${u.disabled ? ' <span class="pill">disabled</span>' : ""}<br>
           <span class="muted">${esc(u.email)}</span></td>
         <td>${u.watches} of ${u.role === "admin" ? "∞" : `<input class="limit" type="number" min="0" value="${u.watch_limit ?? ""}" placeholder="∞">`}</td>
-        <td>${usd(u.ai_spent)}</td>
+        <td>${u.role === "admin" ? usd(u.ai_spent) : `
+          <label class="toggle"><input type="checkbox" class="ai-shared" ${u.ai_shared ? "checked" : ""}> shared</label>
+          ${u.ai_source === "own" ? '<span class="pill">own key</span>' : ""}<br>
+          <span class="muted">today ${u.ai_today} of</span> <input class="ai-cap" type="number" min="0" value="${u.ai_daily_cap}" title="requests a day"><br>
+          <span class="muted">${usd(u.ai_spent)} of $</span><input class="ai-allowance" type="number" min="0" step="0.5" value="${u.ai_allowance}" title="paid AI a month, US $"> <span class="muted">a month</span>`}</td>
         <td>${u.last_active ? ago(u.last_active) : "never"}</td>
         <td class="row">${u.role === "admin" ? "" : `
           <button type="button" class="small" data-act="reset">Reset password</button>
@@ -111,9 +115,12 @@ $("#people-list").addEventListener("click", async e => {
 });
 
 $("#people-list").addEventListener("change", async e => {
-  if (!e.target.matches("input.limit")) return;
-  await api("PUT", `/api/admin/users/${e.target.closest("tr[data-id]").dataset.id}`, { watch_limit: e.target.value });
-  toast("Watch limit saved");
+  const t = e.target, field = t.matches("input.limit") ? "watch_limit" : t.matches(".ai-shared") ? "ai_shared"
+    : t.matches(".ai-cap") ? "ai_daily_cap" : t.matches(".ai-allowance") ? "ai_allowance" : null;
+  if (!field) return;
+  await api("PUT", `/api/admin/users/${t.closest("tr[data-id]").dataset.id}`,
+    { [field]: t.type === "checkbox" ? t.checked : t.value });
+  toast(field === "watch_limit" ? "Watch limit saved" : "AI limits saved");
   fillPeople();
 });
 
@@ -785,6 +792,10 @@ function fillAiChoices() {
 
 function showAiProvider() {
   const f = $("#settings-form"), p = f.ai_provider.value;
+  // Members on the admin's shared AI have nothing to set up: the provider, key and model are the admin's.
+  const admin = state.me && state.me.role === "admin";
+  $$("[data-member]", f).forEach(el => (el.hidden = admin));
+  $("#ai-own").hidden = !admin && f.ai_source.value === "shared";
   $$("[data-provider]", f).forEach(g => (g.hidden = g.dataset.provider !== p));
   $("#ai-price-note").textContent = p === "off"
     ? "Pick a mode above to see where its API key and model go, with setup steps."
@@ -799,7 +810,17 @@ async function showAiSpend() {
     const u = await api("GET", "/api/ai/usage");
     const pct = u.limit ? Math.min(100, (u.spent / u.limit) * 100) : 100;
     const label = id => (state.ai.models.find(m => m.id === id) || { label: id }).label;
-    box.innerHTML = `<div><b>This month: ${usd(u.spent)}</b> of your ${usd(u.limit)} limit</div>
+    if (u.source === "shared") {
+      box.innerHTML = u.blocked ? `<div>${esc(u.blocked)}</div>` : `
+        <div>Using <b>${esc(u.owner)}'s AI</b>${u.model_label ? `: ${esc(u.model_label)}` : ""}.</div>
+        <div><b>Today: ${u.today} of ${u.daily_cap}</b> requests</div>
+        <div class="meter"><span style="width:${u.daily_cap ? Math.min(100, u.today / u.daily_cap * 100).toFixed(1) : 100}%"></span></div>
+        <div class="muted">${u.limit ? `Paid AI this month: ${usd(u.spent)} of the ${usd(u.limit)} ${esc(u.owner)} gave you.`
+          : u.free ? "It's free to use, within the daily requests." : `Paid models need an allowance from ${esc(u.owner)}.`}</div>`;
+      return;
+    }
+    box.innerHTML = `<div><b>This month: ${usd(u.spent)}</b> of your ${usd(u.limit)} limit${
+      state.me && state.me.role === "admin" ? ", counting everyone who uses your AI" : ""}</div>
       <div class="meter"><span style="width:${pct.toFixed(1)}%"></span></div>
       ${u.breakdown.length ? `<div class="muted">${u.breakdown.map(r =>
         `${esc(state.ai.actions[r.action]?.label || r.action)} × ${r.n} with ${esc(label(r.model))}: ${usd(r.cost)}`).join("<br>")}</div>` : ""}`;
@@ -813,6 +834,8 @@ function fillSettings() {
   fillAccount().catch(() => {});
   fillPeople().catch(err => toast(err.message, true));
   fillAiChoices();
+  const owner = state.ai.owner || "the admin";
+  $("#ai-source-shared").textContent = `Use ${owner}'s AI (shared with you)`;
   for (const el of f.elements) {
     if (!el.name) continue;
     if (el.name.startsWith("src_")) { el.checked = !!s.sources_enabled?.[el.name.slice(4)]; continue; }
@@ -843,6 +866,7 @@ $("#api-key-new").addEventListener("click", e => busy(e.target, async () => {
 }));
 
 $("#settings-form [name=ai_provider]").addEventListener("change", showAiProvider);
+$("#settings-form [name=ai_source]").addEventListener("change", showAiProvider);
 
 $("#settings-form").addEventListener("submit", async e => {
   e.preventDefault();

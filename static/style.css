@@ -82,6 +82,7 @@ th { color: var(--muted); font-weight: 500; font-size: 12px; }
 
 .spend { margin: 8px 0 12px; }
 .meter { height: 8px; border-radius: 4px; background: var(--line, #333); overflow: hidden; margin: 6px 0; max-width: 420px; }
+table.people input.ai-cap, table.people input.ai-allowance { width: 4.5em; }
 .meter span { display: block; height: 100%; background: var(--accent, #4a9eff); }
 .guide { margin: 8px 0; }
 .guide ol { margin: 6px 0 4px 20px; padding: 0; line-height: 1.5; }

@@ -121,7 +121,7 @@ class EndpointTest(unittest.TestCase):
         settings = {**db.get_settings(), "ai_provider": "gemini", "gemini_api_key": "k", "gemini_free_tier": True}
         answer = '{"parts": [{"category": "cpu", "model": "Intel Core i7-12700"}, ' \
                  '{"category": "gpu", "model": "NVIDIA GeForce RTX 3060 12GB"}]}'
-        with mock.patch.object(db, "get_settings", lambda: settings), \
+        with mock.patch.object(db, "get_settings", lambda *a: settings), \
              mock.patch.dict(ai.CALLERS, {"gemini": lambda *a: (answer, 100, 30, None)}):
             res = self.server.fill_specs({"text": "i7-12700, 16GB, RTX 3060 12GB", "use_ai": True}, {},
                                          str(self.mid))

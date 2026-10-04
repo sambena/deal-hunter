@@ -49,6 +49,7 @@ DEFAULT_SETTINGS = {
     "gemini_free_tier": False,  # key has no billing in Google, so requests cost $0 and skip the monthly limit
     "ai_monthly_limit": 5.0,  # US dollars; AI buttons stop working once a request could pass it
     "ai_confirm": True,  # show the cost and ask before each paid AI request
+    "ai_source": "shared",  # members: "shared" = the admin's AI on their allowance, "own" = their own key
     "claude_model": "claude-opus-5-5",
 }
 
@@ -60,7 +61,7 @@ SECRET_KEYS = {"ebay_client_secret", "bestbuy_api_key", "discord_webhook", "anth
 USER_KEYS = {"zip_code", "local_radius_miles", "junk_terms", "discord_enabled", "discord_webhook",
              "discord_deals_only", "ai_provider", "ollama_url", "ollama_model", "anthropic_api_key", "claude_model",
              "openai_api_key", "openai_model", "gemini_api_key", "gemini_model", "gemini_free_tier",
-             "ai_monthly_limit", "ai_confirm", "ha_url", "ha_token"}
+             "ai_monthly_limit", "ai_confirm", "ai_source", "ha_url", "ha_token"}
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -113,7 +114,8 @@ CREATE TABLE IF NOT EXISTS ai_usage (
     action TEXT NOT NULL,
     input_tokens INTEGER NOT NULL,
     output_tokens INTEGER NOT NULL,
-    cost REAL NOT NULL
+    cost REAL NOT NULL,
+    paid_by INTEGER  -- whose AI key it ran on: the person's own, or the admin's when shared
 );
 CREATE INDEX IF NOT EXISTS idx_ai_usage_at ON ai_usage(at);
 CREATE TABLE IF NOT EXISTS machines (
@@ -139,7 +141,10 @@ CREATE TABLE IF NOT EXISTS users (
     role TEXT NOT NULL DEFAULT 'member',  -- admin | member
     disabled INTEGER NOT NULL DEFAULT 0,
     watch_limit INTEGER,             -- NULL = no limit
-    created_at REAL NOT NULL
+    created_at REAL NOT NULL,
+    ai_shared INTEGER NOT NULL DEFAULT 1,     -- may use the admin's AI
+    ai_allowance REAL NOT NULL DEFAULT 0,     -- US $ a month of the admin's paid AI (0 = free models only)
+    ai_daily_cap INTEGER NOT NULL DEFAULT 20  -- requests a day on the admin's AI
 );
 CREATE TABLE IF NOT EXISTS tokens (    -- one per signed-in browser or device; only a hash is kept
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -281,6 +286,17 @@ def conn() -> sqlite3.Connection:
                                       (admin, r["key"], r["value"]))
                         _conn.execute("DELETE FROM settings WHERE key = ?", (r["key"],))
                 _conn.execute("PRAGMA user_version = 5")
+            ucols = {r["name"] for r in _conn.execute("PRAGMA table_info(users)")}
+            for col, ddl in (("ai_shared", "INTEGER NOT NULL DEFAULT 1"), ("ai_allowance", "REAL NOT NULL DEFAULT 0"),
+                             ("ai_daily_cap", "INTEGER NOT NULL DEFAULT 20")):
+                if col not in ucols:
+                    _conn.execute(f"ALTER TABLE users ADD COLUMN {col} {ddl}")
+            if "paid_by" not in {r["name"] for r in _conn.execute("PRAGMA table_info(ai_usage)")}:
+                _conn.execute("ALTER TABLE ai_usage ADD COLUMN paid_by INTEGER")
+            if _conn.execute("PRAGMA user_version").fetchone()[0] < 6:
+                # Shared AI arrived: everything so far ran on the person's own key.
+                _conn.execute("UPDATE ai_usage SET paid_by = user_id WHERE paid_by IS NULL")
+                _conn.execute("PRAGMA user_version = 6")
             _conn.execute("CREATE INDEX IF NOT EXISTS idx_watches_user ON watches(user_id)")
             _conn.execute("CREATE INDEX IF NOT EXISTS idx_machines_user ON machines(user_id)")
             _conn.commit()

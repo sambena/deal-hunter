@@ -49,9 +49,9 @@ class BudgetTest(unittest.TestCase):
             return ai.run(s, "judge", PROMPT, SCHEMA)
 
     def spend(self, amount, at=None):
-        db.execute("INSERT INTO ai_usage (at, provider, model, action, input_tokens, output_tokens, cost, user_id) "
-                   "VALUES (?, 'claude', 'claude-haiku-4-5', 'judge', 0, 0, ?, ?)",
-                   (at or time.time(), amount, db.current_user_id()))
+        db.execute("INSERT INTO ai_usage (at, provider, model, action, input_tokens, output_tokens, cost, user_id, paid_by) "
+                   "VALUES (?, 'claude', 'claude-haiku-4-5', 'judge', 0, 0, ?, ?, ?)",
+                   (at or time.time(), amount, db.current_user_id(), db.current_user_id()))
 
     def test_records_the_real_cost(self):
         fake = FakeClaude(tokens_in=500, tokens_out=200)
