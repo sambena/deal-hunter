@@ -5,6 +5,7 @@ from __future__ import annotations
 import contextlib
 import contextvars
 import json
+import re
 import sqlite3
 import threading
 import time
@@ -83,7 +84,8 @@ CREATE TABLE IF NOT EXISTS watches (
     last_polled REAL,
     last_error TEXT,
     polled_sources TEXT NOT NULL DEFAULT '[]',
-    keep_cheapest INTEGER            -- keep only this many cheapest finds; NULL = keep all
+    keep_cheapest INTEGER,           -- keep only this many cheapest finds; NULL = keep all
+    color TEXT                       -- "#RRGGBB" the person picked; NULL = from the palette by id
 );
 CREATE TABLE IF NOT EXISTS listings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -231,6 +233,8 @@ def conn() -> sqlite3.Connection:
                     (SELECT json_group_array(DISTINCT source) FROM listings WHERE listings.watch_id = watches.id)""")
             if "keep_cheapest" not in cols:
                 _conn.execute("ALTER TABLE watches ADD COLUMN keep_cheapest INTEGER")
+            if "color" not in cols:
+                _conn.execute("ALTER TABLE watches ADD COLUMN color TEXT")
             mcols = {r["name"] for r in _conn.execute("PRAGMA table_info(machines)")}
             for col, ddl in (("kind", "TEXT NOT NULL DEFAULT 'pc'"), ("model", "TEXT NOT NULL DEFAULT ''"),
                              ("source_ref", "TEXT"),  # devices other than PCs, and where they were imported from
@@ -382,7 +386,7 @@ def public_settings(user_id: int | None = None) -> dict:
 # ---- watches --------------------------------------------------------------
 
 WATCH_FIELDS = ("name", "query", "exclude", "min_price", "max_price", "condition",
-                "include_auctions", "sources", "enabled", "notes", "machine_id", "keep_cheapest")
+                "include_auctions", "sources", "enabled", "notes", "machine_id", "keep_cheapest", "color")
 # Changing any of these makes the next check find a fresh backlog of older listings.
 MATCH_FIELDS = ("query", "exclude", "min_price", "max_price", "condition", "include_auctions")
 
@@ -434,6 +438,8 @@ def _watch_values(data: dict) -> dict:
             except (TypeError, ValueError):
                 v = None
             v = v if v is None or v > 0 else None
+        elif f == "color":
+            v = v.lower() if isinstance(v, str) and re.fullmatch(r"#[0-9a-fA-F]{6}", v) else None
         elif f == "machine_id" and v is not None and not get_machine(int(v)):
             v = None  # only link to your own devices
         out[f] = v
