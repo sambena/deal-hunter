@@ -59,6 +59,7 @@ ACTIONS = {
     "judge": {"label": "Ask AI", "typical_out": 250, "max_out": 3000},
     "draft": {"label": "Suggest watches", "typical_out": 2500, "max_out": 8000},
     "upgrades": {"label": "Find upgrades with AI", "typical_out": 3000, "max_out": 8000},
+    "specs": {"label": "Read specs with AI", "typical_out": 300, "max_out": 2000},
 }
 
 
@@ -397,6 +398,43 @@ Give 3 to 8 suggestions, best value first. If the device is already top of its c
 the reasons and suggest fewer.
 
 {QUERY_RULES}""", SUGGESTION_SCHEMA
+
+
+PART_CATEGORIES = ["cpu", "motherboard", "ram", "gpu", "storage", "psu", "cooler", "case", "network", "other"]
+
+PARTS_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "parts": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "category": {"type": "string", "enum": PART_CATEGORIES},
+                    "model": {"type": "string"},
+                },
+                "required": ["category", "model"],
+                "additionalProperties": False,
+            },
+        }
+    },
+    "required": ["parts"],
+    "additionalProperties": False,
+}
+
+
+def specs_prompt(machine: dict, text: str) -> tuple[str, dict]:
+    """Parts from whatever the user pasted: System Information, a receipt, notes."""
+    return f"""Pull a computer's parts out of the text below, which describes the computer "{machine['name']}".
+
+Return each part once with a short, searchable model name, e.g. "AMD Ryzen 7 3700X",
+"MSI MPG B550 GAMING PLUS", "32GB (2x16GB) DDR4-3200", "NVIDIA GeForce RTX 3060 12GB", "Samsung 980 Pro 1TB NVMe".
+Combine RAM sticks into one entry. Leave out anything the text doesn't actually say; don't guess.
+
+Text:
+---
+{text[:6000]}
+---""", PARTS_SCHEMA
 
 
 def draft_prompt(description: str, machines: list[dict]) -> tuple[str, dict]:
