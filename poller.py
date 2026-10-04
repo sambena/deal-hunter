@@ -13,7 +13,8 @@ import netguard
 import matching
 from sources import SOURCES, SourceError, USER_AGENT, family
 
-state = {"running": False, "last_cycle": None, "next_cycle": None, "source_errors": {}}
+state = {"running": False, "last_cycle": None, "next_cycle": None, "source_errors": {},
+         "fetches": {"made": 0, "shared": 0}}  # the last full cycle: requests sent vs answered from another watch
 _wake = threading.Event()
 _run_lock = threading.Lock()
 
@@ -46,8 +47,43 @@ def send_discord(webhook: str, payload: dict) -> None:
     urllib.request.urlopen(req, timeout=15).close()
 
 
-def run_watch(watch: dict, settings: dict) -> dict:
-    """Poll one watch. Returns {new: int, errors: [..]}."""
+# Everything a source's request depends on. Two watches (anyone's) with the same key get the same results,
+# so during one pass the request is sent once and the answer reused: friends watching the same card don't
+# multiply eBay calls (5000 a day) or KSL requests. Matching, excludes and alerts still run per watch.
+FETCH_SETTINGS = ("zip_code", "local_radius_miles", "ebay_marketplace", "deal_max_age_days", "reddit_subs")
+# Sources that send the watch's price/condition/auction choices with the request; the rest only send the query.
+WATCH_FILTERS = {"ebay": ("min_price", "max_price", "condition", "include_auctions")}
+WATCH_FILTERS["ebay_local"] = WATCH_FILTERS["ebay"]
+WATCH_FILTERS["craigslist"] = WATCH_FILTERS["offerup"] = ("min_price", "max_price")
+
+
+def fetch_key(name: str, watch: dict, settings: dict) -> str:
+    return json.dumps([name, watch.get("query"), [watch.get(k) for k in WATCH_FILTERS.get(name, ())],
+                       [str(settings.get(k)) for k in FETCH_SETTINGS]])
+
+
+def fetch(name: str, watch: dict, settings: dict, shared: dict | None = None) -> list[dict]:
+    """Run one source for a watch, reusing an identical request made earlier in this pass (errors too)."""
+    if shared is None:
+        return SOURCES[name](watch, settings)
+    key = fetch_key(name, watch, settings)
+    if key in shared:
+        shared["_shared"] = shared.get("_shared", 0) + 1
+        hit = shared[key]
+        if isinstance(hit, SourceError):
+            raise hit
+        return [dict(it) for it in hit]
+    shared["_made"] = shared.get("_made", 0) + 1
+    try:
+        shared[key] = SOURCES[name](watch, settings)
+    except SourceError as e:
+        shared[key] = e
+        raise
+    return [dict(it) for it in shared[key]]
+
+
+def run_watch(watch: dict, settings: dict, shared: dict | None = None) -> dict:
+    """Poll one watch. Returns {new: int, errors: [..]}. `shared` holds this pass's requests (see fetch)."""
     history = [r["total"] for r in db.query(
         "SELECT total FROM listings WHERE watch_id = ? AND total IS NOT NULL", (watch["id"],))]
     polled = set(watch["polled_sources"])
@@ -61,7 +97,7 @@ def run_watch(watch: dict, settings: dict) -> dict:
         if not enabled.get(name) or name not in SOURCES:
             continue
         try:
-            items = SOURCES[name](watch, settings)
+            items = fetch(name, watch, settings, shared)
             state["source_errors"].pop(name, None)
         except SourceError as e:
             errors.append(f"{name}: {e}")
@@ -132,21 +168,23 @@ def purge_expired(now: float | None = None) -> int:
 def run_all() -> None:
     with _run_lock:
         state["running"] = True
+        shared: dict = {}
         try:
             for w in db.list_watches(all_users=True):
                 if w["enabled"]:
-                    _run_as_owner(w)
+                    _run_as_owner(w, shared)
             purge_expired()
+            state["fetches"] = {"made": shared.get("_made", 0), "shared": shared.get("_shared", 0)}
         finally:
             state["running"] = False
             state["last_cycle"] = time.time()
 
 
-def _run_as_owner(w: dict) -> dict:
+def _run_as_owner(w: dict, shared: dict | None = None) -> dict:
     """Each watch runs with its owner's settings (ZIP, junk words, Discord...)."""
     with db.as_user(w["user_id"]):
         try:
-            return run_watch(w, db.get_settings())
+            return run_watch(w, db.get_settings(), shared)
         except Exception:  # noqa: BLE001
             traceback.print_exc()
             db.execute("UPDATE watches SET last_error = ? WHERE id = ?", ("internal error, see console", w["id"]))
@@ -167,9 +205,10 @@ def poll_user(user_id: int) -> None:
     def work():
         with _run_lock:
             with db.as_user(user_id):
+                shared: dict = {}
                 for w in db.list_watches():
                     if w["enabled"]:
-                        _run_as_owner(w)
+                        _run_as_owner(w, shared)
     threading.Thread(target=work, name=f"poll-user-{user_id}", daemon=True).start()
 
 

@@ -19,11 +19,18 @@ set `"host": "0.0.0.0"`. There's no login, so only do that on your home network.
 |---|---|---|
 | eBay | Free: developer.ebay.com, create a Production keyset, paste the App ID and Cert ID in Settings | Official Browse API; newest listings first |
 | eBay local pickup | Same eBay key | Listings you can pick up within your radius (Settings > Local area: ZIP + miles). Shown as "eBay local pickup" |
+| KSL Classifieds | None | Utah classifieds near your ZIP (Settings > Local area) |
+| Craigslist | None | Classifieds near your ZIP, anywhere in the US; listings outside your radius are dropped |
+| OfferUp | None | Listings near your ZIP, anywhere in the US; OfferUp's radius tops out at 50 miles |
 | Reddit | None | r/hardwareswap and r/homelabsales by default, via RSS. Prices are guessed from the post text |
 | Best Buy open-box | Free: developer.bestbuy.com | Experimental |
 
 Facebook Marketplace and Amazon aren't supported: Marketplace has no API and
 blocks scrapers, and Amazon's API needs an affiliate account.
+
+When several watches (yours or friends') run the same search, each check sends it
+once and every watch gets the answer, so more people doesn't mean more eBay calls
+(5000 a day) or more KSL requests. Hover "Last check" to see how many were shared.
 
 ## How matching works
 
