@@ -129,7 +129,8 @@ def _ebay_search(watch: dict, settings: dict, local: bool) -> list[dict]:
             "condition": it.get("condition", ""),
             "buying": ("local pickup · " if local else "")
                       + "/".join(it.get("buyingOptions", [])).lower().replace("_", " "),
-            "text": "",
+            # eBay keeps "For parts or not working" in the condition, not the title; junk words check this too.
+            "text": it.get("condition", ""),
         })
     return out
 

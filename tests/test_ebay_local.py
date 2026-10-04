@@ -94,5 +94,17 @@ class SettingsAndMigrationTest(TempDb):
         self.assertEqual(got, {"a": ["ebay", "ebay_local", "reddit"], "b": ["reddit"]})
 
 
+
+@mock.patch.object(sources, "_ebay_access_token", lambda s: "tok")
+class EbayConditionJunkTest(TempDb):
+    def test_for_parts_condition_is_filtered(self):
+        broken = {**ITEM, "itemId": "v1|999|0", "title": "Nvidia GeForce RTX 3060 12GB Dell OEM",
+                  "condition": "For parts or not working"}
+        wid = db.create_watch({"name": "x", "query": "rtx 3060 12gb", "sources": ["ebay"]})
+        with mock.patch.object(sources, "_http", lambda url, **kw: {"itemSummaries": [broken]}):
+            r = poller.run_watch(db.get_watch(wid), SETTINGS)
+        self.assertEqual(r["new"], 0)
+
+
 if __name__ == "__main__":
     unittest.main()
