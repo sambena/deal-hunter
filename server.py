@@ -91,10 +91,11 @@ def create_watch(body, params):
 
 @route("PUT", r"/api/watches/(\d+)")
 def update_watch(body, params, wid):
-    if not db.update_watch(int(wid), body):
+    marked_seen = db.update_watch(int(wid), body)
+    if marked_seen is None:
         raise HTTPError(404, "watch not found")
     removed = _tidy_finds(int(wid))
-    return {"ok": True, "removed": removed + db.prune_cheapest(db.get_watch(int(wid)))}
+    return {"ok": True, "removed": removed + db.prune_cheapest(db.get_watch(int(wid))), "marked_seen": marked_seen}
 
 
 def _tidy_finds(watch_id: int) -> int:
