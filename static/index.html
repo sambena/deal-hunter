@@ -194,6 +194,17 @@
         </div>
 
         <div class="panel">
+          <h2>API</h2>
+          <p class="muted">Let your own apps and scripts use Deal Hunter (watches, finds, My hardware) over your home
+            network or VPN. Every call needs this key. <a href="api.html" target="_blank" rel="noopener">How to use the API</a></p>
+          <p id="api-status" class="muted"></p>
+          <div class="row"><button type="button" id="api-key-new">Create API key</button></div>
+          <div id="api-key-box" hidden>
+            <label>Your new API key (copy it now; it won't be shown again) <input id="api-key-value" readonly></label>
+          </div>
+        </div>
+
+        <div class="panel">
           <h2>Home Assistant</h2>
           <p class="muted">Optional. Lets My hardware import your TVs, phones, speakers, network gear and appliances.
             Deal Hunter only reads the device list; it never changes anything in Home Assistant.</p>

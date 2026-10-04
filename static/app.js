@@ -676,7 +676,23 @@ function fillSettings() {
   }
   showAiProvider();
   showAiSpend();
+  const port = state.api_port;
+  $("#api-status").innerHTML = (s.api_key ? "An API key is set. " : "No API key yet, so the API is off. ") +
+    (port ? `Apps use <code>http://${esc(location.hostname === "localhost" ? "localhost" : "THIS-SERVER")}:${port}</code>
+      (for this install, <code>http://192.168.86.82:${port}</code> on your network).` : "The API port isn't switched on in this install.");
+  $("#api-key-new").textContent = s.api_key ? "Replace API key" : "Create API key";
+  $("#api-key-box").hidden = true;
 }
+
+$("#api-key-new").addEventListener("click", e => busy(e.target, async () => {
+  if (state.settings.api_key && !confirm("Make a new key? Apps using the old one will stop working until you update them.")) return;
+  const { api_key } = await api("POST", "/api/api-key");
+  $("#api-key-value").value = api_key;
+  $("#api-key-box").hidden = false;
+  $("#api-key-value").select();
+  await refresh();
+  toast("New API key made; copy it now");
+}));
 
 $("#settings-form [name=ai_provider]").addEventListener("change", showAiProvider);
 
