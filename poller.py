@@ -54,7 +54,7 @@ FETCH_SETTINGS = ("zip_code", "local_radius_miles", "ebay_marketplace", "deal_ma
 # Sources that send the watch's price/condition/auction choices with the request; the rest only send the query.
 WATCH_FILTERS = {"ebay": ("min_price", "max_price", "condition", "include_auctions")}
 WATCH_FILTERS["ebay_local"] = WATCH_FILTERS["ebay"]
-WATCH_FILTERS["craigslist"] = ("min_price", "max_price")
+WATCH_FILTERS["craigslist"] = WATCH_FILTERS["offerup"] = ("min_price", "max_price")
 
 
 def fetch_key(name: str, watch: dict, settings: dict) -> str:

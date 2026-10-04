@@ -585,8 +585,101 @@ def craigslist(watch: dict, settings: dict) -> list[dict]:
     return out
 
 
+# ---- OfferUp (local; the search page's Next.js data) ------------------------
+# No public API. The search page carries its results in __NEXT_DATA__; the area comes from the
+# ou.location cookie (otherwise OfferUp guesses from the IP), and radius only takes 5/10/20/30/50 miles.
+
+OFFERUP_RADII = (5, 10, 20, 30, 50)
+OFFERUP_GAP_SECONDS = 4
+_offerup_last = {"at": 0.0}
+
+
+def _offerup_listings(page: str) -> list[dict]:
+    m = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', page, re.S)
+    if not m:
+        raise SourceError("couldn't find listings on the OfferUp page (did the site change?)")
+    feed = json.loads(m.group(1)).get("props", {}).get("pageProps", {}).get("searchFeedResponse")
+    if feed is None:
+        raise SourceError("couldn't find listings on the OfferUp page (did the site change?)")
+    found: dict = {}
+
+    def walk(node):
+        if isinstance(node, dict):
+            if node.get("__typename") == "ModularFeedListing" and node.get("listingId"):
+                found.setdefault(node["listingId"], node)
+            for v in node.values():
+                walk(v)
+        elif isinstance(node, list):
+            for v in node:
+                walk(v)
+    walk(feed)  # listings sit in looseTiles and inside modules
+    return list(found.values())
+
+
+def offerup(watch: dict, settings: dict) -> list[dict]:
+    zip_code = str(settings.get("zip_code") or "").strip()
+    if not zip_code:
+        raise SourceError("set your ZIP code in Settings > Local area")
+    terms = search_terms(watch["query"])
+    if not terms:
+        return []
+    place = zip_place(zip_code)
+    radius = int(float(settings.get("local_radius_miles") or 50))
+    radius = next((r for r in OFFERUP_RADII if r >= radius), OFFERUP_RADII[-1])
+    params = {"q": terms, "radius": str(radius), "sort": "-posted"}
+    if watch.get("min_price"):
+        params["price_min"] = str(int(watch["min_price"]))
+    if watch.get("max_price"):
+        params["price_max"] = str(int(math.ceil(watch["max_price"])))
+    cookie = json.dumps({"city": place["city"], "state": place["state"], "zipCode": zip_code,
+                         "longitude": place["lon"], "latitude": place["lat"], "source": "manual"},
+                        separators=(",", ":"))
+    wait = OFFERUP_GAP_SECONDS - (time.time() - _offerup_last["at"])
+    if wait > 0:
+        time.sleep(wait)
+    req = urllib.request.Request("https://offerup.com/search?" + urllib.parse.urlencode(params),
+                                 headers={**KSL_HEADERS, "Cookie": "ou.location=" + urllib.parse.quote(cookie)})
+    try:
+        with urllib.request.urlopen(req, timeout=25) as resp:
+            page = resp.read().decode("utf-8", "replace")
+    except urllib.error.HTTPError as e:
+        if e.code in (403, 429):
+            raise SourceError(f"OfferUp's bot protection blocked the request (HTTP {e.code}); "
+                              "it usually clears on a later check") from e
+        raise SourceError(f"HTTP {e.code} from OfferUp") from e
+    except urllib.error.URLError as e:
+        raise SourceError(f"Network error reaching OfferUp: {e.reason}") from e
+    finally:
+        _offerup_last["at"] = time.time()
+    out = []
+    for r in _offerup_listings(page):
+        try:
+            price = float(r["price"]) if r.get("price") not in (None, "") else None
+        except (TypeError, ValueError):
+            price = None
+        if price is not None and price <= 1:
+            price = None  # "$1" / "$0" is a placeholder for "make an offer"
+        flags = r.get("flags") or []
+        out.append({
+            "source": "offerup",
+            "source_id": r["listingId"],
+            "title": r.get("title") or "",
+            "price": price,
+            "shipping": 0.0 if "LOCAL_PICKUP" in flags else None,
+            "currency": "USD",
+            "url": f"https://offerup.com/item/detail/{r['listingId']}",
+            "image": (r.get("image") or {}).get("url"),
+            "location": r.get("locationName") or "",
+            "condition": (r.get("conditionText") or "used").lower(),
+            "buying": "OfferUp" + (" · ships" if "SHIPPING" in flags else ""),
+            "text": "",
+        })
+    return out
+
+
 SOURCES = {"ebay": ebay, "ebay_local": ebay_local, "reddit": reddit, "bestbuy": bestbuy,
-           "slickdeals": slickdeals, "buildapcsales": buildapcsales, "ksl": ksl, "craigslist": craigslist}
+           "slickdeals": slickdeals, "buildapcsales": buildapcsales, "ksl": ksl, "craigslist": craigslist,
+           "offerup": offerup}
 
 # Sources that see the same items under the same ids; a listing is stored once per family.
 SOURCE_FAMILY = {"ebay_local": "ebay"}
