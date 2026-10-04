@@ -13,6 +13,7 @@ import email.utils
 import html
 import json
 import re
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -152,22 +153,37 @@ def _html_to_text(fragment: str) -> str:
     return html.unescape(text)
 
 
+# Reddit rate-limits anonymous RSS hard, and every Reddit source shares the limit: space all requests
+# out, and after a 429 leave Reddit alone for a while instead of retrying into it.
+REDDIT_GAP_SECONDS = 8
+REDDIT_COOLDOWN_SECONDS = 600
+_reddit_lock = threading.Lock()
+_reddit_state = {"last": 0.0, "blocked_until": 0.0}
+
+
 def _reddit_feed(sub: str) -> list[dict]:
-    # Reddit blocks its JSON API for scripts but still serves RSS; it rate-limits hard, so back off once.
+    # Reddit blocks its JSON API for scripts but still serves RSS.
     url = f"https://www.reddit.com/r/{sub}/new/.rss?limit=100"
-    for attempt in range(2):
+    with _reddit_lock:
+        wait_out = _reddit_state["blocked_until"] - time.time()
+        if wait_out > 0:
+            raise SourceError(f"Reddit asked us to slow down; trying again in {int(wait_out / 60) + 1} min")
+        gap = REDDIT_GAP_SECONDS - (time.time() - _reddit_state["last"])
+        if gap > 0:
+            time.sleep(gap)
         req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
         try:
             with urllib.request.urlopen(req, timeout=20) as resp:
                 root = ET.fromstring(resp.read())
-            break
         except urllib.error.HTTPError as e:
-            if e.code == 429 and attempt == 0:
-                time.sleep(10)
-                continue
+            if e.code == 429:
+                _reddit_state["blocked_until"] = time.time() + REDDIT_COOLDOWN_SECONDS
+                raise SourceError("Reddit asked us to slow down (HTTP 429); trying again in 10 min") from e
             raise SourceError(f"HTTP {e.code} from reddit") from e
         except (urllib.error.URLError, ET.ParseError) as e:
             raise SourceError(f"couldn't read feed: {e}") from e
+        finally:
+            _reddit_state["last"] = time.time()
     posts = []
     for entry in root.findall("a:entry", ATOM):
         link = entry.find("a:link", ATOM)
@@ -188,14 +204,14 @@ def _reddit_posts(settings: dict) -> list[dict]:
     if time.time() - _reddit_cache["at"] < 300:
         return _reddit_cache["posts"]
     posts, errors = [], []
-    for i, sub in enumerate(settings.get("reddit_subs") or []):
-        if i:
-            time.sleep(3)
+    for sub in settings.get("reddit_subs") or []:
         try:
             posts += _reddit_feed(sub)
         except SourceError as e:
             errors.append(f"r/{sub}: {e}")
     if errors and not posts:
+        if _reddit_cache["posts"]:  # a recent good fetch beats an error
+            return _reddit_cache["posts"]
         raise SourceError("; ".join(errors))
     _reddit_cache.update(at=time.time(), posts=posts)
     return posts
@@ -360,7 +376,12 @@ _feed_cache: dict = {}  # subreddit -> (fetched at, posts); one fetch per poll c
 def _cached_feed(sub: str) -> list[dict]:
     at, posts = _feed_cache.get(sub, (0.0, []))
     if time.time() - at >= 300:
-        posts = _reddit_feed(sub)
+        try:
+            posts = _reddit_feed(sub)
+        except SourceError:
+            if posts:  # keep using the last good fetch while Reddit is cooling off
+                return posts
+            raise
         _feed_cache[sub] = (time.time(), posts)
     return posts
 
