@@ -9,10 +9,11 @@ const CATEGORIES = ["cpu", "motherboard", "ram", "gpu", "storage", "psu", "coole
 // ---- helpers ------------------------------------------------------------------
 
 async function api(method, path, body) {
+  const write = method !== "GET";  // the server only accepts JSON writes
   const res = await fetch(path, {
     method,
-    headers: body ? { "Content-Type": "application/json" } : {},
-    body: body ? JSON.stringify(body) : undefined,
+    headers: write ? { "Content-Type": "application/json" } : {},
+    body: write ? JSON.stringify(body || {}) : undefined,
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
@@ -21,6 +22,11 @@ async function api(method, path, body) {
 
 function esc(s) {
   return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+// Listing images come from other sites; keep them to http(s) and out of the CSS string.
+function cssUrl(u) {
+  return /^https?:\/\//i.test(u || "") ? `url("${encodeURI(u).replace(/["()\\]/g, c => "%" + c.charCodeAt(0).toString(16))}")` : "none";
 }
 
 function money(v) { return v == null ? "price?" : "$" + Number(v).toFixed(v % 1 ? 2 : 0); }
@@ -110,7 +116,7 @@ async function loadListings() {
     const deal = label ? `<span class="deal ${label}">${Math.round(pct * 100)}% under typical</span>` : "";
     const ship = l.shipping ? ` <span class="meta">(${money(l.price)} + ${money(l.shipping)} ship)</span>` : "";
     return `<div class="card ${l.status}" data-id="${l.id}">
-      ${l.image ? `<a href="${esc(l.url)}" target="_blank" rel="noopener" class="img" style="background-image:url('${esc(l.image)}')"></a>`
+      ${l.image ? `<a href="${esc(l.url)}" target="_blank" rel="noopener" class="img" style="background-image:${esc(cssUrl(l.image))}"></a>`
         : `<a href="${esc(l.url)}" target="_blank" rel="noopener" class="img none">${esc(l.buying || l.source)}</a>`}
       <div class="body">
         <a class="title" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.title)}</a>

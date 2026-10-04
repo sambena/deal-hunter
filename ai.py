@@ -89,7 +89,7 @@ def _claude(settings: dict, prompt: str, schema: dict) -> dict:
     key = settings.get("anthropic_api_key") or None  # None -> SDK reads ANTHROPIC_API_KEY
     client = anthropic.Anthropic(api_key=key)
     request = dict(
-        model=settings.get("claude_model") or "claude-opus-5",
+        model=settings.get("claude_model") or "claude-opus-5-5",
         max_tokens=16000,
         messages=[{"role": "user", "content": prompt}],
         output_config={"effort": "low", "format": {"type": "json_schema", "schema": schema}},
