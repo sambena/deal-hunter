@@ -10,7 +10,7 @@ import urllib.request
 
 import db
 import matching
-from sources import SOURCES, SourceError, USER_AGENT
+from sources import SOURCES, SourceError, USER_AGENT, family
 
 state = {"running": False, "last_cycle": None, "next_cycle": None, "source_errors": {}}
 _wake = threading.Event()
@@ -51,7 +51,8 @@ def run_watch(watch: dict, settings: dict) -> dict:
     polled = set(watch["polled_sources"])
     enabled = settings["sources_enabled"]
     new_rows, errors = [], []
-    for name in watch["sources"]:
+    # Local searches go first so an item that is both local and national is stored as local.
+    for name in sorted(watch["sources"], key=lambda n: n != "ebay_local"):
         if not enabled.get(name) or name not in SOURCES:
             continue
         try:
@@ -73,8 +74,10 @@ def run_watch(watch: dict, settings: dict) -> dict:
                                    total, it.get("text", ""))
             if not ok:
                 continue
-            exists = db.query("SELECT 1 FROM listings WHERE watch_id = ? AND source = ? AND source_id = ?",
-                              (watch["id"], it["source"], it["source_id"]))
+            fam = family(it["source"])  # e.g. an eBay item found by both the national and local search
+            exists = db.query(f"""SELECT 1 FROM listings WHERE watch_id = ? AND source_id = ?
+                                  AND source IN ({','.join('?' * len(fam))})""",
+                              (watch["id"], it["source_id"], *fam))
             if exists:
                 continue
             pct = matching.deal_pct(total, history)

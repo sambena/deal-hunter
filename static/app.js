@@ -4,6 +4,11 @@ const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 let state = { watches: [], machines: [], settings: {}, poller: {} };
 
+// Source keys, in form order, and how they're shown.
+const SOURCES = { ebay: "eBay", ebay_local: "eBay local pickup", reddit: "Reddit", bestbuy: "Best Buy open-box" };
+const NEW_WATCH_SOURCES = ["ebay", "ebay_local", "reddit"];
+const sourceName = s => SOURCES[s] || s;
+
 const CATEGORIES = ["cpu", "motherboard", "ram", "gpu", "storage", "psu", "cooler", "case", "other"];
 
 // ---- helpers ------------------------------------------------------------------
@@ -122,7 +127,7 @@ async function loadListings() {
         <a class="title" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.title)}</a>
         <div><span class="price">${l.source === "reddit" && l.total != null ? "≈" : ""}${money(l.total)}</span>${ship}${deal}
           ${l.source === "reddit" ? `<span class="meta">${l.total == null ? "see post" : "guessed from post"}</span>` : ""}</div>
-        <div class="meta">${esc(l.source)} · ${esc(l.condition || "")} ${l.location ? "· " + esc(l.location) : ""}</div>
+        <div class="meta">${esc(sourceName(l.source))} · ${esc(l.condition || "")} ${l.location ? "· " + esc(l.location) : ""}</div>
         <div class="meta">${esc(l.watch_name)} · found ${ago(l.first_seen)}</div>
         ${l.ai_note ? `<div class="ai-note">${esc(l.ai_note)}</div>` : ""}
       </div>
@@ -185,7 +190,7 @@ function renderWatches() {
         ${w.notes ? `<br><span class="muted">${esc(w.notes)}</span>` : ""}
         ${w.last_error ? `<div class="error">${esc(w.last_error)}</div>` : ""}</td>
       <td>${w.min_price != null ? money(w.min_price) : "$0"} – ${w.max_price != null ? money(w.max_price) : "any"}<br>
-        <span class="muted">${esc(w.condition)} · ${esc(w.sources.join(", "))}</span></td>
+        <span class="muted">${esc(w.condition)} · ${esc(w.sources.map(sourceName).join(", "))}</span></td>
       <td>${w.new_count ? `<b>${w.new_count} new</b> / ` : ""}${w.total_count}</td>
       <td>${w.best_price != null ? money(w.best_price) : "–"}</td>
       <td>${ago(w.last_polled)}</td>
@@ -243,7 +248,7 @@ function editWatch(w) {
     f.condition.value = w.condition;
     f.machine_id.value = w.machine_id ?? "";
     f.include_auctions.checked = w.include_auctions;
-    ["ebay", "reddit", "bestbuy"].forEach(s => (f["src-" + s].checked = w.sources.includes(s)));
+    Object.keys(SOURCES).forEach(s => (f["src-" + s].checked = w.sources.includes(s)));
   }
   $("#watch-form-title").textContent = w ? `Edit "${w.name}"` : "New watch";
   $("#watch-cancel").hidden = !w;
@@ -263,7 +268,7 @@ function formToWatch(f) {
     condition: f.condition.value,
     machine_id: f.machine_id.value ? Number(f.machine_id.value) : null,
     include_auctions: f.include_auctions.checked,
-    sources: ["ebay", "reddit", "bestbuy"].filter(s => f["src-" + s].checked),
+    sources: Object.keys(SOURCES).filter(s => f["src-" + s].checked),
   };
 }
 
@@ -307,7 +312,7 @@ function renderSuggestions(box, suggestions, machineId) {
       const r = await api("POST", "/api/watches", {
         name: s.name, query: s.query, exclude: s.exclude, max_price: $(".max", row).value,
         condition: s.category === "ram" || s.category === "cpu" ? "any" : "any",
-        sources: ["ebay", "reddit"], machine_id: machineId ?? null, notes: s.reason,
+        sources: NEW_WATCH_SOURCES, machine_id: machineId ?? null, notes: s.reason,
       });
       btn.replaceWith(Object.assign(document.createElement("span"), { className: "muted", textContent: `added · ${r.new} found` }));
       await refresh();

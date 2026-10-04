@@ -18,6 +18,7 @@ set `"host": "0.0.0.0"`. There's no login, so only do that on your home network.
 | Source | Key | Notes |
 |---|---|---|
 | eBay | Free: developer.ebay.com, create a Production keyset, paste the App ID and Cert ID in Settings | Official Browse API; newest listings first |
+| eBay local pickup | Same eBay key | Listings you can pick up within your radius (Settings > Local area: ZIP + miles). Shown as "eBay local pickup" |
 | Reddit | None | r/hardwareswap and r/homelabsales by default, via RSS. Prices are guessed from the post text |
 | Best Buy open-box | Free: developer.bestbuy.com | Experimental |
 
@@ -52,6 +53,10 @@ Settings > AI. It only runs when you press an AI button:
 
 Settings > Discord: paste a channel webhook URL and tick the toggle. By default it
 only posts deals, and never posts the first batch a new watch finds.
+
+## Tests
+
+`python -m unittest discover tests`
 
 ## License
 

@@ -64,6 +64,18 @@ def _ebay_access_token(settings: dict) -> str:
 
 
 def ebay(watch: dict, settings: dict) -> list[dict]:
+    return _ebay_search(watch, settings, local=False)
+
+
+def ebay_local(watch: dict, settings: dict) -> list[dict]:
+    """eBay listings the seller lets you pick up within the local radius."""
+    return _ebay_search(watch, settings, local=True)
+
+
+def _ebay_search(watch: dict, settings: dict, local: bool) -> list[dict]:
+    zip_code = str(settings.get("zip_code") or "").strip()
+    if local and not zip_code:
+        raise SourceError("set your ZIP code in Settings > Local area")
     token = _ebay_access_token(settings)
     groups, _ = parse_query(watch["query"])
     # eBay keyword syntax: (a,b) means a OR b.
@@ -78,6 +90,11 @@ def ebay(watch: dict, settings: dict) -> list[dict]:
         filters.append(f"conditions:{{{cond}}}")
     if not watch.get("include_auctions"):
         filters.append("buyingOptions:{FIXED_PRICE|BEST_OFFER}")
+    if local:
+        # eBay requires all five pickup filters together.
+        radius = max(1, int(float(settings.get("local_radius_miles") or 50)))
+        filters += ["deliveryOptions:{SELLER_ARRANGED_LOCAL_PICKUP}", "pickupCountry:US",
+                    f"pickupPostalCode:{zip_code}", f"pickupRadius:{radius}", "pickupRadiusUnit:mi"]
     params = {"q": q, "limit": "50", "sort": "newlyListed"}
     if filters:
         params["filter"] = ",".join(filters)
@@ -85,8 +102,8 @@ def ebay(watch: dict, settings: dict) -> list[dict]:
         "Authorization": f"Bearer {token}",
         "X-EBAY-C-MARKETPLACE-ID": settings.get("ebay_marketplace") or "EBAY_US",
     }
-    if settings.get("zip_code"):
-        headers["X-EBAY-C-ENDUSERCTX"] = f"contextualLocation=country%3DUS%2Czip%3D{settings['zip_code']}"
+    if zip_code:
+        headers["X-EBAY-C-ENDUSERCTX"] = f"contextualLocation=country%3DUS%2Czip%3D{zip_code}"
     data = _http("https://api.ebay.com/buy/browse/v1/item_summary/search?" + urllib.parse.urlencode(params),
                  headers=headers)
     out = []
@@ -100,7 +117,7 @@ def ebay(watch: dict, settings: dict) -> list[dict]:
                 break
         loc = it.get("itemLocation") or {}
         out.append({
-            "source": "ebay",
+            "source": "ebay_local" if local else "ebay",
             "source_id": it["itemId"],
             "title": it.get("title", ""),
             "price": float(price["value"]) if price.get("value") else None,
@@ -110,7 +127,8 @@ def ebay(watch: dict, settings: dict) -> list[dict]:
             "image": (it.get("image") or {}).get("imageUrl"),
             "location": ", ".join(x for x in (loc.get("city"), loc.get("stateOrProvince"), loc.get("country")) if x),
             "condition": it.get("condition", ""),
-            "buying": "/".join(it.get("buyingOptions", [])).lower().replace("_", " "),
+            "buying": ("local pickup · " if local else "")
+                      + "/".join(it.get("buyingOptions", [])).lower().replace("_", " "),
             "text": "",
         })
     return out
@@ -272,4 +290,12 @@ def bestbuy(watch: dict, settings: dict) -> list[dict]:
     return out
 
 
-SOURCES = {"ebay": ebay, "reddit": reddit, "bestbuy": bestbuy}
+SOURCES = {"ebay": ebay, "ebay_local": ebay_local, "reddit": reddit, "bestbuy": bestbuy}
+
+# Sources that see the same items under the same ids; a listing is stored once per family.
+SOURCE_FAMILY = {"ebay_local": "ebay"}
+
+
+def family(source: str) -> list[str]:
+    root = SOURCE_FAMILY.get(source, source)
+    return [root, *(s for s, r in SOURCE_FAMILY.items() if r == root)]
