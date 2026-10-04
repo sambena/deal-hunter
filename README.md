@@ -51,6 +51,9 @@ Add a machine's parts and press **Find upgrades**. Built-in rules recognise
 desktop platforms (X99, X299, Intel 100–800 series, AM4, AM5) from the
 motherboard chipset or CPU and suggest better drop-in CPUs and RAM kits.
 
+Vehicles in My hardware take a VIN and odometer: **Look up** fills in make, model, year and trim from
+NHTSA's free VIN decoder, and **Recalls** lists NHTSA safety recalls for that model year.
+
 ## AI (optional, off by default)
 
 Settings > AI. It only runs when you press an AI button:

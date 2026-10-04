@@ -135,7 +135,9 @@ CREATE TABLE IF NOT EXISTS machines (
     msrp REAL,
     purchased TEXT NOT NULL DEFAULT '',  -- purchase date, as the user typed it (YYYY-MM-DD from the form)
     price_paid REAL,
-    custom TEXT NOT NULL DEFAULT '[]'  -- the user's own fields: [{"label": "Serial number", "value": "..."}]
+    custom TEXT NOT NULL DEFAULT '[]',  -- the user's own fields: [{"label": "Serial number", "value": "..."}]
+    vin TEXT NOT NULL DEFAULT '',    -- vehicles
+    odometer INTEGER
 );
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -240,7 +242,8 @@ def conn() -> sqlite3.Connection:
                              ("source_ref", "TEXT"),  # devices other than PCs, and where they were imported from
                              ("make", "TEXT NOT NULL DEFAULT ''"), ("year", "INTEGER"), ("msrp", "REAL"),
                              ("purchased", "TEXT NOT NULL DEFAULT ''"), ("price_paid", "REAL"),
-                             ("custom", "TEXT NOT NULL DEFAULT '[]'")):
+                             ("custom", "TEXT NOT NULL DEFAULT '[]'"), ("vin", "TEXT NOT NULL DEFAULT ''"),
+                             ("odometer", "INTEGER")):
                 if col not in mcols:
                     _conn.execute(f"ALTER TABLE machines ADD COLUMN {col} {ddl}")
             if "seen_at" not in {r["name"] for r in _conn.execute("PRAGMA table_info(listings)")}:
@@ -546,14 +549,27 @@ def save_machine(data: dict, machine_id: int | None = None) -> int:
             data.get("source_ref") or None)
     uid = current_user_id()
     if machine_id is None:
-        return execute("""INSERT INTO machines (name, notes, parts, kind, make, model, year, msrp, purchased, price_paid,
-                          custom, source_ref, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", (*vals, uid))
+        mid = execute("""INSERT INTO machines (name, notes, parts, kind, make, model, year, msrp, purchased, price_paid,
+                         custom, source_ref, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", (*vals, uid))
+        _save_vehicle_fields(mid, data)
+        return mid
     changed = execute_count("""UPDATE machines SET name = ?, notes = ?, parts = ?, kind = ?, make = ?, model = ?,
                year = ?, msrp = ?, purchased = ?, price_paid = ?, custom = ?, source_ref = COALESCE(?, source_ref)
                WHERE id = ? AND user_id = ?""", (*vals, machine_id, uid))
     if not changed:
         raise LookupError("device not found")
+    _save_vehicle_fields(machine_id, data)
     return machine_id
+
+
+def _save_vehicle_fields(machine_id: int, data: dict) -> None:
+    """VIN and odometer change only when sent, so apps that don't know them yet don't wipe them."""
+    if "vin" in data:
+        vin = "".join(str(data["vin"] or "").split()).upper()[:17]
+        execute("UPDATE machines SET vin = ? WHERE id = ?", (vin, machine_id))
+    if "odometer" in data:
+        miles = _number(data["odometer"], int)
+        execute("UPDATE machines SET odometer = ? WHERE id = ?", (miles if miles and miles >= 0 else None, machine_id))
 
 
 def delete_machine(machine_id: int) -> bool:
