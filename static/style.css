@@ -100,3 +100,11 @@ table.radar input[data-f=max] { width: 6em; }
 #radar-box h3 { margin: 14px 0 4px; }
 .custom-row { display: flex; gap: 6px; margin: 4px 0; }
 .custom-row input { flex: 1; min-width: 0; }
+#auth-screen { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: flex-start; justify-content: center; padding: 10vh 16px 16px; z-index: 50; overflow: auto; }
+#auth-screen[hidden] { display: none; }
+#auth-form { width: 100%; max-width: 420px; }
+#auth-form label { display: block; margin: 8px 0; }
+#auth-form input { width: 100%; }
+#auth-error { color: var(--bad); min-height: 1.2em; }
+body.signed-out header nav, body.signed-out main { visibility: hidden; }
+.device { border-top: 1px solid var(--line); padding: 6px 0; }

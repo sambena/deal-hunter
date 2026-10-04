@@ -121,9 +121,24 @@
     <!-- SETTINGS -->
     <section id="tab-settings" class="tab" hidden>
       <form id="settings-form">
+        <div class="panel" id="account-panel">
+          <h2>Your account</h2>
+          <p class="muted" id="account-who"></p>
+          <div class="grid">
+            <label>Name <input id="acct-name"></label>
+            <label>Email <input id="acct-email" type="email"></label>
+            <label>Current password (to change email or password) <input id="acct-current" type="password" autocomplete="current-password"></label>
+            <label>New password <input id="acct-new" type="password" autocomplete="new-password"></label>
+          </div>
+          <div class="row"><button type="button" id="acct-save">Save account</button>
+            <span class="spacer"></span><button type="button" class="danger" id="sign-out">Sign out</button></div>
+          <h3>Signed in on</h3>
+          <div id="acct-devices"></div>
+        </div>
+
         <div class="panel">
           <h2>Checking</h2>
-          <div class="grid">
+          <div class="grid" data-admin>
             <label>Check every (minutes) <input name="poll_minutes" type="number" min="5"></label>
           </div>
           <label>Junk words, always filtered (one per line) <textarea name="junk_terms" rows="6"></textarea></label>
@@ -132,14 +147,14 @@
         <div class="panel">
           <h2>Local area</h2>
           <p class="muted">Local sources only show things you can pick up within this distance. eBay also uses the ZIP for shipping estimates.</p>
-          <label class="toggle"><input type="checkbox" name="src_ksl"> KSL Classifieds (Utah). Free, no key. Private sellers near you, pickup only</label>
+          <label class="toggle" data-admin><input type="checkbox" name="src_ksl"> KSL Classifieds (Utah). Free, no key. Private sellers near you, pickup only</label>
           <div class="grid">
             <label>Your ZIP code <input name="zip_code" inputmode="numeric" placeholder="84057"></label>
             <label>Radius (miles) <input name="local_radius_miles" type="number" min="1" max="500"></label>
           </div>
         </div>
 
-        <div class="panel">
+        <div class="panel" data-admin>
           <h2>eBay</h2>
           <label class="toggle"><input type="checkbox" name="src_ebay"> Enabled</label>
           <label class="toggle"><input type="checkbox" name="src_ebay_local"> Local pickup search (uses Local area)</label>
@@ -160,7 +175,7 @@
           </div>
         </div>
 
-        <div class="panel">
+        <div class="panel" data-admin>
           <h2>Reddit</h2>
           <label class="toggle"><input type="checkbox" name="src_reddit"> Enabled</label>
           <label>Subreddits (one per line) <textarea name="reddit_subs" rows="3"></textarea></label>
@@ -168,7 +183,7 @@
             Prices are guessed from the post text, so check the post. Nothing to set up.</p>
         </div>
 
-        <div class="panel">
+        <div class="panel" data-admin>
           <h2>Retail deals</h2>
           <label class="toggle"><input type="checkbox" name="src_slickdeals"> Slickdeals</label>
           <label class="toggle"><input type="checkbox" name="src_buildapcsales"> r/buildapcsales</label>
@@ -177,7 +192,7 @@
             Micro Center and other stores. Prices are read from the post title, so check the post before you buy.</p>
         </div>
 
-        <div class="panel">
+        <div class="panel" data-admin>
           <h2>Best Buy open-box <span class="pill">experimental</span></h2>
           <label class="toggle"><input type="checkbox" name="src_bestbuy"> Enabled</label>
           <p class="muted">Free, if Best Buy approves you.</p>
@@ -193,7 +208,7 @@
           <label>API key <input name="bestbuy_api_key" type="password" autocomplete="off"></label>
         </div>
 
-        <div class="panel">
+        <div class="panel" data-admin>
           <h2>API</h2>
           <p class="muted">Let your own apps and scripts use Deal Hunter (watches, finds, My hardware) over your home
             network or VPN. Every call needs this key. <a href="api.html" target="_blank" rel="noopener">How to use the API</a></p>
@@ -332,6 +347,19 @@
       </form>
     </section>
   </main>
+
+  <div id="auth-screen" hidden>
+    <form id="auth-form" class="panel">
+      <h2 id="auth-title">Sign in to Deal Hunter</h2>
+      <p class="muted" id="auth-intro"></p>
+      <label data-setup>Your name <input name="name" autocomplete="name"></label>
+      <label>Email <input name="email" type="email" autocomplete="username" required></label>
+      <label>Password <input name="password" type="password" autocomplete="current-password" required></label>
+      <label data-setup>Password again <input name="password2" type="password" autocomplete="new-password"></label>
+      <div class="row"><button class="primary" type="submit" id="auth-go">Sign in</button></div>
+      <p class="muted" id="auth-error"></p>
+    </form>
+  </div>
 
   <div id="toast" hidden></div>
   <script src="app.js"></script>

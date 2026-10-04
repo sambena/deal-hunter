@@ -83,11 +83,18 @@ class ServerTest(unittest.TestCase):
         cls.httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
         threading.Thread(target=cls.httpd.serve_forever, daemon=True).start()
         cls.base = f"http://127.0.0.1:{cls.httpd.server_port}"
+        # Sign in like a browser: first-time setup sets the admin's password and a session cookie.
+        import http.cookiejar
+        cls.opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+        cls.opener.open(urllib.request.Request(cls.base + "/api/auth/setup", method="POST",
+                        data=b'{"email": "admin@example.com", "password": "correct horse 1"}',
+                        headers={"Content-Type": "application/json"}))
 
     @classmethod
     def tearDownClass(cls):
         cls.httpd.shutdown()
-        db._conn.close()
+        if db._conn:
+            db._conn.close()
         db._conn = None
         cls.tmp.cleanup()
 
@@ -95,7 +102,7 @@ class ServerTest(unittest.TestCase):
         req = urllib.request.Request(self.base + path, data=body, method=method,
                                      headers={"Content-Type": ctype} if ctype else {})
         try:
-            with urllib.request.urlopen(req) as r:
+            with self.opener.open(req) as r:
                 return r.status, json.loads(r.read())
         except urllib.error.HTTPError as e:
             return e.code, json.loads(e.read())

@@ -31,9 +31,77 @@ async function api(method, path, body) {
     body: write ? JSON.stringify(body || {}) : undefined,
   });
   const data = await res.json().catch(() => ({}));
+  if (res.status === 401 && !path.startsWith("/api/auth/")) { showAuth(false); throw new Error("Please sign in"); }
   if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
   return data;
 }
+
+// ---- sign in ----------------------------------------------------------------
+// First visit after accounts arrived: the admin sets up their name, email and password. After that,
+// everyone signs in with email + password; the browser keeps a long-lived session cookie.
+
+function showAuth(setup) {
+  const screen = $("#auth-screen"), f = $("#auth-form");
+  f.dataset.mode = setup ? "setup" : "login";
+  $("#auth-title").textContent = setup ? "Set up your Deal Hunter account" : "Sign in to Deal Hunter";
+  $("#auth-intro").textContent = setup
+    ? "Deal Hunter now has accounts so friends and family can have their own. Everything you already have becomes yours; pick the email and password you'll sign in with."
+    : "";
+  $$("[data-setup]", f).forEach(el => (el.hidden = !setup));
+  f.password.autocomplete = setup ? "new-password" : "current-password";
+  $("#auth-go").textContent = setup ? "Create my account" : "Sign in";
+  $("#auth-error").textContent = "";
+  screen.hidden = false;
+  document.body.classList.add("signed-out");
+}
+
+$("#auth-form").addEventListener("submit", async e => {
+  e.preventDefault();
+  const f = e.target, setup = f.dataset.mode === "setup";
+  if (setup && f.password.value !== f.password2.value) return ($("#auth-error").textContent = "The passwords don't match");
+  try {
+    await api("POST", setup ? "/api/auth/setup" : "/api/auth/login",
+      { name: f.name.value.trim(), email: f.email.value.trim(), password: f.password.value });
+    location.reload();
+  } catch (err) { $("#auth-error").textContent = err.message; }
+});
+
+async function fillAccount() {
+  const me = state.me || {};
+  $("#account-who").textContent = `${me.name} · ${me.email}${me.role === "admin" ? " · admin" : ""}`;
+  $("#acct-name").value = me.name || "";
+  $("#acct-email").value = me.email || "";
+  $("#acct-current").value = $("#acct-new").value = "";
+  const { tokens } = await api("GET", "/api/tokens");
+  $("#acct-devices").innerHTML = tokens.length ? tokens.map(t => `<div class="row device" data-id="${t.id}">
+      <span><b>${esc(t.name)}</b>${t.current ? " (this one)" : ""}<br><span class="muted">${esc(t.kind)} · signed in ${ago(t.created_at)} · last used ${ago(t.last_used)}</span></span>
+      <span class="spacer"></span>${t.current ? "" : `<button type="button" class="small danger" data-act="revoke">Sign out</button>`}</div>`).join("")
+    : `<p class="muted">Nowhere else.</p>`;
+}
+
+$("#acct-devices").addEventListener("click", async e => {
+  const btn = e.target.closest("[data-act=revoke]");
+  if (!btn) return;
+  await api("DELETE", `/api/tokens/${btn.closest(".device").dataset.id}`);
+  toast("Signed out there");
+  fillAccount();
+});
+
+$("#acct-save").addEventListener("click", e => busy(e.target, async () => {
+  const body = { name: $("#acct-name").value.trim() };
+  if ($("#acct-email").value.trim() !== (state.me.email || "")) body.email = $("#acct-email").value.trim();
+  if ($("#acct-new").value) body.new_password = $("#acct-new").value;
+  if (body.email || body.new_password) body.current_password = $("#acct-current").value;
+  await api("POST", "/api/me", body);
+  await refresh();
+  fillAccount();
+  toast("Account saved");
+}));
+
+$("#sign-out").addEventListener("click", async () => {
+  await api("POST", "/api/auth/logout");
+  location.reload();
+});
 
 function esc(s) {
   return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -689,6 +757,9 @@ async function showAiSpend() {
 
 function fillSettings() {
   const s = state.settings, f = $("#settings-form");
+  const admin = state.me && state.me.role === "admin";
+  $$("[data-admin]", f).forEach(el => (el.hidden = !admin));  // shared settings are the admin's
+  fillAccount().catch(() => {});
   fillAiChoices();
   for (const el of f.elements) {
     if (!el.name) continue;
@@ -748,6 +819,8 @@ $("#test-discord").addEventListener("click", e => busy(e.target, async () => {
 // ---- boot -----------------------------------------------------------------------
 
 (async () => {
+  const status = await api("GET", "/api/auth/status");
+  if (status.setup_needed || !status.user) return showAuth(status.setup_needed);
   await refresh();
   let tab = "finds";
   try { tab = localStorage.getItem("tab") || "finds"; } catch {}

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextvars
 import hmac
 import json
 import mimetypes
@@ -10,11 +11,13 @@ import threading
 import re
 import sys
 import time
+from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 import ai
+import auth
 import db
 import hardware
 import homeassistant
@@ -38,6 +41,22 @@ class HTTPError(Exception):
         self.status = status
 
 
+# The signed-in person for this request (set by the handler); routes read it through me().
+_request = contextvars.ContextVar("deal_hunter_request", default=None)
+
+
+def me() -> dict:
+    """The signed-in user. Outside a request (tests, scripts) that's the first admin."""
+    req = _request.get()
+    if req and req.get("user"):
+        return req["user"]
+    return db.query("SELECT * FROM users WHERE id = ?", (db.current_user_id(),))[0]
+
+
+def is_admin() -> bool:
+    return me()["role"] == "admin"
+
+
 # ---- API --------------------------------------------------------------------
 
 @route("GET", "/api/state")
@@ -46,6 +65,7 @@ def get_state(body, params):
         "watches": db.list_watches(),
         "machines": db.list_machines(),
         "settings": db.public_settings(),
+        "me": auth.public_user(me()),
         "api_port": API_PORT["port"],
         "ai": {**ai.catalog(), "budget": ai.budget(db.get_settings())},
         "poller": poller.state,
@@ -65,13 +85,15 @@ def create_watch(body, params):
 
 @route("PUT", r"/api/watches/(\d+)")
 def update_watch(body, params, wid):
-    db.update_watch(int(wid), body)
+    if not db.update_watch(int(wid), body):
+        raise HTTPError(404, "watch not found")
     return {"ok": True}
 
 
 @route("DELETE", r"/api/watches/(\d+)")
 def delete_watch(body, params, wid):
-    db.delete_watch(int(wid))
+    if not db.delete_watch(int(wid)):
+        raise HTTPError(404, "watch not found")
     return {"ok": True}
 
 
@@ -82,13 +104,16 @@ def run_watch(body, params, wid):
 
 @route("POST", "/api/poll")
 def poll_all(body, params):
-    poller.poll_now()
+    if is_admin():
+        poller.poll_now()  # everyone's watches, on the normal loop
+    else:
+        poller.poll_user(me()["id"])  # just this person's
     return {"ok": True}
 
 
 @route("GET", "/api/listings")
 def list_listings(body, params):
-    where, args = [], []
+    where, args = ["w.user_id = ?"], [me()["id"]]
     if params.get("watch"):
         where.append("l.watch_id = ?")
         args.append(int(params["watch"]))
@@ -109,7 +134,7 @@ def list_listings(body, params):
         "deal": "l.deal_pct IS NULL, l.deal_pct DESC",
     }.get(params.get("sort"), "l.id ASC" if since is not None else "l.first_seen DESC")
     sql = f"""SELECT l.*, w.name AS watch_name FROM listings l JOIN watches w ON w.id = l.watch_id
-              {'WHERE ' + ' AND '.join(where) if where else ''} ORDER BY {order} LIMIT 500"""
+              WHERE {' AND '.join(where)} ORDER BY {order} LIMIT 500"""
     return {"listings": db.query(sql, tuple(args))}
 
 
@@ -117,23 +142,30 @@ def list_listings(body, params):
 def update_listing(body, params, lid):
     if body.get("status") not in ("new", "seen", "starred", "dismissed"):
         raise HTTPError(400, "bad status")
-    db.execute("UPDATE listings SET status = ? WHERE id = ?", (body["status"], int(lid)))
+    changed = db.execute_count("""UPDATE listings SET status = ? WHERE id = ?
+                                  AND watch_id IN (SELECT id FROM watches WHERE user_id = ?)""",
+                               (body["status"], int(lid), me()["id"]))
+    if not changed:
+        raise HTTPError(404, "listing not found")
     return {"ok": True}
 
 
 @route("POST", "/api/listings/mark-seen")
 def mark_all_seen(body, params):
+    mine = "watch_id IN (SELECT id FROM watches WHERE user_id = ?)"
     if body.get("watch"):
-        db.execute("UPDATE listings SET status = 'seen' WHERE status = 'new' AND watch_id = ?", (int(body["watch"]),))
+        db.execute(f"UPDATE listings SET status = 'seen' WHERE status = 'new' AND watch_id = ? AND {mine}",
+                   (int(body["watch"]), me()["id"]))
     else:
-        db.execute("UPDATE listings SET status = 'seen' WHERE status = 'new'")
+        db.execute(f"UPDATE listings SET status = 'seen' WHERE status = 'new' AND {mine}", (me()["id"],))
     return {"ok": True}
 
 
 def _ai_prompt(action: str, body: dict, ref: str | None = None) -> tuple[str, dict, dict]:
     """The prompt for an AI button, plus what's needed to use its answer."""
     if action == "judge":
-        rows = db.query("SELECT * FROM listings WHERE id = ?", (int(ref or body.get("listing_id")),))
+        rows = db.query("""SELECT l.* FROM listings l JOIN watches w ON w.id = l.watch_id
+                           WHERE l.id = ? AND w.user_id = ?""", (int(ref or body.get("listing_id")), me()["id"]))
         if not rows:
             raise HTTPError(404, "listing not found")
         watch = db.get_watch(rows[0]["watch_id"])
@@ -236,13 +268,17 @@ def create_machine(body, params):
 
 @route("PUT", r"/api/machines/(\d+)")
 def update_machine(body, params, mid):
-    db.save_machine(body, int(mid))
+    try:
+        db.save_machine(body, int(mid))
+    except LookupError as e:
+        raise HTTPError(404, "device not found") from e
     return {"ok": True}
 
 
 @route("DELETE", r"/api/machines/(\d+)")
 def delete_machine(body, params, mid):
-    db.delete_machine(int(mid))
+    if not db.delete_machine(int(mid)):
+        raise HTTPError(404, "device not found")
     return {"ok": True}
 
 
@@ -340,13 +376,15 @@ def draft_watches(body, params):
 def put_settings(body, params):
     # Blank secret fields in the form mean "keep the current value".
     changes = {k: v for k, v in body.items() if not (k in db.SECRET_KEYS and v in ("", None, True))}
-    db.update_settings(changes)
+    db.update_settings(changes, shared_allowed=is_admin())  # members can only change their own settings
     return db.public_settings()
 
 
 @route("POST", "/api/api-key")
 def new_api_key(body, params):
     """Make a new API key (the old one stops working). Shown once; afterwards Settings only says it's set."""
+    if not is_admin():
+        raise HTTPError(403, "only the admin can do that")
     key = "dh_" + secrets.token_urlsafe(32)
     db.update_settings({"api_key": key})
     return {"api_key": key}
@@ -361,7 +399,129 @@ def test_discord(body, params):
     return {"ok": True}
 
 
+# ---- accounts -----------------------------------------------------------------
+# Sign-in is by email + password. A browser gets an HttpOnly cookie; a phone or script asks for a device
+# token (device_name) and sends it as a Bearer header. The first admin sets their password on first visit.
+
+COOKIE = "dh_session"
+COOKIE_DAYS = 365
+
+
+def _setup_needed() -> bool:
+    return not db.query("SELECT 1 FROM users WHERE role = 'admin' AND password_hash IS NOT NULL")
+
+
+def _signed_in(user: dict, kind: str, name: str) -> dict:
+    token = auth.create_token(user["id"], kind, name)
+    out = {"user": auth.public_user(user)}
+    if kind == "web":
+        out["__set_cookie__"] = token  # the handler turns this into the cookie; never sent to page scripts
+    else:
+        out["token"] = token
+    return out
+
+
+@route("GET", "/api/auth/status")
+def auth_status(body, params):
+    req = _request.get() or {}
+    return {"setup_needed": _setup_needed(),
+            "user": auth.public_user(req["user"]) if req.get("user") else None}
+
+
+@route("POST", "/api/auth/setup")
+def auth_setup(body, params):
+    """First visit after accounts arrived: the admin picks their name, email and password."""
+    req = _request.get() or {}
+    if req.get("api_port"):
+        raise HTTPError(403, "set up Deal Hunter from its web page")
+    if not _setup_needed():
+        raise HTTPError(409, "already set up; sign in instead")
+    email = str(body.get("email") or "").strip()
+    if "@" not in email:
+        raise HTTPError(400, "Enter your email address")
+    try:
+        password = auth.hash_password(str(body.get("password") or ""))
+    except auth.AuthError as e:
+        raise HTTPError(400, str(e)) from e
+    admin = db.admin_id()
+    db.execute("UPDATE users SET email = ?, name = ?, password_hash = ? WHERE id = ?",
+               (email, str(body.get("name") or "").strip() or email.split("@")[0], password, admin))
+    user = db.query("SELECT * FROM users WHERE id = ?", (admin,))[0]
+    return _signed_in(user, "web", "web browser")
+
+
+@route("POST", "/api/auth/login")
+def auth_login(body, params):
+    req = _request.get() or {}
+    try:
+        user = auth.sign_in(str(body.get("email") or ""), str(body.get("password") or ""), req.get("address", "?"))
+    except auth.AuthError as e:
+        raise HTTPError(429 if "Too many" in str(e) else 401, str(e)) from e
+    device = str(body.get("device_name") or "").strip()
+    if device or req.get("api_port"):
+        return _signed_in(user, "device", device or "app")
+    return _signed_in(user, "web", "web browser")
+
+
+@route("POST", "/api/auth/logout")
+def auth_logout(body, params):
+    req = _request.get() or {}
+    if req.get("token"):
+        auth.revoke_token(req["token"])
+    return {"ok": True, "__clear_cookie__": True}
+
+
+@route("GET", "/api/me")
+def get_me(body, params):
+    return auth.public_user(me())
+
+
+@route("POST", "/api/me")
+def update_me(body, params):
+    """Change your name, email or password (the current password is needed for email/password)."""
+    user = me()
+    sets, args = [], []
+    if body.get("name") is not None:
+        sets.append("name = ?")
+        args.append(str(body["name"]).strip()[:60] or user["name"])
+    if body.get("email") or body.get("new_password"):
+        if not auth.verify_password(str(body.get("current_password") or ""), user["password_hash"]):
+            raise HTTPError(403, "Your current password is wrong")
+        if body.get("email"):
+            sets.append("email = ?")
+            args.append(str(body["email"]).strip())
+        if body.get("new_password"):
+            try:
+                sets.append("password_hash = ?")
+                args.append(auth.hash_password(str(body["new_password"])))
+            except auth.AuthError as e:
+                raise HTTPError(400, str(e)) from e
+    if sets:
+        db.execute(f"UPDATE users SET {', '.join(sets)} WHERE id = ?", (*args, user["id"]))
+    return auth.public_user(db.query("SELECT * FROM users WHERE id = ?", (user["id"],))[0])
+
+
+@route("GET", "/api/tokens")
+def list_tokens(body, params):
+    """Where you're signed in: browsers and devices, with the one making this request marked."""
+    req = _request.get() or {}
+    rows = db.query("SELECT id, kind, name, created_at, last_used FROM tokens WHERE user_id = ? ORDER BY last_used DESC",
+                    (me()["id"],))
+    for r in rows:
+        r["current"] = r["id"] == req.get("token_id")
+    return {"tokens": rows}
+
+
+@route("DELETE", r"/api/tokens/(\d+)")
+def revoke_token(body, params, tid):
+    if not db.execute_count("DELETE FROM tokens WHERE id = ? AND user_id = ?", (int(tid), me()["id"])):
+        raise HTTPError(404, "not found")
+    return {"ok": True}
+
+
 # ---- HTTP plumbing ----------------------------------------------------------
+
+OPEN_ROUTES = {("GET", "/api/auth/status"), ("POST", "/api/auth/setup"), ("POST", "/api/auth/login")}
 
 # The API port (config "api_port") is a second door for other apps on the network: API only, every call
 # needs the API key, and it can't read or change settings or keys. The web page's own port is unchanged.
@@ -372,29 +532,53 @@ API_PORT = {"port": None}
 class Handler(BaseHTTPRequestHandler):
     api_only = False
 
-    def _api_key_ok(self) -> str | None:
-        """None when the request may proceed, else the error to return."""
-        expected = db.get_settings().get("api_key") or ""
-        if not expected:
-            return "The API is off: create an API key in Deal Hunter's Settings > API"
-        auth = self.headers.get("Authorization") or ""
-        given = auth[7:].strip() if auth.lower().startswith("bearer ") else (self.headers.get("X-API-Key") or "").strip()
-        return None if given and hmac.compare_digest(given, expected) else "Missing or wrong API key"
+    def _identify(self) -> tuple[dict | None, str | None]:
+        """Who is asking: a device token (Bearer / X-API-Key), the browser's cookie, or on the API port the
+        old single API key (which acts as the first admin until apps move to their own sign-in)."""
+        auth_header = self.headers.get("Authorization") or ""
+        bearer = auth_header[7:].strip() if auth_header.lower().startswith("bearer ") else             (self.headers.get("X-API-Key") or "").strip()
+        if bearer:
+            user = auth.user_for_token(bearer)
+            if user:
+                return user, bearer
+            legacy = db.get_settings(db.admin_id()).get("api_key") or ""
+            if self.api_only and legacy and hmac.compare_digest(bearer, legacy):
+                return db.query("SELECT * FROM users WHERE id = ?", (db.admin_id(),))[0], None
+            return None, None
+        if not self.api_only:
+            cookie = SimpleCookie(self.headers.get("Cookie") or "")
+            if COOKIE in cookie:
+                user = auth.user_for_token(cookie[COOKIE].value)
+                if user:
+                    return user, cookie[COOKIE].value
+        return None, None
+
+    def _address(self) -> str:
+        return self.headers.get("Cf-Connecting-Ip") or self.client_address[0]
+
+    def _https(self) -> bool:
+        return "https" in (self.headers.get("X-Forwarded-Proto") or "") or "https" in (self.headers.get("Cf-Visitor") or "")
 
     def log_message(self, format, *args):  # noqa: A002 - stdlib signature
         if not self.path.startswith("/api/state"):
             print(f"{self.address_string()} - {format % args}")
 
-    def _send(self, status: int, body: bytes, ctype: str) -> None:
+    def _send(self, status: int, body: bytes, ctype: str, headers: list[tuple[str, str]] = ()) -> None:
         self.send_response(status)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
+        for k, v in headers:
+            self.send_header(k, v)
         self.end_headers()
         self.wfile.write(body)
 
-    def _json(self, status: int, payload) -> None:
-        self._send(status, json.dumps(payload).encode(), "application/json")
+    def _json(self, status: int, payload, headers: list[tuple[str, str]] = ()) -> None:
+        self._send(status, json.dumps(payload).encode(), "application/json", headers)
+
+    def _cookie(self, value: str, max_age: int) -> tuple[str, str]:
+        secure = "; Secure" if self._https() else ""
+        return ("Set-Cookie", f"{COOKIE}={value}; Path=/; Max-Age={max_age}; HttpOnly; SameSite=Lax{secure}")
 
     def _dispatch(self, method: str) -> None:
         url = urlparse(self.path)
@@ -403,9 +587,6 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(404, {"error": "API only on this port; see /api.html on the web address"})
             if url.path.startswith(API_PORT_BLOCKED):
                 return self._json(403, {"error": "not available through the API port"})
-            problem = self._api_key_ok()
-            if problem:
-                return self._json(401, {"error": problem})
         if method == "GET" and not url.path.startswith("/api/"):
             return self._static(url.path)
         for m, pattern, fn in ROUTES:
@@ -417,11 +598,23 @@ class Handler(BaseHTTPRequestHandler):
         if method != "GET" and self.headers.get_content_type() != "application/json":
             # Browsers can send cross-site form/text POSTs without asking first, but not JSON ones.
             return self._json(415, {"error": "send JSON"})
+        user, token = self._identify()
+        if not user and (method, url.path) not in OPEN_ROUTES:
+            return self._json(401, {"error": "Sign in to Deal Hunter"})
+        req = {"user": user, "token": token, "token_id": user.get("token_id") if user else None,
+               "api_port": self.api_only, "address": self._address()}
+        req_token, user_token = _request.set(req), db.set_user(user["id"] if user else None)
         try:
             length = int(self.headers.get("Content-Length") or 0)
             body = json.loads(self.rfile.read(length) or b"{}") if length else {}
             params = {k: v[0] for k, v in parse_qs(url.query).items()}
-            self._json(200, fn(body, params, *match.groups()))
+            result = fn(body, params, *match.groups())
+            headers = []
+            if isinstance(result, dict) and "__set_cookie__" in result:
+                headers.append(self._cookie(result.pop("__set_cookie__"), COOKIE_DAYS * 86400))
+            if isinstance(result, dict) and result.pop("__clear_cookie__", None):
+                headers.append(self._cookie("", 0))
+            self._json(200, result, headers)
         except HTTPError as e:
             self._json(e.status, {"error": str(e)})
         except (ValueError, TypeError) as e:  # bad numbers or JSON from the client
@@ -432,6 +625,9 @@ class Handler(BaseHTTPRequestHandler):
             import traceback
             traceback.print_exc()
             self._json(500, {"error": f"{type(e).__name__}: {e}"})
+        finally:
+            _request.reset(req_token)
+            db._current_user.reset(user_token)
 
     def _static(self, path: str) -> None:
         rel = "index.html" if path in ("", "/") else path.lstrip("/")

@@ -107,7 +107,8 @@ def month_start(now: float | None = None) -> float:
 
 
 def budget(settings: dict) -> dict:
-    spent = db.query("SELECT COALESCE(SUM(cost), 0) AS s FROM ai_usage WHERE at >= ?", (month_start(),))[0]["s"]
+    spent = db.query("SELECT COALESCE(SUM(cost), 0) AS s FROM ai_usage WHERE at >= ? AND user_id = ?",
+                     (month_start(), db.current_user_id()))[0]["s"]
     limit = max(0.0, float(settings.get("ai_monthly_limit") or 0))
     return {"spent": round(spent, 6), "limit": limit, "remaining": round(max(0.0, limit - spent), 6)}
 
@@ -145,9 +146,9 @@ def run(settings: dict, action: str, prompt: str, schema: dict) -> dict:
         text, tokens_in, tokens_out, problem = call(settings, info, prompt, schema, ACTIONS[action]["max_out"])
         # Record before parsing: a cut-off or refused answer is still billed.
         spent = 0.0 if info["free"] else cost(info, tokens_in, tokens_out)
-        db.execute("""INSERT INTO ai_usage (at, provider, model, action, input_tokens, output_tokens, cost)
-                      VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                   (time.time(), info["provider"], info["id"], action, tokens_in, tokens_out, spent))
+        db.execute("""INSERT INTO ai_usage (at, provider, model, action, input_tokens, output_tokens, cost, user_id)
+                      VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                   (time.time(), info["provider"], info["id"], action, tokens_in, tokens_out, spent, db.current_user_id()))
     if problem:
         raise AIError(problem)
     try:
@@ -158,7 +159,8 @@ def run(settings: dict, action: str, prompt: str, schema: dict) -> dict:
 
 def usage_summary(settings: dict) -> dict:
     rows = db.query("""SELECT model, action, COUNT(*) AS n, SUM(cost) AS cost FROM ai_usage
-                       WHERE at >= ? GROUP BY model, action ORDER BY cost DESC""", (month_start(),))
+                       WHERE at >= ? AND user_id = ? GROUP BY model, action ORDER BY cost DESC""",
+                    (month_start(), db.current_user_id()))
     return {**budget(settings), "breakdown": rows}
 
 
