@@ -75,10 +75,11 @@ def run_watch(watch: dict, settings: dict) -> dict:
             if not ok:
                 continue
             fam = family(it["source"])  # e.g. an eBay item found by both the national and local search
-            exists = db.query(f"""SELECT 1 FROM listings WHERE watch_id = ? AND source_id = ?
+            exists = db.query(f"""SELECT id FROM listings WHERE watch_id = ? AND source_id = ?
                                   AND source IN ({','.join('?' * len(fam))})""",
                               (watch["id"], it["source_id"], *fam))
             if exists:
+                db.execute("UPDATE listings SET seen_at = ? WHERE id = ?", (time.time(), exists[0]["id"]))
                 continue
             pct = matching.deal_pct(total, history)
             lid = db.execute("""INSERT INTO listings (watch_id, source, source_id, title, price, shipping, total,
@@ -103,6 +104,20 @@ def run_watch(watch: dict, settings: dict) -> dict:
     return {"new": len(new_rows), "errors": errors}
 
 
+# Best Buy's API terms allow keeping its content for at most 72 hours, so its finds are dropped once
+# they haven't been seen in a check for that long (a find that's still listed keeps being refreshed).
+RETENTION_SECONDS = {"bestbuy": 72 * 3600}
+
+
+def purge_expired(now: float | None = None) -> int:
+    now = now or time.time()
+    removed = 0
+    for source, seconds in RETENTION_SECONDS.items():
+        removed += db.execute_count("DELETE FROM listings WHERE source = ? AND COALESCE(seen_at, first_seen) < ?",
+                                    (source, now - seconds))
+    return removed
+
+
 def run_all() -> None:
     with _run_lock:
         state["running"] = True
@@ -116,6 +131,7 @@ def run_all() -> None:
                         traceback.print_exc()
                         db.execute("UPDATE watches SET last_error = ? WHERE id = ?",
                                    ("internal error, see console", w["id"]))
+            purge_expired()
         finally:
             state["running"] = False
             state["last_cycle"] = time.time()
