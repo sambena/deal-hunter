@@ -87,6 +87,7 @@ CREATE TABLE IF NOT EXISTS listings (
     status TEXT NOT NULL DEFAULT 'new',
     deal_pct REAL,
     ai_note TEXT,
+    seen_at REAL,
     UNIQUE (watch_id, source, source_id)
 );
 CREATE INDEX IF NOT EXISTS idx_listings_watch ON listings(watch_id, first_seen);
@@ -132,6 +133,8 @@ def conn() -> sqlite3.Connection:
                 _conn.execute("ALTER TABLE watches ADD COLUMN polled_sources TEXT NOT NULL DEFAULT '[]'")
                 _conn.execute("""UPDATE watches SET polled_sources =
                     (SELECT json_group_array(DISTINCT source) FROM listings WHERE listings.watch_id = watches.id)""")
+            if "seen_at" not in {r["name"] for r in _conn.execute("PRAGMA table_info(listings)")}:
+                _conn.execute("ALTER TABLE listings ADD COLUMN seen_at REAL")  # last check that still found it
             if _conn.execute("PRAGMA user_version").fetchone()[0] < 1:
                 # eBay local pickup arrived: watches that search eBay search it locally too.
                 for r in _conn.execute("SELECT id, sources FROM watches").fetchall():
@@ -154,6 +157,14 @@ def execute(sql: str, args: tuple = ()) -> int:
         cur = conn().execute(sql, args)
         conn().commit()
         return cur.lastrowid
+
+
+def execute_count(sql: str, args: tuple = ()) -> int:
+    """Like execute, but returns how many rows changed."""
+    with _lock:
+        cur = conn().execute(sql, args)
+        conn().commit()
+        return cur.rowcount
 
 
 # ---- settings -------------------------------------------------------------

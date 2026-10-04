@@ -87,3 +87,4 @@ th { color: var(--muted); font-weight: 500; font-size: 12px; }
 .guide ol { margin: 6px 0 4px 20px; padding: 0; line-height: 1.5; }
 .guide a { color: var(--accent); }
 #settings-form select { width: 100%; max-width: 100%; text-overflow: ellipsis; }
+.bby-credit img { height: 18px; margin-top: 4px; vertical-align: middle; }

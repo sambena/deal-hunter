@@ -8,6 +8,9 @@ let state = { watches: [], machines: [], settings: {}, poller: {} };
 const SOURCES = { ebay: "eBay", ebay_local: "eBay local pickup", reddit: "Reddit", bestbuy: "Best Buy open-box" };
 const NEW_WATCH_SOURCES = ["ebay", "ebay_local", "reddit"];
 const sourceName = s => SOURCES[s] || s;
+// Best Buy's API branding guidelines: their logo, linked, wherever their data appears.
+const BESTBUY_CREDIT = `<a class="bby-credit" href="https://developer.bestbuy.com" target="_blank" rel="noopener">
+  <img src="https://developer.bestbuy.com/images/bestbuy-logo.png" alt="Best Buy Developer API"></a>`;
 
 const CATEGORIES = ["cpu", "motherboard", "ram", "gpu", "storage", "psu", "cooler", "case", "other"];
 
@@ -151,6 +154,7 @@ async function loadListings() {
         <div><span class="price">${l.source === "reddit" && l.total != null ? "≈" : ""}${money(l.total)}</span>${ship}${deal}
           ${l.source === "reddit" ? `<span class="meta">${l.total == null ? "see post" : "guessed from post"}</span>` : ""}</div>
         <div class="meta">${esc(sourceName(l.source))} · ${esc(l.condition || "")} ${l.location ? "· " + esc(l.location) : ""}</div>
+        ${l.source === "bestbuy" ? BESTBUY_CREDIT : ""}
         <div class="meta">${esc(l.watch_name)} · found ${ago(l.first_seen)}</div>
         ${l.ai_note ? `<div class="ai-note">${esc(l.ai_note)}</div>` : ""}
       </div>
