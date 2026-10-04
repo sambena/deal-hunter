@@ -98,6 +98,21 @@ def check(title: str, watch: dict, junk_terms: list[str], total: float | None,
     return True, ""
 
 
+def still_wanted(title: str, total: float | None, watch: dict) -> bool:
+    """For finds already stored when a watch is edited: do its excludes and price limits still allow it?
+    (The query itself isn't re-checked: some sources match on text that isn't stored.)"""
+    _, q_excludes = parse_query(watch["query"])
+    hn, hc = normalize(title), compact(title)
+    if any(_contains(hn, hc, t) for t in [*q_excludes, *watch.get("exclude", [])]):
+        return False
+    if total is not None:
+        if watch.get("max_price") is not None and total > watch["max_price"]:
+            return False
+        if watch.get("min_price") is not None and total < watch["min_price"]:
+            return False
+    return True
+
+
 def deal_pct(total: float | None, history: list[float]) -> float | None:
     """How far below the typical asking price this is, as a fraction (0.2 = 20% under).
 

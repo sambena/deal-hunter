@@ -284,7 +284,7 @@ async function loadListings() {
     const label = pct == null ? "" : pct >= 0.25 ? "great" : pct >= 0.10 ? "good" : "";
     const deal = label ? `<span class="deal ${label}">${Math.round(pct * 100)}% under typical</span>` : "";
     const ship = l.shipping ? ` <span class="meta">(${money(l.price)} + ${money(l.shipping)} ship)</span>` : "";
-    return `<div class="card ${l.status}" data-id="${l.id}">
+    return `<div class="card ${l.status}" data-id="${l.id}" data-watch="${l.watch_id}">
       ${l.image ? `<a href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener" class="img" style="background-image:${esc(cssUrl(l.image))}"></a>`
         : `<a href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener" class="img none">${esc(l.buying || l.source)}</a>`}
       <div class="body">
@@ -293,13 +293,15 @@ async function loadListings() {
           ${l.source === "reddit" ? `<span class="meta">${l.total == null ? "see post" : "guessed from post"}</span>` : ""}</div>
         <div class="meta">${esc(sourceName(l.source))} · ${esc(l.condition || "")} ${l.location ? "· " + esc(l.location) : ""}</div>
         ${l.source === "bestbuy" ? BESTBUY_CREDIT : ""}
-        <div class="meta">${esc(l.watch_name)} · found ${ago(l.first_seen)}</div>
+        <div class="meta"><a href="#" class="watch-link" data-edit-watch="${l.watch_id}" title="Edit this watch">${esc(l.watch_name)} ✎</a> · found ${ago(l.first_seen)}</div>
         ${l.ai_note ? `<div class="ai-note">${esc(l.ai_note)}</div>` : ""}
       </div>
       <div class="actions">
         <button class="small" data-act="${l.status === "starred" ? "seen" : "starred"}">${l.status === "starred" ? "★ Starred" : "☆ Star"}</button>
         <button class="small" data-act="${l.status === "dismissed" ? "seen" : "dismissed"}">${l.status === "dismissed" ? "Restore" : "Dismiss"}</button>
         ${aiOn() ? `<button class="small" data-act="ai">Ask AI</button>` : ""}
+        <button class="small" data-act="exclude" title="Exclude a word from this watch, hiding finds like this one">Not this…</button>
+        <button class="small" data-act="maxprice" title="Set this watch's highest price">Max $…</button>
       </div>
     </div>`;
   }).join("");
@@ -310,6 +312,36 @@ $("#listings").addEventListener("click", async e => {
   const card = e.target.closest(".card");
   if (!card) return;
   const id = card.dataset.id;
+  const watch = state.watches.find(w => w.id === Number(card.dataset.watch));
+  if (e.target.closest("[data-edit-watch]")) {
+    e.preventDefault();
+    if (watch) editWatch(watch, "finds");
+    return;
+  }
+  if (btn && btn.dataset.act === "maxprice") {
+    if (!watch) return;
+    const now = watch.max_price != null ? `Now $${watch.max_price}.` : "No max price yet.";
+    const v = prompt(`Highest price for "${watch.name}", shipping included. ${now}\nFinds above it are removed; leave blank for no limit.`,
+      watch.max_price ?? "");
+    if (v === null) return;
+    const max = v.replace(/[$,\s]/g, "");
+    if (max && !(Number(max) > 0)) return toast("Enter a price like 400", true);
+    const r = await api("PUT", `/api/watches/${watch.id}`, { max_price: max });
+    toast((max ? `Max $${max}` : "No max price") + ` · ${r.removed} find${r.removed === 1 ? "" : "s"} removed`);
+    await Promise.all([loadListings(), refresh()]);
+    return;
+  }
+  if (btn && btn.dataset.act === "exclude") {
+    if (!watch) return;
+    const title = $(".title", card).textContent;
+    const term = (prompt(`Hide finds like this from "${watch.name}".\n\n${title}\n\nWord or phrase to exclude:`,
+      suggestExclude(title, watch)) || "").trim();
+    if (!term) return;
+    const r = await api("PUT", `/api/watches/${watch.id}`, { exclude: [...watch.exclude, term] });
+    toast(`Excluding "${term}" · ${r.removed} find${r.removed === 1 ? "" : "s"} removed`);
+    await Promise.all([loadListings(), refresh()]);
+    return;
+  }
   if (!btn) {
     // Opening a listing marks it seen.
     if (e.target.closest("a") && card.classList.contains("new")) {
@@ -342,6 +374,18 @@ $("#poll-now").addEventListener("click", async () => {
   toast("Checking all watches…");
   setTimeout(() => refresh().then(loadListings), 4000);
 });
+
+// A first guess at what makes a find unwanted: a whole-system word if there is one, else the first
+// word of the title that isn't part of the watch's search.
+const SYSTEM_WORDS = ["tower", "desktop", "workstation", "computer", "laptop", "notebook", "bundle", "combo",
+  "motherboard", "build", "system", "server", "pc"];
+function suggestExclude(title, watch) {
+  const words = title.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  const query = watch.query.toLowerCase();
+  const sys = SYSTEM_WORDS.find(w => words.includes(w) && !query.includes(w));
+  if (sys) return sys;
+  return words.find(w => w.length > 2 && !/^\d+$/.test(w) && !query.includes(w) && !watch.exclude.includes(w)) || "";
+}
 
 // ---- watches --------------------------------------------------------------------
 
@@ -404,7 +448,10 @@ $("#watch-list").addEventListener("click", async e => {
   refresh();
 });
 
-function editWatch(w) {
+let watchReturn = null;  // the tab to go back to after saving, when editing started from a find
+
+function editWatch(w, returnTo = null) {
+  watchReturn = w ? returnTo : null;
   const f = $("#watch-form");
   f.reset();
   f.id.value = w?.id || "";
@@ -425,7 +472,11 @@ function editWatch(w) {
   f.scrollIntoView({ behavior: "smooth" });
 }
 
-$("#watch-cancel").addEventListener("click", () => editWatch(null));
+$("#watch-cancel").addEventListener("click", () => {
+  const back = watchReturn;
+  editWatch(null);
+  if (back) showTab(back);
+});
 
 function formToWatch(f) {
   return {
@@ -447,16 +498,19 @@ $("#watch-form").addEventListener("submit", async e => {
   const btn = $("button[type=submit]", f);
   await busy(btn, async () => {
     const data = formToWatch(f);
+    const back = watchReturn;
     if (f.id.value) {
-      await api("PUT", `/api/watches/${f.id.value}`, data);
+      const u = await api("PUT", `/api/watches/${f.id.value}`, data);
       const r = await api("POST", `/api/watches/${f.id.value}/run`);
-      toast(`Saved · ${r.new} new` + (r.errors.length ? ` · ${r.errors.join("; ")}` : ""), r.errors.length > 0);
+      toast(`Saved · ${u.removed ? `${u.removed} removed · ` : ""}${r.new} new` +
+        (r.errors.length ? ` · ${r.errors.join("; ")}` : ""), r.errors.length > 0);
     } else {
       const r = await api("POST", "/api/watches", data);
       toast(`Watch added · ${r.new} found` + (r.errors.length ? ` · ${r.errors.join("; ")}` : ""), r.errors.length > 0);
     }
     editWatch(null);
     await refresh();
+    if (back) showTab(back);
   });
 });
 
