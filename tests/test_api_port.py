@@ -125,5 +125,39 @@ class AccountsOverHttpTest(unittest.TestCase):
                                   {"email": "sam@example.com", "password": "correct horse 1"})[0], 429)
 
 
+    def test_3_public_hardening(self):
+        import auth as auth_mod
+        app = Client(self.api.server_port)
+        # Spoofed Cloudflare header on the API port doesn't buy fresh attempts.
+        codes = [app.call("POST", "/api/auth/login", {"email": "sam@example.com", "password": f"x{i}"},
+                          headers={"Cf-Connecting-Ip": f"10.0.0.{i}"})[0] for i in range(6)]
+        self.assertEqual(codes[-1], 429)
+        auth_mod._fails.clear()
+        # One account guessed from many addresses (through the web port, where the header is trusted) is limited too.
+        web = Client(self.ui.server_port)
+        codes = [web.call("POST", "/api/auth/login", {"email": "sam@example.com", "password": f"y{i}"},
+                          headers={"Cf-Connecting-Ip": f"203.0.113.{i}"})[0] for i in range(6)]
+        self.assertEqual(codes[-1], 429)
+        auth_mod._fails.clear()
+        # A wrong email reads the same as a wrong password.
+        self.assertEqual(app.call("POST", "/api/auth/login", {"email": "nobody@example.com", "password": "whatever1"})[1],
+                         {"error": "Wrong email or password"})
+        # Security headers on every response; big bodies refused.
+        status, _, headers = web.call("GET", "/api/auth/status")
+        self.assertEqual((headers["X-Frame-Options"], headers["X-Content-Type-Options"]), ("DENY", "nosniff"))
+        status, body, _ = web.call("POST", "/api/auth/login", {"pad": "x" * 1_100_000})
+        self.assertEqual(status, 413)
+
+    def test_4_errors_do_not_leak_details(self):
+        import server
+        server.route("GET", "/api/boom")(lambda body, params: 1 / 0)
+        status, body, _ = Client(self.api.server_port, self.legacy_or_token()).call("GET", "/api/boom")
+        self.assertEqual((status, body), (500, {"error": "Something went wrong on the server"}))
+
+    def legacy_or_token(self):
+        import auth as auth_mod
+        return auth_mod.create_token(db.admin_id(), "device", "test")
+
+
 if __name__ == "__main__":
     unittest.main()
