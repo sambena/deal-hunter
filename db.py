@@ -156,7 +156,21 @@ CREATE TABLE IF NOT EXISTS user_settings (
     value TEXT NOT NULL,
     PRIMARY KEY (user_id, key)
 );
+CREATE TABLE IF NOT EXISTS invites (   -- one-time links: a new account, or a password reset
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code_hash TEXT NOT NULL UNIQUE,     -- only a hash; the code itself is in the link
+    kind TEXT NOT NULL,                 -- invite | reset
+    note TEXT NOT NULL DEFAULT '',      -- who it's for, as the admin wrote it
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,  -- reset: whose password
+    watch_limit INTEGER,                -- invite: the new account's limit
+    created_by INTEGER NOT NULL,
+    created_at REAL NOT NULL,
+    expires_at REAL NOT NULL,
+    used_at REAL
+);
 """
+
+DEFAULT_WATCH_LIMIT = 10  # for invited friends; the admin has none
 
 # Who the current request (or poller pass) is acting for. Unset means the first admin, which is what
 # scripts, tests and single-user installs want; the web server always sets it after signing someone in.

@@ -40,9 +40,27 @@ async function api(method, path, body) {
 // First visit after accounts arrived: the admin sets up their name, email and password. After that,
 // everyone signs in with email + password; the browser keeps a long-lived session cookie.
 
-function showAuth(setup) {
+function showAuth(setup, link) {
   const screen = $("#auth-screen"), f = $("#auth-form");
-  f.dataset.mode = setup ? "setup" : "login";
+  f.dataset.mode = link ? link.kind : setup ? "setup" : "login";
+  if (link) {
+    // Invite: name, email and password for a new account. Reset: a new password for an existing one.
+    const invite = link.kind === "invite";
+    $("#auth-title").textContent = invite ? "Join Deal Hunter" : "Choose a new password";
+    $("#auth-intro").textContent = invite
+      ? "You've been invited to Deal Hunter. Pick a name, your email and a password; your watches and finds are yours alone."
+      : `For ${link.email}. You'll be signed out everywhere else.`;
+    $$("[data-setup]", f).forEach(el => (el.hidden = false));
+    f.name.closest("label").hidden = !invite;
+    f.email.closest("label").hidden = !invite;
+    f.email.required = invite;
+    f.password.autocomplete = "new-password";
+    $("#auth-go").textContent = invite ? "Create my account" : "Save new password";
+    $("#auth-error").textContent = "";
+    screen.hidden = false;
+    document.body.classList.add("signed-out");
+    return;
+  }
   $("#auth-title").textContent = setup ? "Set up your Deal Hunter account" : "Sign in to Deal Hunter";
   $("#auth-intro").textContent = setup
     ? "Deal Hunter now has accounts so friends and family can have their own. Everything you already have becomes yours; pick the email and password you'll sign in with."
@@ -57,13 +75,105 @@ function showAuth(setup) {
 
 $("#auth-form").addEventListener("submit", async e => {
   e.preventDefault();
-  const f = e.target, setup = f.dataset.mode === "setup";
-  if (setup && f.password.value !== f.password2.value) return ($("#auth-error").textContent = "The passwords don't match");
+  const f = e.target, mode = f.dataset.mode;
+  if (mode !== "login" && f.password.value !== f.password2.value) return ($("#auth-error").textContent = "The passwords don't match");
+  const fields = { name: f.name.value.trim(), email: f.email.value.trim(), password: f.password.value };
   try {
-    await api("POST", setup ? "/api/auth/setup" : "/api/auth/login",
-      { name: f.name.value.trim(), email: f.email.value.trim(), password: f.password.value });
+    if (mode === "invite" || mode === "reset") {
+      await api("POST", "/api/auth/accept", { ...fields, code: linkCode().code });
+      history.replaceState(null, "", location.pathname);  // the link is used up
+    } else {
+      await api("POST", mode === "setup" ? "/api/auth/setup" : "/api/auth/login", fields);
+    }
     location.reload();
   } catch (err) { $("#auth-error").textContent = err.message; }
+});
+
+// "Get the Android app": shown wherever .app-link appears, once a build has been published.
+async function showAppLinks() {
+  try {
+    const app = await api("GET", "/api/app/android");
+    if (!app.available) return;
+    const note = [app.version && `version ${app.version}`, app.size && `${(app.size / 1e6).toFixed(1)} MB`,
+      app.published_at && `updated ${new Date(app.published_at * 1000).toLocaleDateString()}`].filter(Boolean).join(" · ");
+    $$(".app-link").forEach(p => { $(".muted", p).textContent = note ? `(${note})` : ""; p.hidden = false; });
+  } catch {}
+}
+
+// An invite or reset link looks like https://deals.cougarcave.dev/#invite=CODE or #reset=CODE.
+function linkCode() {
+  const m = location.hash.match(/^#(invite|reset)=([\w-]+)$/);
+  return m ? { kind: m[1], code: m[2] } : null;
+}
+
+// ---- people (admin) ---------------------------------------------------------------
+
+async function fillPeople() {
+  if (!state.me || state.me.role !== "admin") return;
+  const { users, invites } = await api("GET", "/api/admin/users");
+  $("#people-list").innerHTML = `<div class="table-wrap"><table class="people">
+      <tr><th>Person</th><th>Watches</th><th>AI this month</th><th>Last active</th><th></th></tr>
+      ${users.map(u => `<tr data-id="${u.id}">
+        <td><b>${esc(u.name)}</b>${u.role === "admin" ? ' <span class="pill">admin</span>' : ""}${u.disabled ? ' <span class="pill">disabled</span>' : ""}<br>
+          <span class="muted">${esc(u.email)}</span></td>
+        <td>${u.watches} of ${u.role === "admin" ? "∞" : `<input class="limit" type="number" min="0" value="${u.watch_limit ?? ""}" placeholder="∞">`}</td>
+        <td>${usd(u.ai_spent)}</td>
+        <td>${u.last_active ? ago(u.last_active) : "never"}</td>
+        <td class="row">${u.role === "admin" ? "" : `
+          <button type="button" class="small" data-act="reset">Reset password</button>
+          <button type="button" class="small ${u.disabled ? "" : "danger"}" data-act="${u.disabled ? "enable" : "disable"}">${u.disabled ? "Enable" : "Disable"}</button>`}</td>
+      </tr>`).join("")}
+    </table></div>
+    ${invites.length ? `<h3>Waiting to be used</h3>${invites.map(i => `<div class="row device" data-invite="${i.id}">
+      <span>${i.kind === "reset" ? "Password reset" : "Invite"}${i.note ? `: ${esc(i.note)}` : ""}<br>
+        <span class="muted">expires ${new Date(i.expires_at * 1000).toLocaleDateString()}</span></span>
+      <span class="spacer"></span><button type="button" class="small danger" data-act="cancel-invite">Cancel</button></div>`).join("")}` : ""}`;
+}
+
+function showLink(link) {
+  $("#invite-link").value = link;
+  $("#invite-result").hidden = false;
+  $("#invite-link").select();
+}
+
+$("#invite-new").addEventListener("click", e => busy(e.target, async () => {
+  const { link } = await api("POST", "/api/admin/invites",
+    { note: $("#invite-note").value.trim(), watch_limit: $("#invite-limit").value });
+  showLink(link);
+  $("#invite-note").value = "";
+  fillPeople();
+}));
+
+$("#invite-copy").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText($("#invite-link").value); toast("Link copied"); }
+  catch { toast("Select the link and copy it yourself", true); }
+});
+
+$("#people-list").addEventListener("click", async e => {
+  const btn = e.target.closest("[data-act]");
+  if (!btn) return;
+  const act = btn.dataset.act;
+  if (act === "cancel-invite") {
+    await api("DELETE", `/api/admin/invites/${btn.closest("[data-invite]").dataset.invite}`);
+    return fillPeople();
+  }
+  const id = btn.closest("tr[data-id]").dataset.id;
+  if (act === "reset") {
+    const { link } = await api("POST", `/api/admin/users/${id}/reset`);
+    showLink(link);
+    toast("Send them this reset link");
+  } else {
+    if (act === "disable" && !confirm("Disable this person? They're signed out everywhere and can't sign in until you enable them.")) return;
+    await api("PUT", `/api/admin/users/${id}`, { disabled: act === "disable" });
+  }
+  fillPeople();
+});
+
+$("#people-list").addEventListener("change", async e => {
+  if (!e.target.matches("input.limit")) return;
+  await api("PUT", `/api/admin/users/${e.target.closest("tr[data-id]").dataset.id}`, { watch_limit: e.target.value });
+  toast("Watch limit saved");
+  fillPeople();
 });
 
 async function fillAccount() {
@@ -760,6 +870,7 @@ function fillSettings() {
   const admin = state.me && state.me.role === "admin";
   $$("[data-admin]", f).forEach(el => (el.hidden = !admin));  // shared settings are the admin's
   fillAccount().catch(() => {});
+  fillPeople().catch(err => toast(err.message, true));
   fillAiChoices();
   for (const el of f.elements) {
     if (!el.name) continue;
@@ -819,6 +930,12 @@ $("#test-discord").addEventListener("click", e => busy(e.target, async () => {
 // ---- boot -----------------------------------------------------------------------
 
 (async () => {
+  showAppLinks();
+  const link = linkCode();
+  if (link) {
+    try { return showAuth(false, { ...(await api("GET", `/api/auth/link?code=${encodeURIComponent(link.code)}`)) }); }
+    catch (err) { history.replaceState(null, "", location.pathname); toast(err.message, true); }
+  }
   const status = await api("GET", "/api/auth/status");
   if (status.setup_needed || !status.user) return showAuth(status.setup_needed);
   await refresh();
