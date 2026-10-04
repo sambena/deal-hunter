@@ -9,6 +9,16 @@ const SOURCES = { ebay: "eBay", ebay_local: "eBay local pickup", ksl: "KSL Class
   buildapcsales: "r/buildapcsales", bestbuy: "Best Buy open-box" };
 const NEW_WATCH_SOURCES = ["ebay", "ebay_local", "ksl", "craigslist", "offerup", "reddit", "slickdeals", "buildapcsales"];
 const sourceName = s => SOURCES[s] || s;
+// Small brand-coloured tag in the corner of each find's photo (same text and colours as the Android app).
+const SOURCE_TAGS = {
+  ebay: ["eBay", "#E53238"], ebay_local: ["eBay local", "#86B817", "#1A2E05"], ksl: ["KSL", "#0D5EA6"],
+  reddit: ["Reddit", "#FF4500"], buildapcsales: ["r/bapcs", "#FF4500"], slickdeals: ["Slick", "#2B6CB0"],
+  bestbuy: ["Best Buy", "#0046BE", "#FFE000"], craigslist: ["CL", "#5A1A8C"], offerup: ["OfferUp", "#00AB80"],
+};
+function sourceTag(s) {
+  const [text, bg, fg] = SOURCE_TAGS[s] || [sourceName(s), "#4B5563"];
+  return `<span class="src-tag" style="background:${bg};color:${fg || "#FFFFFF"}" title="${esc(sourceName(s))}">${esc(text)}</span>`;
+}
 // Each watch's colour: the one picked, else from this palette by id (the Android app uses the same rule).
 const WATCH_PALETTE = ["#3B82F6", "#F97316", "#A855F7", "#14B8A6", "#EC4899", "#EAB308", "#22C55E", "#EF4444",
   "#06B6D4", "#8B5CF6"];
@@ -324,8 +334,8 @@ function findCard(l) {
   const deal = label ? `<span class="deal ${label}">${Math.round(pct * 100)}% under typical</span>` : "";
   const ship = l.shipping ? ` <span class="meta">(${money(l.price)} + ${money(l.shipping)} ship)</span>` : "";
   return `<div class="card ${l.status}" data-id="${l.id}" data-watch="${l.watch_id}" style="border-left-color:${colorOf(l.watch_id)}">
-    ${l.image ? `<a href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener" class="img" style="background-image:${esc(cssUrl(l.image))}"></a>`
-      : `<a href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener" class="img none">${esc(l.buying || l.source)}</a>`}
+    ${l.image ? `<a href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener" class="img" style="background-image:${esc(cssUrl(l.image))}">${sourceTag(l.source)}</a>`
+      : `<a href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener" class="img none">${sourceTag(l.source)}${esc(l.buying || l.source)}</a>`}
     <div class="body">
       <a class="title" href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener">${esc(l.title)}</a>
       <div><span class="price">${l.source === "reddit" && l.total != null ? "≈" : ""}${money(l.total)}</span>${ship}${deal}
