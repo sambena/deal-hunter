@@ -130,8 +130,17 @@
           <h2>eBay</h2>
           <label class="toggle"><input type="checkbox" name="src_ebay"> Enabled</label>
           <label class="toggle"><input type="checkbox" name="src_ebay_local"> Local pickup search (uses Local area)</label>
-          <p class="muted">Free key: sign up at developer.ebay.com, create an application keyset (Production), and paste the
-            App ID and Cert ID here.</p>
+          <p class="muted">Free. Covers both the nationwide search and local pickup.</p>
+          <details class="help guide">
+            <summary>How to get an eBay key (free)</summary>
+            <ol>
+              <li>Go to <a href="https://developer.ebay.com/signin" target="_blank" rel="noopener">developer.ebay.com</a> and join the Developers Program. Your normal eBay login works.</li>
+              <li>Open <b>Application Keys</b> and create a keyset under <b>Production</b> (not Sandbox). Give the app any name, e.g. "Deal Hunter".</li>
+              <li>eBay asks about <b>marketplace account deletion notifications</b> before it switches the keyset on. Choose the exemption: you are <i>not persisting eBay data</i>.</li>
+              <li>Copy the <b>App ID (Client ID)</b> and the <b>Cert ID (Client Secret)</b> into the boxes below, then press <b>Save settings</b>.</li>
+            </ol>
+            <p>The free tier allows 5,000 searches a day, far more than Deal Hunter uses.</p>
+          </details>
           <div class="grid">
             <label>App ID (Client ID) <input name="ebay_client_id"></label>
             <label>Cert ID (Client Secret) <input name="ebay_client_secret" type="password" autocomplete="off"></label>
@@ -143,13 +152,22 @@
           <label class="toggle"><input type="checkbox" name="src_reddit"> Enabled</label>
           <label>Subreddits (one per line) <textarea name="reddit_subs" rows="3"></textarea></label>
           <p class="muted">No key needed. Only "selling" posts are matched: [H] item [W] PayPal/cash, or [FS].
-            Prices are guessed from the post text, so check the post.</p>
+            Prices are guessed from the post text, so check the post. Nothing to set up.</p>
         </div>
 
         <div class="panel">
           <h2>Best Buy open-box <span class="pill">experimental</span></h2>
           <label class="toggle"><input type="checkbox" name="src_bestbuy"> Enabled</label>
-          <p class="muted">Free key from developer.bestbuy.com.</p>
+          <p class="muted">Free, if Best Buy approves you.</p>
+          <details class="help guide">
+            <summary>How to get a Best Buy key (free)</summary>
+            <ol>
+              <li>Go to <a href="https://developer.bestbuy.com/" target="_blank" rel="noopener">developer.bestbuy.com</a> and choose <b>Get API Key</b>.</li>
+              <li>Sign up and confirm your email. Best Buy sometimes asks for a business email or reviews new sign-ups by hand, so the key can take a while or be refused.</li>
+              <li>Copy the key from your account page into the box below, tick <b>Enabled</b>, and save.</li>
+            </ol>
+            <p>It only finds open-box items for products that match your watch, and doesn't know which store they're in.</p>
+          </details>
           <label>API key <input name="bestbuy_api_key" type="password" autocomplete="off"></label>
         </div>
 
@@ -158,6 +176,16 @@
           <label class="toggle"><input type="checkbox" name="discord_enabled"> Post new finds to Discord</label>
           <label class="toggle"><input type="checkbox" name="discord_deals_only"> Only when it's a deal (10%+ under this watch's typical price)</label>
           <label>Webhook URL <input name="discord_webhook" type="password" autocomplete="off"></label>
+          <details class="help guide">
+            <summary>How to get a Discord webhook (free)</summary>
+            <ol>
+              <li>In Discord, hover over the channel you want alerts in and click the gear (<b>Edit Channel</b>).</li>
+              <li>Open <b>Integrations → Webhooks → New Webhook</b>. Name it "Deal Hunter" if you like.</li>
+              <li>Click <b>Copy Webhook URL</b>, paste it below, tick <b>Post new finds to Discord</b>, and save.</li>
+              <li>Press <b>Send test message</b> to check it works.</li>
+            </ol>
+            <p>You need Manage Webhooks permission on the server. Anyone with the link can post to that channel, so keep it private.</p>
+          </details>
           <button type="button" id="test-discord">Send test message</button>
         </div>
 
@@ -173,21 +201,67 @@
             <label>Monthly limit (US $) <input name="ai_monthly_limit" type="number" min="0" step="0.5"></label>
           </div>
           <label class="toggle"><input type="checkbox" name="ai_confirm"> Show the cost and ask before every paid AI request</label>
-          <div class="grid" data-provider="claude">
+          <div data-provider="claude">
+          <div class="grid">
             <label>Claude model <select name="claude_model" data-models="claude"></select></label>
             <label>Anthropic API key <input name="anthropic_api_key" type="password" autocomplete="off" data-ph="from console.anthropic.com"></label>
           </div>
-          <div class="grid" data-provider="openai">
+          <details class="help guide">
+            <summary>How to get a Claude (Anthropic) key: pay as you go</summary>
+            <ol>
+              <li>Go to <a href="https://console.anthropic.com/" target="_blank" rel="noopener">console.anthropic.com</a> and sign in. This is separate from a Claude Pro/Max subscription, which can't be used here.</li>
+              <li>Open <b>Billing</b> and buy a few dollars of credit. $5 lasts a long time with the cheaper models.</li>
+              <li>Under <b>Settings → Limits</b>, set a monthly spend limit. That cap is on Anthropic's side, on top of the limit above.</li>
+              <li>Open <b>API Keys → Create Key</b>, copy it (it's only shown once), paste it below, and save.</li>
+            </ol>
+            <p>Claude Haiku 4.5 is the cheapest. Opus 5.5 gives the best judgement on listings.</p>
+          </details>
+          </div>
+          <div data-provider="openai">
+          <div class="grid">
             <label>OpenAI model <select name="openai_model" data-models="openai"></select></label>
             <label>OpenAI API key <input name="openai_api_key" type="password" autocomplete="off" data-ph="from platform.openai.com"></label>
           </div>
-          <div class="grid" data-provider="gemini">
+          <details class="help guide">
+            <summary>How to get an OpenAI (ChatGPT) key: pay as you go</summary>
+            <ol>
+              <li>Go to <a href="https://platform.openai.com/" target="_blank" rel="noopener">platform.openai.com</a> and sign in. A ChatGPT Plus subscription doesn't include API use.</li>
+              <li>Open <b>Settings → Billing</b> and add a few dollars of credit.</li>
+              <li>Under <b>Settings → Limits</b>, set a monthly budget.</li>
+              <li>Open <b>API keys → Create new secret key</b>, copy it (it's only shown once), paste it below, and save.</li>
+            </ol>
+          </details>
+          </div>
+          <div data-provider="gemini">
+          <div class="grid">
             <label>Gemini model <select name="gemini_model" data-models="gemini"></select></label>
             <label>Gemini API key <input name="gemini_api_key" type="password" autocomplete="off" data-ph="from aistudio.google.com"></label>
           </div>
-          <div class="grid" data-provider="ollama">
+          <details class="help guide">
+            <summary>How to get a Google Gemini key: free tier, then pay as you go</summary>
+            <ol>
+              <li>Go to <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> and sign in with a Google account.</li>
+              <li>Click <b>Create API key</b>. Pick or create a Google Cloud project when asked.</li>
+              <li>Copy the key, paste it below, and save.</li>
+            </ol>
+            <p>Without billing turned on, the key uses Google's free tier: limited requests per day, and Google may use the prompts to improve its products. Turning on billing in Google Cloud lifts the limits and the cost is shown above.</p>
+          </details>
+          </div>
+          <div data-provider="ollama">
+          <div class="grid">
             <label>Ollama URL <input name="ollama_url"></label>
             <label>Ollama model <input name="ollama_model"></label>
+          </div>
+          <details class="help guide">
+            <summary>How to set up Ollama (free, runs on your own computer)</summary>
+            <ol>
+              <li>Install Ollama from <a href="https://ollama.com/download" target="_blank" rel="noopener">ollama.com</a> on a computer with a decent graphics card.</li>
+              <li>In a terminal there, run <code>ollama pull qwen3:8b</code> (about 5 GB).</li>
+              <li>Put that computer's address in <b>Ollama URL</b>, e.g. <code>http://192.168.1.50:11434</code>. To reach it from another machine, set <code>OLLAMA_HOST=0.0.0.0</code> on the Ollama computer.</li>
+              <li>Type the model name (<code>qwen3:8b</code>) in <b>Ollama model</b> and save.</li>
+            </ol>
+            <p>It costs nothing, but without a graphics card each answer can take a minute or more.</p>
+          </details>
           </div>
           <p class="muted" id="ai-price-note"></p>
         </div>

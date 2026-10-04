@@ -16,6 +16,7 @@ Providers:
 from __future__ import annotations
 
 import json
+import os
 import threading
 import time
 import urllib.error
@@ -35,10 +36,20 @@ MODELS = [
     {"provider": "claude", "id": "claude-sonnet-5-5", "label": "Claude Sonnet 5.5", "in": 2.00, "out": 10.00, "effort": True},
     {"provider": "claude", "id": "claude-haiku-4-5", "label": "Claude Haiku 4.5 (cheapest)", "in": 1.00, "out": 5.00, "effort": False},
     {"provider": "claude", "id": "claude-opus-5", "label": "Claude Opus 5 (older)", "in": 5.00, "out": 25.00, "effort": True},
+    {"provider": "openai", "id": "gpt-6-astra", "label": "GPT-6 Astra (best)", "in": 10.00, "out": 50.00, "effort": True},
+    {"provider": "openai", "id": "gpt-6.1-sol", "label": "GPT-6.1 Sol", "in": 2.00, "out": 10.00, "effort": True},
+    {"provider": "openai", "id": "gpt-6-luna", "label": "GPT-6 Luna (cheapest)", "in": 0.10, "out": 0.50, "effort": True},
+    {"provider": "gemini", "id": "gemini-3.1-pro-preview", "label": "Gemini 3.1 Pro (best, preview)", "in": 2.00, "out": 12.00, "effort": True},
+    # Half price until the end of 2026, then $1.50 / $7.50.
+    {"provider": "gemini", "id": "gemini-3.8-flash", "label": "Gemini 3.8 Flash", "in": 1.50, "out": 7.50, "effort": True,
+     "promo": {"until": "2027-01-01", "in": 0.75, "out": 3.75}},
+    {"provider": "gemini", "id": "gemini-3.5-flash-lite", "label": "Gemini 3.5 Flash-Lite (cheapest)", "in": 0.30, "out": 2.50, "effort": True},
 ]
 
 PROVIDERS = {
     "claude": {"label": "Claude (Anthropic)", "key": "anthropic_api_key", "model": "claude_model"},
+    "openai": {"label": "OpenAI (ChatGPT)", "key": "openai_api_key", "model": "openai_model"},
+    "gemini": {"label": "Google Gemini", "key": "gemini_api_key", "model": "gemini_model"},
     "ollama": {"label": "Ollama (free, local)", "key": None, "model": "ollama_model"},
 }
 
@@ -62,9 +73,16 @@ def model_info(settings: dict) -> dict:
                 "effort": False, "free": True}
     for m in MODELS:
         if m["provider"] == provider and m["id"] == model:
-            return {**m, "free": False}
+            return {**m, **_price_today(m), "free": False}
     raise AIError(f"Pick a model from the list in Settings > AI (\"{model}\" has no known price, "
                   "so its cost can't be capped).")
+
+
+def _price_today(m: dict) -> dict:
+    promo = m.get("promo")
+    if promo and time.strftime("%Y-%m-%d") < promo["until"]:
+        return {"in": promo["in"], "out": promo["out"]}
+    return {"in": m["in"], "out": m["out"]}
 
 
 def cost(info: dict, tokens_in: int, tokens_out: int) -> float:
@@ -95,7 +113,11 @@ def estimate(settings: dict, action: str, prompt: str, schema: dict) -> dict:
     typical, worst = cost(info, tokens_in, a["typical_out"]), cost(info, tokens_in, a["max_out"])
     b = budget(settings)
     allowed, reason = True, ""
-    if not info["free"] and b["spent"] + worst > b["limit"]:
+    key_setting = PROVIDERS[info["provider"]]["key"]
+    env_key = info["provider"] == "claude" and os.environ.get("ANTHROPIC_API_KEY")
+    if key_setting and not (settings.get(key_setting) or env_key):
+        allowed, reason = False, f"Add your {PROVIDERS[info['provider']]['label']} API key in Settings > AI first."
+    elif not info["free"] and b["spent"] + worst > b["limit"]:
         allowed = False
         reason = (f"Monthly AI limit: ${b['spent']:.2f} of ${b['limit']:.2f} used, and this could cost up to "
                   f"${worst:.3f}. Raise the limit or pick a cheaper model in Settings > AI.")
@@ -137,7 +159,8 @@ def usage_summary(settings: dict) -> dict:
 def catalog() -> dict:
     """Everything the Settings page needs to show models with their prices."""
     return {"providers": {k: v["label"] for k, v in PROVIDERS.items()},
-            "models": [{k: m[k] for k in ("provider", "id", "label", "in", "out")} for m in MODELS],
+            "models": [{"provider": m["provider"], "id": m["id"], "label": m["label"], **_price_today(m)}
+                       for m in MODELS],
             "actions": ACTIONS}
 
 
@@ -199,7 +222,86 @@ def _ollama(settings: dict, info: dict, prompt: str, schema: dict, max_out: int)
     return text, data.get("prompt_eval_count", 0), data.get("eval_count", 0), None
 
 
-CALLERS = {"claude": _claude, "ollama": _ollama}
+def _post_json(url: str, headers: dict, body: dict, name: str) -> dict:
+    req = urllib.request.Request(url, data=json.dumps(body).encode(),
+                                 headers={"Content-Type": "application/json", **headers})
+    try:
+        with urllib.request.urlopen(req, timeout=180) as resp:
+            return json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode("utf-8", "replace")
+        try:
+            detail = json.loads(detail)["error"]["message"]
+        except (ValueError, KeyError, TypeError):
+            detail = detail[:200]
+        if e.code in (401, 403):
+            raise AIError(f"{name} rejected the API key ({detail})") from e
+        if e.code == 429:
+            raise AIError(f"{name} rate limit or quota hit; try again later ({detail})") from e
+        raise AIError(f"{name} API error {e.code}: {detail}") from e
+    except urllib.error.URLError as e:
+        raise AIError(f"Can't reach the {name} API ({e.reason})") from e
+
+
+def _require_key(settings: dict, provider: str, name: str) -> str:
+    key = (settings.get(PROVIDERS[provider]["key"]) or "").strip()
+    if not key:
+        raise AIError(f"Add your {name} API key in Settings > AI")
+    return key
+
+
+def _openai(settings: dict, info: dict, prompt: str, schema: dict, max_out: int):
+    key = _require_key(settings, "openai", "OpenAI")
+    data = _post_json("https://api.openai.com/v1/responses", {"Authorization": f"Bearer {key}"}, {
+        "model": info["id"],
+        "input": [{"role": "user", "content": prompt}],
+        "reasoning": {"effort": "low"},
+        "max_output_tokens": max_out,  # includes reasoning tokens
+        "text": {"format": {"type": "json_schema", "name": "answer", "strict": True, "schema": schema}},
+    }, "OpenAI")
+    usage = data.get("usage") or {}
+    text, problem = "", None
+    for item in data.get("output") or []:
+        if item.get("type") != "message":
+            continue  # reasoning items
+        for part in item.get("content") or []:
+            if part.get("type") == "output_text":
+                text += part.get("text", "")
+            elif part.get("type") == "refusal":
+                problem = "OpenAI declined this request"
+    if data.get("status") == "incomplete":
+        reason = (data.get("incomplete_details") or {}).get("reason")
+        problem = "OpenAI's answer was cut off; try again" if reason == "max_output_tokens"             else f"OpenAI stopped early ({reason})"
+    return text, usage.get("input_tokens", 0), usage.get("output_tokens", 0), problem
+
+
+def _gemini(settings: dict, info: dict, prompt: str, schema: dict, max_out: int):
+    key = _require_key(settings, "gemini", "Gemini")
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{info['id']}:generateContent"
+    config = {"responseMimeType": "application/json", "responseJsonSchema": schema,
+              "maxOutputTokens": max_out, "thinkingConfig": {"thinkingLevel": "low"}}
+    data = _post_json(url, {"x-goog-api-key": key},
+                      {"contents": [{"role": "user", "parts": [{"text": prompt}]}], "generationConfig": config},
+                      "Gemini")
+    usage = data.get("usageMetadata") or {}
+    # Thinking tokens bill as output but aren't in candidatesTokenCount.
+    tokens_out = usage.get("candidatesTokenCount", 0) + usage.get("thoughtsTokenCount", 0)
+    tokens_in = usage.get("promptTokenCount", 0)
+    candidates = data.get("candidates") or []
+    if not candidates:
+        reason = (data.get("promptFeedback") or {}).get("blockReason", "no answer")
+        return "", tokens_in, tokens_out, f"Gemini declined this request ({reason})"
+    c = candidates[0]
+    text = "".join(p.get("text", "") for p in (c.get("content") or {}).get("parts", []) if not p.get("thought"))
+    problem = None
+    if c.get("finishReason") == "MAX_TOKENS":
+        problem = "Gemini's answer was cut off; try again"
+    elif c.get("finishReason") not in (None, "STOP"):
+        problem = f"Gemini stopped early ({c['finishReason']})"
+    return text, tokens_in, tokens_out, problem
+
+
+CALLERS = {"claude": _claude, "openai": _openai, "gemini": _gemini, "ollama": _ollama}
 
 
 # ---- prompts ----------------------------------------------------------------------

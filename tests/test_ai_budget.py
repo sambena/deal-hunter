@@ -17,7 +17,7 @@ PROMPT, SCHEMA = ai.judge_prompt({"title": "Ryzen 7 5700X", "total": 120, "sourc
 
 
 def settings(**kw):
-    return {**db.DEFAULT_SETTINGS, "ai_provider": "claude", "claude_model": "claude-haiku-4-5",
+    return {**db.DEFAULT_SETTINGS, "ai_provider": "claude", "claude_model": "claude-haiku-4-5", "anthropic_api_key": "k",
             "ai_monthly_limit": 1.0, **kw}
 
 
@@ -82,6 +82,13 @@ class BudgetTest(unittest.TestCase):
         self.spend(5.0, at=ai.month_start() - 3600)
         self.assertEqual(ai.budget(settings())["spent"], 0)
         self.run_with(FakeClaude(), settings())
+
+    def test_missing_key_is_refused_before_any_call(self):
+        fake = FakeClaude()
+        with mock.patch.dict(ai.os.environ, {}, clear=True), self.assertRaises(ai.AIError) as cm:
+            self.run_with(fake, settings(anthropic_api_key=""))
+        self.assertIn("API key", str(cm.exception))
+        self.assertEqual(fake.calls, 0)
 
     def test_unknown_model_is_refused(self):
         with self.assertRaises(ai.AIError) as cm:
