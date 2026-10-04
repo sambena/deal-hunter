@@ -386,8 +386,87 @@ def buildapcsales(watch: dict, settings: dict) -> list[dict]:
     return out
 
 
+# ---- KSL Classifieds (Utah; local pickup) -----------------------------------
+# No API or RSS. The search page carries its results as JSON inside the Next.js payload
+# (SearchStoreProvider -> initialState.results). KSL runs bot protection, so: one request per watch
+# per cycle, a few seconds apart, with ordinary browser headers.
+
+KSL_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+}
+KSL_GAP_SECONDS = 4
+_ksl_last = {"at": 0.0}
+
+
+def _ksl_results(page: str) -> list[dict]:
+    for chunk in re.findall(r'self\.__next_f\.push\(\[1,"(.*?)"\]\)', page, re.S):
+        if "SearchStoreProvider" not in chunk:
+            continue
+        text = json.loads(f'"{chunk}"')  # it's a JS string literal holding the payload
+        at = text.find('"results":')
+        if at < 0:
+            continue
+        results, _ = json.JSONDecoder().raw_decode(text, at + len('"results":'))
+        # A list of pages, each a list of listings.
+        return [r for page_ in results for r in (page_ if isinstance(page_, list) else [page_])]
+    raise SourceError("couldn't find listings on the KSL page (did the site change?)")
+
+
+def ksl(watch: dict, settings: dict) -> list[dict]:
+    zip_code = str(settings.get("zip_code") or "").strip()
+    if not zip_code:
+        raise SourceError("set your ZIP code in Settings > Local area")
+    terms = search_terms(watch["query"])
+    if not terms:
+        return []
+    radius = max(1, int(float(settings.get("local_radius_miles") or 50)))
+    url = (f"https://classifieds.ksl.com/search/keyword/{urllib.parse.quote(terms, safe='')}"
+           f"/zip/{urllib.parse.quote(zip_code, safe='')}/miles/{radius}")
+    wait = KSL_GAP_SECONDS - (time.time() - _ksl_last["at"])
+    if wait > 0:
+        time.sleep(wait)
+    req = urllib.request.Request(url, headers=KSL_HEADERS)
+    try:
+        with urllib.request.urlopen(req, timeout=25) as resp:
+            page = resp.read().decode("utf-8", "replace")
+    except urllib.error.HTTPError as e:
+        if e.code in (403, 429):
+            raise SourceError(f"KSL's bot protection blocked the request (HTTP {e.code}); "
+                              "it usually clears on a later check") from e
+        raise SourceError(f"HTTP {e.code} from KSL") from e
+    except urllib.error.URLError as e:
+        raise SourceError(f"Network error reaching KSL: {e.reason}") from e
+    finally:
+        _ksl_last["at"] = time.time()
+    if "Access to this page has been denied" in page:
+        raise SourceError("KSL's bot protection blocked the request; it usually clears on a later check")
+    out = []
+    for r in _ksl_results(page):
+        if r.get("marketType") != "Sale":  # skip wanted / rental / service posts
+            continue
+        loc = r.get("location") or {}
+        seller = (r.get("sellerType") or "").lower()
+        out.append({
+            "source": "ksl",
+            "source_id": str(r["id"]),
+            "title": r.get("title") or "",
+            "price": float(r["price"]) if r.get("price") else None,
+            "shipping": 0.0,  # local pickup
+            "currency": "USD",
+            "url": f"https://classifieds.ksl.com/listing/{r['id']}",
+            "image": (r.get("primaryImage") or {}).get("url"),
+            "location": ", ".join(x for x in (loc.get("city"), loc.get("state")) if x),
+            "condition": "used",
+            "buying": f"KSL · {seller} seller" if seller else "KSL",
+            "text": "",
+        })
+    return out
+
+
 SOURCES = {"ebay": ebay, "ebay_local": ebay_local, "reddit": reddit, "bestbuy": bestbuy,
-           "slickdeals": slickdeals, "buildapcsales": buildapcsales}
+           "slickdeals": slickdeals, "buildapcsales": buildapcsales, "ksl": ksl}
 
 # Sources that see the same items under the same ids; a listing is stored once per family.
 SOURCE_FAMILY = {"ebay_local": "ebay"}
