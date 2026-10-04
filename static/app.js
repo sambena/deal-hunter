@@ -19,7 +19,7 @@ const kindOptions = cur => Object.entries(KINDS).map(([k, label]) =>
 const BESTBUY_CREDIT = `<a class="bby-credit" href="https://developer.bestbuy.com" target="_blank" rel="noopener">
   <img src="https://developer.bestbuy.com/images/bestbuy-logo.png" alt="Best Buy Developer API"></a>`;
 
-const CATEGORIES = ["cpu", "motherboard", "ram", "gpu", "storage", "psu", "cooler", "case", "other"];
+const CATEGORIES = ["cpu", "motherboard", "ram", "gpu", "storage", "psu", "cooler", "case", "network", "other"];
 
 // ---- helpers ------------------------------------------------------------------
 
@@ -396,14 +396,19 @@ $("#ha-import").addEventListener("click", e => busy(e.target, async () => {
   const { devices } = await api("GET", "/api/import/ha");
   if (!devices.length) { box.innerHTML = `<p class="muted">Everything Home Assistant knows about is already here.</p>`; return; }
   box.innerHTML = `<p class="muted">${devices.length} devices from Home Assistant. Ticked ones look worth tracking;
-      smart plugs, sensors and things already added are left unticked.</p>
+      smart plugs and sensors are left unticked. Computers are grouped from their network card, ping check and wake
+      button; ones you already have are linked rather than added again, and new ones need <b>Get specs</b> afterwards.</p>
     <div class="table-wrap"><table class="import">
       <tr><th></th><th>Name</th><th>Kind</th><th>Make / model</th><th>Area</th></tr>
       ${devices.map((d, i) => `<tr data-i="${i}">
         <td><input type="checkbox" ${d.checked ? "checked" : ""}></td>
         <td><input data-f="name" value="${esc(d.name)}"></td>
         <td><select data-f="kind">${kindOptions(d.kind)}</select></td>
-        <td>${esc([d.make, d.model].filter(Boolean).join(" "))}${d.already ? ` <span class="muted">(already added)</span>` : ""}</td>
+        <td>${d.computer
+          ? (d.match_id ? `Computer · links to <b>${esc(d.match_name)}</b>` : `Computer · new, specs needed`) +
+            (d.model ? ` · ${esc(d.model)}` : "") +
+            (d.parts.length ? `<br><span class="muted">${esc(d.parts.map(p => p.model).join(", "))}</span>` : "")
+          : esc([d.make, d.model].filter(Boolean).join(" "))}${d.already ? ` <span class="muted">(already added)</span>` : ""}</td>
         <td class="muted">${esc(d.area)}</td></tr>`).join("")}
     </table></div>
     <div class="row"><button class="primary" id="ha-import-go">Add ticked devices</button>
@@ -412,16 +417,20 @@ $("#ha-import").addEventListener("click", e => busy(e.target, async () => {
   $("#ha-import-go").onclick = ev => busy(ev.target, async () => {
     const picked = $$("tr[data-i]", box).filter(r => $("input[type=checkbox]", r).checked).map(r => ({
       ...devices[r.dataset.i], name: $("[data-f=name]", r).value.trim(), kind: $("[data-f=kind]", r).value }));
-    const { added } = await api("POST", "/api/import/ha", { devices: picked });
+    const { added, linked } = await api("POST", "/api/import/ha", { devices: picked });
     box.innerHTML = "";
-    toast(`Added ${added} device${added === 1 ? "" : "s"}`);
+    toast(`Added ${added} device${added === 1 ? "" : "s"}` + (linked ? `, linked ${linked} computer${linked === 1 ? "" : "s"} you already had` : ""));
     await refresh();
     renderMachines();
   });
 }));
 
+// A PC or server with no CPU listed yet (e.g. just imported from Home Assistant).
+const specsNeeded = m => ["pc", "server"].includes(m.kind || "pc") && !m.parts.some(p => p.category === "cpu") && !m.model;
+
 function machineCard(m) {
   const kind = m.kind || "pc";
+  const needed = m.id && specsNeeded(m);
   return `<div class="panel machine" data-id="${m.id ?? ""}" data-kind="${esc(kind)}">
     <div class="grid">
       <label>Name <input data-f="name" value="${esc(m.name)}" placeholder="X299 box, Living room TV…"></label>
@@ -429,18 +438,67 @@ function machineCard(m) {
       <label class="gear-only">Make and model <input data-f="model" value="${esc(m.model || "")}" placeholder="LG OLED65B2AUA"></label>
       <label>Notes <input data-f="notes" value="${esc(m.notes)}" placeholder="use, size, PSU wattage, limits…"></label>
     </div>
+    ${needed ? `<p class="specs-needed parts-only">Specs needed: press <b>Get specs</b> to fill in this computer's parts.</p>` : ""}
     <div class="parts parts-only">${(m.parts.length ? m.parts : [{ category: "cpu", model: "" }, { category: "motherboard", model: "" }, { category: "ram", model: "" }]).map(partRow).join("")}</div>
     <div class="row">
       <button class="small parts-only" data-act="add-part">+ Part</button>
       <span class="spacer"></span>
       <button data-act="save">Save</button>
+      <button class="parts-only ${needed ? "primary" : ""}" data-act="get-specs">Get specs</button>
       <button class="primary parts-only" data-act="suggest">Find upgrades</button>
       <button class="primary gear-only" data-act="watch-model">Watch this model</button>
       ${aiOn() ? `<button data-act="suggest-ai">Find upgrades with AI</button>` : ""}
       ${m.id ? `<button class="danger" data-act="delete">Delete</button>` : ""}
     </div>
+    <div class="specs-box" hidden></div>
     <div class="results"></div>
   </div>`;
+}
+
+// Get specs: a one-line command to run on the computer, whose output (or any text) is pasted back.
+let specCommands = null;
+
+async function openSpecs(card) {
+  const box = $(".specs-box", card);
+  if (!box.hidden) { box.hidden = true; return; }
+  specCommands = specCommands || await api("GET", "/api/specs/commands");
+  const id = card.dataset.id || "new";
+  const name = $("[data-f=name]", card).value.trim() || "this computer";
+  box.innerHTML = `<p class="muted">Run one of these on <b>${esc(name)}</b>, then paste what it prints below.
+      Nothing is installed and nothing connects back to Deal Hunter.</p>
+    <div class="row os-pick">
+      <label><input type="radio" name="os-${esc(id)}" value="windows" checked> Windows (paste into PowerShell)</label>
+      <label><input type="radio" name="os-${esc(id)}" value="linux"> Linux / Bazzite / SteamOS (paste into a terminal)</label>
+    </div>
+    <pre class="cmd"></pre>
+    <div class="row"><button class="small" data-act="copy-cmd">Copy command</button></div>
+    <label>Paste the output here, or any text about this computer (System Information, a receipt, your notes)
+      <textarea class="specs-text" rows="6"></textarea></label>
+    <div class="row"><button class="primary" data-act="fill-specs">Fill in parts</button></div>`;
+  const show = () => ($(".cmd", box).textContent = specCommands[$("input[type=radio]:checked", box).value]);
+  $$("input[type=radio]", box).forEach(r => r.addEventListener("change", show));
+  show();
+  box.hidden = false;
+}
+
+async function fillSpecs(card, btn) {
+  const text = $(".specs-text", card).value.trim();
+  if (!text) return toast("Paste the command's output first", true);
+  await busy(btn, async () => {
+    const id = await saveMachine(card);
+    let res;
+    try {
+      res = await api("POST", `/api/machines/${id}/specs`, { text });
+    } catch (e) {
+      if (e.message !== "need_ai") throw e;
+      if (!aiOn()) throw new Error("That isn't the command's output. Run the command, or turn on AI in Settings to read other text.");
+      if (!await aiGate("specs", { machine_id: id, text })) return;
+      res = await api("POST", `/api/machines/${id}/specs`, { text, use_ai: true });
+    }
+    toast(`Filled in ${res.found} part${res.found === 1 ? "" : "s"}${res.method === "ai" ? " (read by AI)" : ""}`);
+    await refresh();
+    renderMachines();
+  });
 }
 
 function machineFromCard(card) {
@@ -470,6 +528,13 @@ $("#machines").addEventListener("click", async e => {
   const card = e.target.closest(".machine");
   if (!btn || !card) return;
   const act = btn.dataset.act;
+  if (act === "get-specs") return openSpecs(card).catch(err => toast(err.message, true));
+  if (act === "copy-cmd") {
+    try { await navigator.clipboard.writeText($(".cmd", card).textContent); toast("Command copied"); }
+    catch { toast("Couldn't copy; select the command and copy it yourself", true); }
+    return;
+  }
+  if (act === "fill-specs") return fillSpecs(card, btn);
   if (act === "watch-model") {
     const data = machineFromCard(card);
     if (!data.model) return toast("Add the make and model first", true);

@@ -34,25 +34,46 @@ HA_DEVICES = [
     {"id": "sun", "name": "Sun", "make": None, "model": None, "area": None,
      "integrations": ["sun"], "domains": ["sensor"], "entry_type": "service"},
     {"id": "pc1", "name": "Dexter", "make": "Micro-Star INTL CO., LTD.", "model": None, "area": None,
-     "integrations": [], "domains": ["switch"], "entry_type": None},
+     "integrations": [], "domains": ["device_tracker"], "entry_type": None},
+    {"id": "pc1-ping", "name": "Dexter", "make": "Ping", "model": None, "area": None,
+     "integrations": ["ping"], "domains": ["binary_sensor"], "entry_type": None},
+    {"id": "pc1-wake", "name": "Dexter", "make": None, "model": None, "area": None,
+     "integrations": [], "domains": ["button"], "entry_type": None},
+    {"id": "new-nic", "name": "Rosie", "make": "Lite-On Network Communication (Dongguan) Limited", "model": None,
+     "area": None, "integrations": [], "domains": ["device_tracker"], "entry_type": None},
+    {"id": "new-ping", "name": "Rosie", "make": "Ping", "model": None, "area": None,
+     "integrations": ["ping"], "domains": ["binary_sensor"], "entry_type": None},
+    {"id": "phone-client", "name": "Galaxy-Watch", "make": "Samsung Electronics", "model": None, "area": None,
+     "integrations": [], "domains": ["device_tracker"], "entry_type": None},
 ]
 
 
 class ClassifyTest(unittest.TestCase):
-    def cands(self, known_names=(), known_refs=()):
+    def cands(self, machines=()):
         with mock.patch.object(ha, "fetch_devices", lambda url, token: HA_DEVICES):
-            return {c["ref"]: c for c in ha.candidates("http://ha", "t", set(known_names), set(known_refs))}
+            return {c["refs"][0]: c for c in ha.candidates("http://ha", "t", list(machines))}
 
     def test_kinds_and_ticks(self):
-        c = self.cands(known_names={"dexter"})
+        c = self.cands([{"id": 9, "name": "Dexter (main PC)", "kind": "pc", "source_ref": None}])
         self.assertEqual((c["tv1"]["kind"], c["tv1"]["checked"]), ("tv", True))
         self.assertEqual(c["ph1"]["kind"], "phone")
         self.assertEqual(c["ip1"]["kind"], "tablet")
         self.assertEqual((c["plug1"]["kind"], c["plug1"]["checked"]), ("smart home", False))  # named Microwave
         self.assertEqual((c["wash"]["kind"], c["wash"]["model"]), ("appliance", "T1789EFH_F"))
         self.assertEqual(c["ap1"]["kind"], "network")
-        self.assertTrue(c["pc1"]["already"])
-        self.assertFalse(c["pc1"]["checked"])
+        # Dexter's network card, ping check and wake button become one computer, linked to the PC already here.
+        dexter = c["pc1"]
+        self.assertTrue(dexter["computer"])
+        self.assertEqual(sorted(dexter["refs"]), ["pc1", "pc1-ping", "pc1-wake"])
+        self.assertEqual((dexter["match_id"], dexter["parts"]), (9, [{"category": "network", "model": "MSI network adapter"}]))
+        for ref in ("pc1-ping", "pc1-wake"):
+            self.assertNotIn(ref, c)
+        # A computer that isn't here yet comes in as a new PC with its network card as a part.
+        rosie = c["new-nic"]
+        self.assertEqual((rosie["kind"], rosie["match_id"], rosie["checked"]), ("pc", None, True))
+        self.assertEqual(rosie["parts"], [{"category": "network", "model": "Lite-On network adapter"}])
+        # A tracked network client from a non-PC vendor isn't turned into a computer.
+        self.assertFalse(c.get("phone-client", {}).get("computer"))
 
     def test_virtual_devices_are_left_out(self):
         c = self.cands()
@@ -60,7 +81,7 @@ class ClassifyTest(unittest.TestCase):
             self.assertNotIn(ref, c)
 
     def test_already_imported_refs_are_left_out(self):
-        self.assertNotIn("tv1", self.cands(known_refs={"tv1"}))
+        self.assertNotIn("tv1", self.cands([{"id": 1, "name": "TV", "kind": "tv", "source_ref": "tv1 other"}]))
 
     def test_full_model(self):
         self.assertEqual(ha.full_model("LGE", "OLED65B2AUA"), "LG OLED65B2AUA")
@@ -87,10 +108,10 @@ class ServerTest(unittest.TestCase):
         self.tmp.cleanup()
 
     def test_import_adds_once_with_kind_and_model(self):
-        picked = [{"ref": "tv1", "name": "Living room TV", "kind": "tv", "make": "LGE", "model": "OLED65B2AUA",
+        picked = [{"refs": ["tv1"], "name": "Living room TV", "kind": "tv", "make": "LGE", "model": "OLED65B2AUA",
                    "area": "Living Room"}]
-        self.assertEqual(self.server.ha_import({"devices": picked}, {}), {"added": 1})
-        self.assertEqual(self.server.ha_import({"devices": picked}, {}), {"added": 0})  # same ref again
+        self.assertEqual(self.server.ha_import({"devices": picked}, {}), {"added": 1, "linked": 0})
+        self.assertEqual(self.server.ha_import({"devices": picked}, {}), {"added": 0, "linked": 0})  # same ref
         m = db.list_machines()[0]
         self.assertEqual((m["name"], m["kind"], m["model"], m["source_ref"]),
                          ("Living room TV", "tv", "LG OLED65B2AUA", "tv1"))
@@ -147,6 +168,39 @@ class HttpErrorTest(unittest.TestCase):
             ha.fetch_devices("https://ha.example.com", "t")
         self.assertIn("local address", str(cm.exception))
         self.assertTrue(seen["ua"].startswith("deal-hunter"))
+
+
+
+class LinkTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        db._conn = None
+        db.DB_PATH = Path(self.tmp.name) / "t.db"
+        import server
+        self.server = server
+
+    def tearDown(self):
+        if db._conn:
+            db._conn.close()
+        db._conn = None
+        self.tmp.cleanup()
+
+    def test_linking_adds_parts_and_refs_but_no_new_machine(self):
+        mid = db.save_machine({"name": "Dexter (main PC)", "kind": "pc",
+                               "parts": [{"category": "cpu", "model": "AMD Ryzen 7 3700X"}]})
+        pick = {"refs": ["pc1", "pc1-ping"], "name": "Dexter", "kind": "pc", "computer": True, "match_id": mid,
+                "parts": [{"category": "network", "model": "MSI network adapter"}]}
+        self.assertEqual(self.server.ha_import({"devices": [pick]}, {}), {"added": 0, "linked": 1})
+        [m] = db.list_machines()
+        self.assertEqual([p["category"] for p in m["parts"]], ["cpu", "network"])
+        self.assertEqual(m["source_ref"], "pc1 pc1-ping")
+        self.assertEqual(self.server.ha_import({"devices": [pick]}, {}), {"added": 0, "linked": 0})  # again: no-op
+
+    def test_new_computer_notes_say_get_specs(self):
+        pick = {"refs": ["r1"], "name": "Rosie", "kind": "pc", "computer": True, "match_id": None,
+                "parts": [{"category": "network", "model": "Lite-On network adapter"}]}
+        self.assertEqual(self.server.ha_import({"devices": [pick]}, {}), {"added": 1, "linked": 0})
+        self.assertIn("Get specs", db.list_machines()[0]["notes"])
 
 
 if __name__ == "__main__":

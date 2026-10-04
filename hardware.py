@@ -141,7 +141,9 @@ CHIPSETS = [
 
 
 def cpu_socket(model: str) -> str | None:
-    t = model.lower().replace(" ", "").replace("-", "")
+    # Raw names ("Intel(R) Core(TM) i7-7800X CPU @ 3.50GHz") would glue "cpu" onto the suffix and hide the X.
+    t = re.sub(r"\((?:r|tm)\)|\bcpu\b|@.*$|\bprocessor\b", "", model.lower())
+    t = t.replace(" ", "").replace("-", "")
     m = re.search(r"i[3579](\d{4,5})([a-z]*)", t)
     if m:
         num, suffix = m.group(1), m.group(2)

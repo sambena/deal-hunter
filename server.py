@@ -16,6 +16,7 @@ import db
 import hardware
 import homeassistant
 import poller
+import specs
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 ROUTES: list[tuple[str, re.Pattern, callable]] = []
@@ -132,6 +133,13 @@ def _ai_prompt(action: str, body: dict, ref: str | None = None) -> tuple[str, di
         if not machine:
             raise HTTPError(404, "machine not found")
         return (*ai.upgrades_prompt(machine), {"machine": machine})
+    if action == "specs":
+        if not str(body.get("text", "")).strip():
+            raise HTTPError(400, "Paste some text about the computer first")
+        machine = db.get_machine(int(ref or body.get("machine_id")))
+        if not machine:
+            raise HTTPError(404, "machine not found")
+        return (*ai.specs_prompt(machine, body["text"]), {"machine": machine})
     if action == "draft":
         if not str(body.get("description", "")).strip():
             raise HTTPError(400, "Describe what you're looking for")
@@ -196,10 +204,8 @@ def suggest_upgrades(body, params, mid):
 @route("GET", "/api/import/ha")
 def ha_candidates(body, params):
     s = db.get_settings()
-    machines = db.list_machines()
     try:
-        devices = homeassistant.candidates(s["ha_url"], s["ha_token"], {m["name"].lower() for m in machines},
-                                           {m["source_ref"] for m in machines if m.get("source_ref")})
+        devices = homeassistant.candidates(s["ha_url"], s["ha_token"], db.list_machines())
     except homeassistant.HAError as e:
         raise HTTPError(400, str(e)) from e
     return {"devices": devices, "kinds": db.DEVICE_KINDS}
@@ -207,17 +213,59 @@ def ha_candidates(body, params):
 
 @route("POST", "/api/import/ha")
 def ha_import(body, params):
-    known = {m["source_ref"] for m in db.list_machines() if m.get("source_ref")}
-    added = 0
+    """Add the ticked devices. A computer that matches one already here is linked to it, not added again."""
+    machines = db.list_machines()
+    known = {r for m in machines for r in (m.get("source_ref") or "").split()}
+    added = linked = 0
     for d in body.get("devices", []):
-        if d.get("ref") and d["ref"] in known:
+        refs = [r for r in d.get("refs") or [] if r]
+        if refs and set(refs) <= known:
+            continue
+        match = next((m for m in machines if d.get("match_id") and m["id"] == d["match_id"]), None)
+        if match:
+            parts = match["parts"] + [p for p in d.get("parts") or [] if p not in match["parts"]]
+            mine = (match.get("source_ref") or "").split()
+            db.save_machine({**match, "parts": parts,
+                             "source_ref": " ".join(dict.fromkeys(mine + refs))}, match["id"])
+            linked += 1
             continue
         model = homeassistant.full_model(d.get("make") or "", d.get("model") or "")
+        note = "Imported from Home Assistant" + (f" ({d['area']})" if d.get("area") else "") + "."
+        if d.get("computer"):
+            note += " Press Get specs to fill in its parts."
         db.save_machine({"name": d.get("name") or model or "Device", "kind": d.get("kind"), "model": model,
-                         "notes": f"Imported from Home Assistant{' (' + d['area'] + ')' if d.get('area') else ''}.",
-                         "source_ref": d.get("ref")})
+                         "parts": d.get("parts") or [], "notes": note, "source_ref": " ".join(refs)})
         added += 1
-    return {"added": added}
+    return {"added": added, "linked": linked}
+
+
+@route("GET", "/api/specs/commands")
+def spec_commands(body, params):
+    return {"windows": specs.WINDOWS_COMMAND, "linux": specs.LINUX_COMMAND}
+
+
+@route("POST", r"/api/machines/(\d+)/specs")
+def fill_specs(body, params, mid):
+    """Parts from pasted text: the Get specs command's output, or (with AI) anything else."""
+    machine = db.get_machine(int(mid))
+    if not machine:
+        raise HTTPError(404, "machine not found")
+    text = str(body.get("text") or "").strip()
+    if not text:
+        raise HTTPError(400, "Paste the command's output, or any text describing the computer")
+    if specs.looks_like_report(text):
+        parts, method = specs.parse_report(text), "report"
+    elif body.get("use_ai"):
+        prompt, schema, _ = _ai_prompt("specs", body, mid)
+        parts, method = ai.run(db.get_settings(), "specs", prompt, schema)["parts"], "ai"
+    else:
+        raise HTTPError(422, "need_ai")
+    parts = [p for p in parts if str(p.get("model", "")).strip()]
+    if not parts:
+        raise HTTPError(400, "Couldn't find any parts in that text")
+    merged = specs.merge_parts(machine["parts"], parts)
+    db.save_machine({**machine, "parts": merged}, machine["id"])
+    return {"parts": merged, "method": method, "found": len(parts)}
 
 
 @route("POST", "/api/ai/draft-watches")

@@ -91,3 +91,7 @@ th { color: var(--muted); font-weight: 500; font-size: 12px; }
 .machine:not([data-kind="pc"]):not([data-kind="server"]) .parts-only { display: none; }
 .machine[data-kind="pc"] .gear-only, .machine[data-kind="server"] .gear-only { display: none; }
 table.import input[data-f=name] { min-width: 12em; }
+.specs-needed { color: var(--great); margin: 4px 0 8px; }
+.specs-box { border-top: 1px solid var(--line); margin-top: 10px; padding-top: 10px; }
+.specs-box pre.cmd { white-space: pre-wrap; word-break: break-all; background: var(--panel2); padding: 8px; border-radius: 6px; font-size: 12px; max-height: 9em; overflow: auto; }
+.os-pick label { margin-right: 14px; }
