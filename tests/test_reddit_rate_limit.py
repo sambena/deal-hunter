@@ -27,7 +27,7 @@ def too_many(req, timeout):
 class RateLimitTest(unittest.TestCase):
     def setUp(self):
         sources._reddit_state.update(last=0.0, blocked_until=0.0)
-        sources._feed_cache.clear()
+        sources._reddit_cache.update(at=0.0, posts=[], subs=None)
 
     def test_429_pauses_every_reddit_source_without_retrying(self):
         calls = []
@@ -50,11 +50,12 @@ class RateLimitTest(unittest.TestCase):
         self.assertGreater(sleeps[0], 7)
 
     def test_stale_posts_are_reused_while_paused(self):
+        settings = {"reddit_subs": [], "sources_enabled": {"buildapcsales": True}}
         with mock.patch.object(sources.urllib.request, "urlopen", lambda r, timeout: Resp()):
-            first = sources._cached_feed("buildapcsales")
-        sources._feed_cache["buildapcsales"] = (0.0, first)  # make it due for a refresh
+            first = sources._reddit_posts(settings)
+        sources._reddit_cache["at"] = 0.0  # make it due for a refresh
         sources._reddit_state["blocked_until"] = sources.time.time() + 600
-        self.assertEqual(sources._cached_feed("buildapcsales"), first)
+        self.assertEqual(sources._reddit_posts(settings), first)
 
 
 if __name__ == "__main__":

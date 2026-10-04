@@ -188,32 +188,40 @@ def _reddit_feed(sub: str) -> list[dict]:
     for entry in root.findall("a:entry", ATOM):
         link = entry.find("a:link", ATOM)
         thumb = entry.find("{http://search.yahoo.com/mrss/}thumbnail")
+        cat = entry.find("a:category", ATOM)  # which subreddit, in a combined "a+b+c" feed
         posts.append({
             "id": (entry.findtext("a:id", "", ATOM)).removeprefix("t3_"),
             "title": html.unescape(entry.findtext("a:title", "", ATOM)),
             "url": link.get("href") if link is not None else "",
             "body": _html_to_text(entry.findtext("a:content", "", ATOM)),
             "image": thumb.get("url") if thumb is not None else None,
-            "_sub": sub,
+            "_sub": (cat.get("term") if cat is not None and cat.get("term") else sub).lower(),
         })
     return posts
 
 
+def reddit_subs(settings: dict) -> list[str]:
+    """Every subreddit any Reddit source needs, so one combined request covers them all."""
+    subs = [s.strip().lower().removeprefix("r/") for s in settings.get("reddit_subs") or [] if s.strip()]
+    if (settings.get("sources_enabled") or {}).get("buildapcsales", True):
+        subs.append("buildapcsales")
+    return list(dict.fromkeys(subs))
+
+
 def _reddit_posts(settings: dict) -> list[dict]:
-    # One fetch per poll cycle, shared by every watch.
-    if time.time() - _reddit_cache["at"] < 300:
+    """One request per poll cycle for all subreddits ("r/a+b+c"), shared by every watch and Reddit source."""
+    combined = "+".join(reddit_subs(settings))
+    if not combined:
+        return []
+    if _reddit_cache.get("subs") == combined and time.time() - _reddit_cache["at"] < 300:
         return _reddit_cache["posts"]
-    posts, errors = [], []
-    for sub in settings.get("reddit_subs") or []:
-        try:
-            posts += _reddit_feed(sub)
-        except SourceError as e:
-            errors.append(f"r/{sub}: {e}")
-    if errors and not posts:
-        if _reddit_cache["posts"]:  # a recent good fetch beats an error
-            return _reddit_cache["posts"]
-        raise SourceError("; ".join(errors))
-    _reddit_cache.update(at=time.time(), posts=posts)
+    try:
+        posts = _reddit_feed(combined)
+    except SourceError:
+        if _reddit_cache.get("subs") == combined and _reddit_cache["posts"]:
+            return _reddit_cache["posts"]  # a recent good fetch beats an error while Reddit cools off
+        raise
+    _reddit_cache.update(at=time.time(), posts=posts, subs=combined)
     return posts
 
 
@@ -246,7 +254,10 @@ def _guess_price(body: str, query: str) -> float | None:
 
 def reddit(watch: dict, settings: dict) -> list[dict]:
     out = []
+    wanted = {s.strip().lower().removeprefix("r/") for s in settings.get("reddit_subs") or []}
     for p in _reddit_posts(settings):
+        if p["_sub"] not in wanted:
+            continue
         selling = _selling_part(p.get("title", ""))
         if selling is None:
             continue
@@ -370,25 +381,11 @@ def slickdeals(watch: dict, settings: dict) -> list[dict]:
     return out
 
 
-_feed_cache: dict = {}  # subreddit -> (fetched at, posts); one fetch per poll cycle, shared by every watch
-
-
-def _cached_feed(sub: str) -> list[dict]:
-    at, posts = _feed_cache.get(sub, (0.0, []))
-    if time.time() - at >= 300:
-        try:
-            posts = _reddit_feed(sub)
-        except SourceError:
-            if posts:  # keep using the last good fetch while Reddit is cooling off
-                return posts
-            raise
-        _feed_cache[sub] = (time.time(), posts)
-    return posts
-
-
 def buildapcsales(watch: dict, settings: dict) -> list[dict]:
     out = []
-    for p in _cached_feed("buildapcsales"):
+    for p in _reddit_posts(settings):
+        if p["_sub"] != "buildapcsales":
+            continue
         title = p["title"]
         out.append({
             "source": "buildapcsales",

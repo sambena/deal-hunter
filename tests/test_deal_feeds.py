@@ -59,19 +59,24 @@ class ParseTest(unittest.TestCase):
         self.assertEqual((third["price"], third["condition"]), (None, "refurbished"))
 
     def test_buildapcsales_first_price_is_the_deal_price(self):
-        with mock.patch.object(sources, "_cached_feed", lambda sub: POSTS):
+        with mock.patch.object(sources, "_reddit_posts", lambda settings: POSTS):
             items = sources.buildapcsales({"query": "x"}, {})
         self.assertEqual(items[0]["price"], 229.99)
         self.assertEqual(items[0]["buying"], "r/buildapcsales")
         self.assertEqual(items[1]["price"], 89.99)
 
-    def test_feed_is_fetched_once_per_cycle(self):
+    def test_one_request_serves_every_reddit_source(self):
         calls = []
-        sources._feed_cache.clear()
-        with mock.patch.object(sources, "_reddit_feed", lambda sub: calls.append(sub) or POSTS):
-            sources.buildapcsales({"query": "a"}, {})
-            sources.buildapcsales({"query": "b"}, {})
-        self.assertEqual(calls, ["buildapcsales"])
+        sources._reddit_cache.update(at=0.0, posts=[], subs=None)
+        settings = {"reddit_subs": ["hardwareswap", "homelabsales"], "sources_enabled": {"buildapcsales": True}}
+        swap = {**POSTS[0], "id": "s1", "_sub": "hardwareswap", "title": "[USA-UT] [H] RTX 3060 12GB [W] PayPal"}
+        with mock.patch.object(sources, "_reddit_feed", lambda sub: calls.append(sub) or [*POSTS, swap]):
+            deals = sources.buildapcsales({"query": "a"}, settings)
+            swaps = sources.reddit({"query": "rtx 3060"}, settings)
+            sources.buildapcsales({"query": "b"}, settings)
+        self.assertEqual(calls, ["hardwareswap+homelabsales+buildapcsales"])
+        self.assertEqual({d["source_id"] for d in deals}, {"abc1", "abc2"})
+        self.assertEqual([p["source_id"] for p in swaps], ["s1"])
 
 
 class WatchTest(unittest.TestCase):
@@ -89,7 +94,7 @@ class WatchTest(unittest.TestCase):
     def test_matching_and_price_cap_apply(self):
         wid = db.create_watch({"name": "3060", "query": "rtx 3060 12gb", "max_price": 300,
                                "sources": ["buildapcsales"]})
-        with mock.patch.object(sources, "_cached_feed", lambda sub: POSTS):
+        with mock.patch.object(sources, "_reddit_posts", lambda settings: POSTS):
             r = poller.run_watch(db.get_watch(wid), db.get_settings())
         self.assertEqual(r["new"], 1)  # the PSU doesn't match the query
         self.assertEqual(db.query("SELECT total FROM listings")[0]["total"], 229.99)
