@@ -56,13 +56,18 @@ def fetch_devices(url: str, token: str) -> list[dict]:
         raise HAError("Add your Home Assistant address and token in Settings > Home Assistant")
     req = urllib.request.Request(url.rstrip("/") + "/api/template",
                                  json.dumps({"template": DEVICE_TEMPLATE}).encode(),
-                                 {"Authorization": f"Bearer {token}", "Content-Type": "application/json"})
+                                 {"Authorization": f"Bearer {token}", "Content-Type": "application/json",
+                                  "User-Agent": "deal-hunter/0.1 (Home Assistant device import)"})
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
             return json.loads(resp.read())
     except urllib.error.HTTPError as e:
         if e.code == 401:
             raise HAError("Home Assistant rejected the token") from e
+        if e.code == 403:
+            # Seen live: a Cloudflare-fronted address answered 403 before Home Assistant saw the request.
+            raise HAError("Access was refused (HTTP 403). If the address goes through Cloudflare or another proxy, "
+                          "use Home Assistant's local address instead, e.g. http://192.168.1.10:8123") from e
         raise HAError(f"Home Assistant returned HTTP {e.code}") from e
     except urllib.error.URLError as e:
         raise HAError(f"Can't reach Home Assistant at {url} ({e.reason})") from e

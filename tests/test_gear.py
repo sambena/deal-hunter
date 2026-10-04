@@ -135,5 +135,19 @@ class PromptTest(unittest.TestCase):
         self.assertIn("drop-in upgrades", prompt)
 
 
+class HttpErrorTest(unittest.TestCase):
+    def test_403_explains_proxies_and_sends_a_user_agent(self):
+        import urllib.error
+        seen = {}
+
+        def refuse(req, timeout):
+            seen["ua"] = req.get_header("User-agent")
+            raise urllib.error.HTTPError(req.full_url, 403, "Forbidden", {}, None)
+        with mock.patch.object(ha.urllib.request, "urlopen", refuse), self.assertRaises(ha.HAError) as cm:
+            ha.fetch_devices("https://ha.example.com", "t")
+        self.assertIn("local address", str(cm.exception))
+        self.assertTrue(seen["ua"].startswith("deal-hunter"))
+
+
 if __name__ == "__main__":
     unittest.main()
