@@ -256,11 +256,14 @@
             <summary>How to set up Ollama (free, runs on your own computer)</summary>
             <ol>
               <li>Install Ollama from <a href="https://ollama.com/download" target="_blank" rel="noopener">ollama.com</a> on a computer with a decent graphics card.</li>
-              <li>In a terminal there, run <code>ollama pull qwen3:8b</code> (about 5 GB).</li>
+              <li>In a terminal there, run <code>ollama pull qwen3.5:4b</code> (about 3.4 GB, fits a 6 GB graphics card).</li>
               <li>Put that computer's address in <b>Ollama URL</b>, e.g. <code>http://192.168.1.50:11434</code>. To reach it from another machine, set <code>OLLAMA_HOST=0.0.0.0</code> on the Ollama computer.</li>
-              <li>Type the model name (<code>qwen3:8b</code>) in <b>Ollama model</b> and save.</li>
+              <li>Type the model name (<code>qwen3.5:4b</code>) in <b>Ollama model</b> and save.</li>
             </ol>
-            <p>It costs nothing, but without a graphics card each answer can take a minute or more.</p>
+            <p>It costs nothing, but without a graphics card each answer can take a minute or more. Small local models
+              are quick but make more mistakes about hardware than the paid models.</p>
+            <p>At home this is already set up: the URL <code>http://192.168.86.82:11434</code> reaches Ollama on
+              the Proxmox server (waking it if it's asleep) from the house network or the VPN.</p>
           </details>
           </div>
           <p class="muted" id="ai-price-note"></p>

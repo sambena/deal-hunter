@@ -207,6 +207,8 @@ def _ollama(settings: dict, info: dict, prompt: str, schema: dict, max_out: int)
         "messages": [{"role": "user", "content": prompt}],
         "format": schema,
         "stream": False,
+        # Thinking models (qwen3.5) otherwise spend the whole allowance thinking and return no answer.
+        "think": False,
         "options": {"num_predict": max_out},
     }).encode()
     url = settings["ollama_url"].rstrip("/") + "/api/chat"
