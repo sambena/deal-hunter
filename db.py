@@ -34,7 +34,7 @@ DEFAULT_SETTINGS = {
     "ollama_url": "http://localhost:11434",
     "ollama_model": "qwen3:8b",
     "anthropic_api_key": "",
-    "claude_model": "claude-opus-5",
+    "claude_model": "claude-opus-5-5",
 }
 
 SECRET_KEYS = {"ebay_client_secret", "bestbuy_api_key", "discord_webhook", "anthropic_api_key"}
@@ -154,6 +154,8 @@ def public_settings() -> dict:
 
 WATCH_FIELDS = ("name", "query", "exclude", "min_price", "max_price", "condition",
                 "include_auctions", "sources", "enabled", "notes", "machine_id")
+# Changing any of these makes the next check find a fresh backlog of older listings.
+MATCH_FIELDS = ("query", "exclude", "min_price", "max_price", "condition", "include_auctions")
 
 
 def _watch_row(r: dict) -> dict:
@@ -205,6 +207,10 @@ def create_watch(data: dict) -> int:
 
 def update_watch(watch_id: int, data: dict) -> None:
     vals = _watch_values(data)
+    old = get_watch(watch_id)
+    if old and any(f in vals and _watch_values({f: old[f]})[f] != vals[f] for f in MATCH_FIELDS):
+        # New criteria find a new backlog; treat it like a fresh watch so it isn't sent to Discord.
+        vals["polled_sources"] = "[]"
     if vals:
         sets = ", ".join(f"{k} = ?" for k in vals)
         execute(f"UPDATE watches SET {sets} WHERE id = ?", (*vals.values(), watch_id))
