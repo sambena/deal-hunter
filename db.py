@@ -20,11 +20,12 @@ DEFAULT_SETTINGS = {
         "engineering sample", "qualification sample", "replica", "wtb", "want to buy",
         "looking for", "read description",
     ],
-    "sources_enabled": {"ebay": True, "reddit": True, "bestbuy": False},
+    "sources_enabled": {"ebay": True, "ebay_local": True, "reddit": True, "bestbuy": False},
     "ebay_client_id": "",
     "ebay_client_secret": "",
     "ebay_marketplace": "EBAY_US",
     "zip_code": "",
+    "local_radius_miles": 50,
     "bestbuy_api_key": "",
     "reddit_subs": ["hardwareswap", "homelabsales"],
     "discord_enabled": False,
@@ -50,7 +51,7 @@ CREATE TABLE IF NOT EXISTS watches (
     max_price REAL,
     condition TEXT NOT NULL DEFAULT 'any',
     include_auctions INTEGER NOT NULL DEFAULT 0,
-    sources TEXT NOT NULL DEFAULT '["ebay","reddit","bestbuy"]',
+    sources TEXT NOT NULL DEFAULT '["ebay","ebay_local","reddit","bestbuy"]',
     enabled INTEGER NOT NULL DEFAULT 1,
     notes TEXT NOT NULL DEFAULT '',
     machine_id INTEGER,
@@ -112,6 +113,14 @@ def conn() -> sqlite3.Connection:
                 _conn.execute("ALTER TABLE watches ADD COLUMN polled_sources TEXT NOT NULL DEFAULT '[]'")
                 _conn.execute("""UPDATE watches SET polled_sources =
                     (SELECT json_group_array(DISTINCT source) FROM listings WHERE listings.watch_id = watches.id)""")
+            if _conn.execute("PRAGMA user_version").fetchone()[0] < 1:
+                # eBay local pickup arrived: watches that search eBay search it locally too.
+                for r in _conn.execute("SELECT id, sources FROM watches").fetchall():
+                    srcs = json.loads(r["sources"])
+                    if "ebay" in srcs and "ebay_local" not in srcs:
+                        srcs.insert(srcs.index("ebay") + 1, "ebay_local")
+                        _conn.execute("UPDATE watches SET sources = ? WHERE id = ?", (json.dumps(srcs), r["id"]))
+                _conn.execute("PRAGMA user_version = 1")
             _conn.commit()
         return _conn
 
@@ -132,7 +141,10 @@ def execute(sql: str, args: tuple = ()) -> int:
 
 def get_settings() -> dict:
     stored = {r["key"]: json.loads(r["value"]) for r in query("SELECT key, value FROM settings")}
-    return {**DEFAULT_SETTINGS, **stored}
+    merged = {**DEFAULT_SETTINGS, **stored}
+    # Sources added after the settings were saved start at their default on/off.
+    merged["sources_enabled"] = {**DEFAULT_SETTINGS["sources_enabled"], **stored.get("sources_enabled", {})}
+    return merged
 
 
 def update_settings(changes: dict) -> None:
