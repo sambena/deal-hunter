@@ -251,6 +251,8 @@ async function refresh() {
   const p = state.poller;
   $("#poll-status").textContent = p.running ? "Checking…" :
     `Last check ${ago(p.last_cycle)}` + (p.next_cycle ? ` · next in ${Math.max(0, Math.round((p.next_cycle - state.now) / 60))}m` : "");
+  const f = p.fetches || {};
+  $("#poll-status").title = f.made ? `Last full check: ${f.made} searches sent, ${f.shared || 0} answered from an identical search` : "";
   renderWatchSelects();
   renderWatches();
   $("#ai-draft").hidden = !aiOn();

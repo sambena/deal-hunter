@@ -25,6 +25,10 @@ set `"host": "0.0.0.0"`. There's no login, so only do that on your home network.
 Facebook Marketplace and Amazon aren't supported: Marketplace has no API and
 blocks scrapers, and Amazon's API needs an affiliate account.
 
+When several watches (yours or friends') run the same search, each check sends it
+once and every watch gets the answer, so more people doesn't mean more eBay calls
+(5000 a day) or more KSL requests. Hover "Last check" to see how many were shared.
+
 ## How matching works
 
 - Query words must all be in the title; `a|b` means either; `"phrase"`; `-word` excludes.
