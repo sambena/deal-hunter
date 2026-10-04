@@ -73,9 +73,58 @@ def search_terms(query: str) -> str:
     return " ".join(g[0] for g in groups)
 
 
+# ---- vehicles -------------------------------------------------------------------
+
+# For car and truck watches the hardware junk list doesn't fit ("as is" is how most dealers sell); these
+# are what make a vehicle listing not a vehicle for sale. Salvage/rebuilt titles are shown, not hidden.
+VEHICLE_JUNK = ["parts only", "parting out", "part out", "for parts", "not running", "doesn't run",
+                "does not run", "non running", "wtb", "want to buy", "looking for", "iso"]
+YEAR_RE = re.compile(r"(?<!\d)(19[5-9]\d|20[0-4]\d)(?!\d)")
+MILES_RE = re.compile(r"(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)\s*(k)?\s*(?:miles|mi\b|odometer)", re.I)
+TITLE_STATUS = (("salvage", "salvage"), ("rebuilt", "rebuilt"), ("rebuild title", "rebuilt"),
+                ("branded title", "branded"), ("lemon", "branded"), ("flood", "salvage"))
+
+
+def vehicle_year(title: str) -> int | None:
+    """The model year, which listings put first: "2018 Toyota Tacoma TRD"."""
+    m = YEAR_RE.search(title or "")
+    return int(m.group(1)) if m else None
+
+
+def vehicle_miles(text: str) -> int | None:
+    m = MILES_RE.search(text or "")
+    if not m:
+        return None
+    n = float(m.group(1).replace(",", ""))
+    miles = int(n * 1000) if m.group(2) or n < 1000 and "." in m.group(1) else int(n)
+    return miles if miles >= 100 else None  # "5 miles from campus" is a distance, not an odometer
+
+
+def title_status(text: str) -> str:
+    low = (text or "").lower()
+    return next((label for word, label in TITLE_STATUS if word in low), "")
+
+
+def check_vehicle(year: int | None, miles: int | None, watch: dict) -> tuple[bool, str]:
+    """A vehicle watch's year range and mileage. A vehicle for sale names its model year, so a listing
+    without one (floor mats, a wanted ad) isn't one; unknown miles pass (not every seller states them)."""
+    if year is None:
+        return False, "no model year"
+    if year is not None:
+        if watch.get("year_min") and year < watch["year_min"]:
+            return False, "older than wanted"
+        if watch.get("year_max") and year > watch["year_max"]:
+            return False, "newer than wanted"
+    if miles is not None and watch.get("max_miles") and miles > watch["max_miles"]:
+        return False, "too many miles"
+    return True, ""
+
+
 def check(title: str, watch: dict, junk_terms: list[str], total: float | None,
           extra_text: str = "") -> tuple[bool, str]:
     """Decide whether a listing belongs to a watch. Returns (ok, reason if rejected)."""
+    if watch.get("kind") == "vehicle":
+        junk_terms = VEHICLE_JUNK
     groups, q_excludes = parse_query(watch["query"])
     hn, hc = normalize(title), compact(title)
     for group in groups:
@@ -111,6 +160,12 @@ def still_wanted(title: str, total: float | None, watch: dict) -> bool:
         if watch.get("min_price") is not None and total < watch["min_price"]:
             return False
     return True
+
+
+def vehicle_history(year: int | None, history: list[tuple[float, int | None]]) -> list[float]:
+    """Prices to compare a vehicle with: the watch's finds within two model years, when there are enough."""
+    near = [t for t, y in history if year is not None and y is not None and abs(y - year) <= 2]
+    return near if len(near) >= 5 else [t for t, _ in history]
 
 
 def deal_pct(total: float | None, history: list[float]) -> float | None:

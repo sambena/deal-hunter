@@ -85,7 +85,11 @@ CREATE TABLE IF NOT EXISTS watches (
     last_error TEXT,
     polled_sources TEXT NOT NULL DEFAULT '[]',
     keep_cheapest INTEGER,           -- keep only this many cheapest finds; NULL = keep all
-    color TEXT                       -- "#RRGGBB" the person picked; NULL = from the palette by id
+    color TEXT,                      -- "#RRGGBB" the person picked; NULL = from the palette by id
+    kind TEXT NOT NULL DEFAULT 'item',  -- item | vehicle (cars, trucks: year range and miles)
+    year_min INTEGER,
+    year_max INTEGER,
+    max_miles INTEGER
 );
 CREATE TABLE IF NOT EXISTS listings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -107,6 +111,9 @@ CREATE TABLE IF NOT EXISTS listings (
     deal_pct REAL,
     ai_note TEXT,
     seen_at REAL,
+    year INTEGER,                    -- vehicles: model year, odometer miles, title (clean/salvage/rebuilt)
+    miles INTEGER,
+    title_status TEXT,
     UNIQUE (watch_id, source, source_id)
 );
 CREATE INDEX IF NOT EXISTS idx_listings_watch ON listings(watch_id, first_seen);
@@ -235,6 +242,14 @@ def conn() -> sqlite3.Connection:
                 _conn.execute("ALTER TABLE watches ADD COLUMN keep_cheapest INTEGER")
             if "color" not in cols:
                 _conn.execute("ALTER TABLE watches ADD COLUMN color TEXT")
+            for col, ddl in (("kind", "TEXT NOT NULL DEFAULT 'item'"), ("year_min", "INTEGER"),
+                             ("year_max", "INTEGER"), ("max_miles", "INTEGER")):
+                if col not in cols:
+                    _conn.execute(f"ALTER TABLE watches ADD COLUMN {col} {ddl}")
+            lcols = {r["name"] for r in _conn.execute("PRAGMA table_info(listings)")}
+            for col, ddl in (("year", "INTEGER"), ("miles", "INTEGER"), ("title_status", "TEXT")):
+                if col not in lcols:
+                    _conn.execute(f"ALTER TABLE listings ADD COLUMN {col} {ddl}")
             mcols = {r["name"] for r in _conn.execute("PRAGMA table_info(machines)")}
             for col, ddl in (("kind", "TEXT NOT NULL DEFAULT 'pc'"), ("model", "TEXT NOT NULL DEFAULT ''"),
                              ("source_ref", "TEXT"),  # devices other than PCs, and where they were imported from
@@ -386,9 +401,11 @@ def public_settings(user_id: int | None = None) -> dict:
 # ---- watches --------------------------------------------------------------
 
 WATCH_FIELDS = ("name", "query", "exclude", "min_price", "max_price", "condition",
-                "include_auctions", "sources", "enabled", "notes", "machine_id", "keep_cheapest", "color")
+                "include_auctions", "sources", "enabled", "notes", "machine_id", "keep_cheapest", "color",
+                "kind", "year_min", "year_max", "max_miles")
 # Changing any of these makes the next check find a fresh backlog of older listings.
-MATCH_FIELDS = ("query", "exclude", "min_price", "max_price", "condition", "include_auctions")
+MATCH_FIELDS = ("query", "exclude", "min_price", "max_price", "condition", "include_auctions",
+                "kind", "year_min", "year_max", "max_miles")
 
 
 def _watch_row(r: dict) -> dict:
@@ -438,6 +455,15 @@ def _watch_values(data: dict) -> dict:
             except (TypeError, ValueError):
                 v = None
             v = v if v is None or v > 0 else None
+        elif f == "kind":
+            v = v if v in ("item", "vehicle") else "item"
+        elif f in ("year_min", "year_max", "max_miles"):
+            try:
+                v = int(float(v)) if v not in (None, "") else None
+            except (TypeError, ValueError):
+                v = None
+            if v is not None and (v < 0 or (f != "max_miles" and not 1900 <= v <= 2100)):
+                v = None
         elif f == "color":
             v = v.lower() if isinstance(v, str) and re.fullmatch(r"#[0-9a-fA-F]{6}", v) else None
         elif f == "machine_id" and v is not None and not get_machine(int(v)):

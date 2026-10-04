@@ -32,6 +32,14 @@ When several watches (yours or friends') run the same search, each check sends i
 once and every watch gets the answer, so more people doesn't mean more eBay calls
 (5000 a day) or more KSL requests. Hover "Last check" to see how many were shared.
 
+## Cars and trucks
+
+Pick "A car or truck" in the watch form: query = make and model (`toyota tacoma`), plus model years and
+max miles. Vehicle watches search eBay Motors (Cars & Trucks), Craigslist cars+trucks, OfferUp vehicles
+(and KSL Cars). Finds show the year, miles and any salvage/rebuilt title; "% under typical" compares with
+the watch's finds within two model years. Ask AI gives a second opinion on price, miles and red flags.
+Cars.com, Autotrader, CarGurus, Carvana, CarMax, TrueCar and Facebook block programs, so they aren't searched.
+
 ## How matching works
 
 - Query words must all be in the title; `a|b` means either; `"phrase"`; `-word` excludes.

@@ -66,6 +66,9 @@ def _ebay_access_token(settings: dict) -> str:
     return tok["access_token"]
 
 
+EBAY_CARS_TRUCKS = "6001"  # eBay Motors > Cars & Trucks
+
+
 def ebay(watch: dict, settings: dict) -> list[dict]:
     return _ebay_search(watch, settings, local=False)
 
@@ -91,14 +94,18 @@ def _ebay_search(watch: dict, settings: dict, local: bool) -> list[dict]:
     cond = {"used": "USED", "new": "NEW"}.get(watch.get("condition", "any"))
     if cond:
         filters.append(f"conditions:{{{cond}}}")
+    vehicle = watch.get("kind") == "vehicle"
     if not watch.get("include_auctions"):
-        filters.append("buyingOptions:{FIXED_PRICE|BEST_OFFER}")
+        # eBay Motors sells many vehicles as classified ads (contact the seller) rather than Buy It Now.
+        filters.append("buyingOptions:{FIXED_PRICE|BEST_OFFER" + ("|CLASSIFIED_AD}" if vehicle else "}"))
     if local:
         # eBay requires all five pickup filters together.
         radius = max(1, int(float(settings.get("local_radius_miles") or 50)))
         filters += ["deliveryOptions:{SELLER_ARRANGED_LOCAL_PICKUP}", "pickupCountry:US",
                     f"pickupPostalCode:{zip_code}", f"pickupRadius:{radius}", "pickupRadiusUnit:mi"]
     params = {"q": q, "limit": "50", "sort": "newlyListed"}
+    if vehicle:
+        params["category_ids"] = EBAY_CARS_TRUCKS  # vehicles only, not parts that mention the model
     if filters:
         params["filter"] = ",".join(filters)
     headers = {
@@ -501,9 +508,12 @@ def _miles(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return 3958.8 * 2 * math.asin(math.sqrt(a))
 
 
-def _craigslist_search(zip_code: str, radius: int, query: str, lo=None, hi=None) -> dict:
-    params = {"batch": "1-0-360-0-0", "cc": "US", "lang": "en", "searchPath": "sss",
+def _craigslist_search(zip_code: str, radius: int, query: str, lo=None, hi=None, vehicle: dict | None = None) -> dict:
+    params = {"batch": "1-0-360-0-0", "cc": "US", "lang": "en", "searchPath": "cta" if vehicle else "sss",
               "postal": zip_code, "search_distance": str(radius), "query": query}
+    for key, field in (("min_auto_year", "year_min"), ("max_auto_year", "year_max"), ("max_auto_miles", "max_miles")):
+        if vehicle and vehicle.get(field):
+            params[key] = str(vehicle[field])
     if lo:
         params["min_price"] = str(int(lo))
     if hi:
@@ -542,6 +552,7 @@ def _craigslist_row(row: list, decode: dict) -> dict | None:
                 "price": row[3] if row[3] >= 0 else None, "lat": float(lat), "lon": float(lon),
                 "place": places[int(place)] if int(place) < len(places) and places[int(place)] else "",
                 "images": tags.get(4, []), "slug": (tags.get(6) or [""])[0], "uuid": (tags.get(13) or [""])[0],
+                "odometer": (tags.get(9) or [None])[0],  # cars and trucks only
                 "title": row[-1] if isinstance(row[-1], str) else ""}
     except (AttributeError, IndexError, KeyError, TypeError, ValueError):
         return None  # a row in a shape we don't know; skip it rather than fail the whole search
@@ -555,7 +566,8 @@ def craigslist(watch: dict, settings: dict) -> list[dict]:
     if not terms:
         return []
     radius = max(1, int(float(settings.get("local_radius_miles") or 50)))
-    data = _craigslist_search(zip_code, radius, terms, watch.get("min_price"), watch.get("max_price"))
+    vehicle = watch if watch.get("kind") == "vehicle" else None  # cars+trucks section, year/miles filters
+    data = _craigslist_search(zip_code, radius, terms, watch.get("min_price"), watch.get("max_price"), vehicle)
     decode, home = data.get("decode") or {}, data.get("location") or {}
     if data and "minPostingId" not in decode and data.get("items"):
         raise SourceError("couldn't read Craigslist's results (did the site change?)")
@@ -579,8 +591,9 @@ def craigslist(watch: dict, settings: dict) -> list[dict]:
             "image": f"https://images.craigslist.org/{img}_300x300.jpg" if img else None,
             "location": r["place"] if len(r["place"]) <= 40 else "",  # some sellers put ads in this field
             "condition": "used",
-            "buying": "Craigslist",
+            "buying": "Craigslist" + ({145: " · owner", 146: " · dealer"}.get(raw[2], "") if vehicle else ""),
             "text": "",
+            "miles": r["odometer"] if isinstance(r["odometer"], int) else None,
         })
     return out
 
@@ -590,6 +603,8 @@ def craigslist(watch: dict, settings: dict) -> list[dict]:
 # ou.location cookie (otherwise OfferUp guesses from the IP), and radius only takes 5/10/20/30/50 miles.
 
 OFFERUP_RADII = (5, 10, 20, 30, 50)
+OFFERUP_VEHICLE_RADII = (25, 80, 100, 200)  # vehicle searches offer different distances (else nationwide)
+OFFERUP_MILEAGE = (25000, 50000, 75000, 100000, 125000, 150000, 175000, 200000)
 OFFERUP_GAP_SECONDS = 4
 _offerup_last = {"at": 0.0}
 
@@ -625,8 +640,18 @@ def offerup(watch: dict, settings: dict) -> list[dict]:
         return []
     place = zip_place(zip_code)
     radius = int(float(settings.get("local_radius_miles") or 50))
-    radius = next((r for r in OFFERUP_RADII if r >= radius), OFFERUP_RADII[-1])
+    vehicle = watch.get("kind") == "vehicle"
+    radii = OFFERUP_VEHICLE_RADII if vehicle else OFFERUP_RADII
+    radius = next((r for r in radii if r >= radius), radii[-1])
     params = {"q": terms, "radius": str(radius), "sort": "-posted"}
+    if vehicle:
+        if watch.get("year_min"):
+            params["veh_year_min"] = str(watch["year_min"])
+        if watch.get("year_max"):
+            params["veh_year_max"] = str(watch["year_max"])
+        bucket = next((m for m in OFFERUP_MILEAGE if watch.get("max_miles") and m >= watch["max_miles"]), None)
+        if bucket:
+            params["veh_mileage"] = str(bucket)
     if watch.get("min_price"):
         params["price_min"] = str(int(watch["min_price"]))
     if watch.get("max_price"):
@@ -673,6 +698,7 @@ def offerup(watch: dict, settings: dict) -> list[dict]:
             "condition": (r.get("conditionText") or "used").lower(),
             "buying": "OfferUp" + (" · ships" if "SHIPPING" in flags else ""),
             "text": "",
+            "miles": r.get("vehicleMiles"),
         })
     return out
 

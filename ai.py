@@ -609,6 +609,8 @@ used-market ceiling in USD, or null if you're unsure. Explain each pick in `reas
 
 def judge_prompt(listing: dict, watch: dict, machine: dict | None) -> tuple[str, dict]:
     price = f"${listing['total']:.2f}" if listing.get("total") is not None else "not stated"
+    if watch.get("kind") == "vehicle":
+        return vehicle_judge_prompt(listing, watch, price)
     return f"""Is this used-hardware listing worth pursuing?
 
 Listing title: {listing['title']}
@@ -621,3 +623,22 @@ Searched for: {watch['name']} (query "{watch['query']}")
 Answer with verdict good / ok / skip and a short note (2 sentences max) covering
 compatibility problems, red flags in the title, and whether the price is fair for
 the used market.""", VERDICT_SCHEMA
+
+
+def vehicle_judge_prompt(listing: dict, watch: dict, price: str) -> tuple[str, dict]:
+    miles = f"{listing['miles']:,}" if listing.get("miles") is not None else "not stated"
+    years = "–".join(str(y) for y in (watch.get("year_min"), watch.get("year_max")) if y) or "any"
+    return f"""Is this used car or truck listing worth pursuing?
+
+Listing title: {listing['title']}
+Model year: {listing.get('year') or 'unknown'}
+Odometer: {miles} miles
+Title status: {listing.get('title_status') or 'not stated (assume clean unless the title says otherwise)'}
+Asking price: {price}
+Location: {listing.get('location') or 'unknown'}
+Seller / source: {listing.get('buying') or listing['source']}
+Searched for: {watch['name']} (query "{watch['query']}", years {years}, max miles {watch.get('max_miles') or 'any'})
+
+Answer with verdict good / ok / skip and a short note (2 sentences max): is the price fair for that
+year and mileage in the US used market, and any red flags (salvage/rebuilt title, mileage too high
+for the year, a price far below market that looks like a scam, "needs work" wording).""", VERDICT_SCHEMA
