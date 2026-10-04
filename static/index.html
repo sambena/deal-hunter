@@ -64,6 +64,9 @@
             <label>Linked machine <select name="machine_id"><option value="">None</option></select></label>
             <label>Min price (incl. shipping) <input name="min_price" type="number" step="1" min="0"></label>
             <label>Max price (incl. shipping) <input name="max_price" type="number" step="1" min="0"></label>
+            <label title="Only the cheapest finds stay; the rest are hidden and never alert. Starred finds always stay.">Keep only the cheapest
+              <select name="keep_cheapest"><option value="">All finds</option><option value="3">3</option><option value="5">5</option><option value="10">10</option><option value="20">20</option></select>
+            </label>
             <label>Condition
               <select name="condition"><option value="any">Any</option><option value="used">Used</option><option value="new">New</option></select>
             </label>

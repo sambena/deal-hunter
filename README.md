@@ -38,6 +38,8 @@ once and every watch gets the answer, so more people doesn't mean more eBay call
 - Case, dashes and spaces are ignored for model numbers (`10980xe` = "i9-10980 XE").
 - Junk words ("for parts", "bent pins", ...) are always filtered; edit them in Settings.
 - Price limits include shipping.
+- "Keep only the cheapest" (3/5/10/20) on a watch keeps that many cheapest finds; the rest are hidden
+  and never alert. Starred finds always stay. Hidden ones come back if a cheaper find goes.
 - After a watch has seen 5+ prices, new finds are marked "good" (10%+ under the
   typical asking price) or "great" (25%+).
 
