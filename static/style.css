@@ -88,3 +88,6 @@ th { color: var(--muted); font-weight: 500; font-size: 12px; }
 .guide a { color: var(--accent); }
 #settings-form select { width: 100%; max-width: 100%; text-overflow: ellipsis; }
 .bby-credit img { height: 18px; margin-top: 4px; vertical-align: middle; }
+.machine:not([data-kind="pc"]):not([data-kind="server"]) .parts-only { display: none; }
+.machine[data-kind="pc"] .gear-only, .machine[data-kind="server"] .gear-only { display: none; }
+table.import input[data-f=name] { min-width: 12em; }

@@ -101,10 +101,17 @@
     <!-- HARDWARE -->
     <section id="tab-hardware" class="tab" hidden>
       <div class="panel">
-        <p class="muted">Add your machines and their parts, then press <b>Find upgrades</b>. Built-in rules recognise desktop
-          platforms from about 2015 on and suggest drop-in CPUs and RAM. With AI on, you also get GPU/storage ideas and
-          support for anything the rules don't know.</p>
-        <button id="add-machine" class="primary">Add machine</button>
+        <p class="muted">Everything you own: PCs and servers with their parts, plus TVs, monitors, phones, tablets,
+          network gear, appliances and more. For PCs, <b>Find upgrades</b> suggests drop-in CPUs and RAM; for anything,
+          <b>Find upgrades with AI</b> suggests better models and accessories, and <b>Watch this model</b> looks for a
+          spare or replacement.</p>
+        <div class="row">
+          <button id="add-machine" class="primary">Add device</button>
+          <button id="ha-import">Import from Home Assistant</button>
+          <span class="spacer"></span>
+          <select id="kind-filter"><option value="">All kinds</option></select>
+        </div>
+        <div id="ha-import-box"></div>
       </div>
       <div id="machines"></div>
     </section>
@@ -182,6 +189,25 @@
             <p>It only finds open-box items for products that match your watch, and doesn't know which store they're in.</p>
           </details>
           <label>API key <input name="bestbuy_api_key" type="password" autocomplete="off"></label>
+        </div>
+
+        <div class="panel">
+          <h2>Home Assistant</h2>
+          <p class="muted">Optional. Lets My hardware import your TVs, phones, speakers, network gear and appliances.
+            Deal Hunter only reads the device list; it never changes anything in Home Assistant.</p>
+          <div class="grid">
+            <label>Home Assistant address <input name="ha_url" placeholder="http://homeassistant.local:8123"></label>
+            <label>Long-lived access token <input name="ha_token" type="password" autocomplete="off" data-ph="from your Home Assistant profile"></label>
+          </div>
+          <details class="help guide">
+            <summary>How to get a Home Assistant token (free)</summary>
+            <ol>
+              <li>In Home Assistant, click your name at the bottom left to open your <b>Profile</b>, then the <b>Security</b> tab.</li>
+              <li>Under <b>Long-lived access tokens</b>, click <b>Create token</b> and name it "Deal Hunter".</li>
+              <li>Copy the token (it's only shown once), paste it here with your Home Assistant address, and save.</li>
+            </ol>
+            <p>The token can do anything your account can, so keep it private. You can delete it from the same page any time.</p>
+          </details>
         </div>
 
         <div class="panel">
