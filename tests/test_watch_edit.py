@@ -45,7 +45,7 @@ class WatchEditTest(unittest.TestCase):
 
     def test_exclude_from_a_find_removes_the_matching_finds_but_not_starred(self):
         out = self.s.update_watch({"exclude": ["tower"]}, {}, str(self.wid))
-        self.assertEqual(out, {"ok": True, "removed": 1})
+        self.assertEqual(out, {"ok": True, "removed": 1, "marked_seen": 0})
         left = self.titles()
         self.assertNotIn("Dell Precision 5820 Tower i9-10980XE 64GB", left)
         self.assertIn("Dell Precision 5820 Tower i9-10980XE 32GB", left)  # starred

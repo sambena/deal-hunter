@@ -426,7 +426,10 @@ $("#watch-list").addEventListener("click", async e => {
   const w = state.watches.find(x => x.id === id);
   switch (el.dataset.act) {
     case "toggle":
-      await api("PUT", `/api/watches/${id}`, { enabled: el.checked });
+      {
+        const r = await api("PUT", `/api/watches/${id}`, { enabled: el.checked });
+        if (r.marked_seen) toast(`Turned off · ${r.marked_seen} new find${r.marked_seen === 1 ? "" : "s"} marked seen`);
+      }
       break;
     case "view":
       $("#f-watch").value = id;
