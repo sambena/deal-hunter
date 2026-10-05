@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import datetime
 import json
+import re
 import threading
 import time
 import traceback
 import urllib.request
+import zoneinfo
 
 import db
 import netguard
@@ -256,16 +259,58 @@ def poll_user(user_id: int) -> None:
     threading.Thread(target=work, name=f"poll-user-{user_id}", daemon=True).start()
 
 
+def clean_times(times) -> list[str]:
+    """["7:00", "18:00", "junk"] -> ["07:00", "18:00"]: valid HH:MM, sorted, no repeats."""
+    out = set()
+    for t in times if isinstance(times, list) else str(times or "").replace(";", ",").split(","):
+        m = re.fullmatch(r"\s*([01]?\d|2[0-3]):([0-5]\d)\s*", str(t))
+        if m:
+            out.add(f"{int(m.group(1)):02d}:{m.group(2)}")
+    return sorted(out)
+
+
+def _zone(name: str | None):
+    """The time zone to keep set times in: the chosen one, else Mountain, else this machine's own."""
+    for key in (name, "America/Denver"):
+        try:
+            return zoneinfo.ZoneInfo(key)
+        except (zoneinfo.ZoneInfoNotFoundError, ValueError, TypeError):
+            continue
+    return datetime.datetime.now().astimezone().tzinfo
+
+
+def next_check(settings: dict, now: float | None = None) -> float:
+    """When the next full check is due: poll_minutes from now, or the next of the day's set times."""
+    now = now or time.time()
+    if settings.get("check_mode") == "times":
+        times = clean_times(settings.get("check_times"))
+        if times:
+            tz = _zone(settings.get("check_timezone"))
+            local = datetime.datetime.fromtimestamp(now, tz)
+            for day in (0, 1):
+                for t in times:
+                    h, m = map(int, t.split(":"))
+                    at = (local + datetime.timedelta(days=day)).replace(hour=h, minute=m, second=0, microsecond=0)
+                    if at.timestamp() > now + 30:
+                        return at.timestamp()
+    return now + max(5, int(settings.get("poll_minutes") or 15)) * 60
+
+
 def _loop() -> None:
+    first = True
     while True:
         try:
-            run_all()
-            minutes = max(5, int(db.get_settings()["poll_minutes"]))
+            settings = db.get_settings()
+            # On set times, a restart waits for the next one instead of checking straight away.
+            if not (first and settings.get("check_mode") == "times"):
+                run_all()
+            due = next_check(db.get_settings())
         except Exception:  # noqa: BLE001 - one bad cycle must not stop the poller for good
             traceback.print_exc()
-            minutes = 15
-        state["next_cycle"] = time.time() + minutes * 60
-        _wake.wait(minutes * 60)
+            due = time.time() + 15 * 60
+        first = False
+        state["next_cycle"] = due
+        _wake.wait(max(1, due - time.time()))
         _wake.clear()
 
 

@@ -342,8 +342,19 @@
 
         <div class="panel">
           <h2>Checking</h2>
+          <p class="muted">How often every watch is searched. Fewer checks are gentler on the sites (and eBay's
+            5,000 a day); "Check now" still works any time.</p>
           <div class="grid">
-            <label>Check every (minutes) <input name="poll_minutes" type="number" min="5"></label>
+            <label>When
+              <select name="check_mode"><option value="interval">Every few minutes</option>
+                <option value="times">At set times each day</option></select></label>
+            <label data-check="interval">Check every (minutes) <input name="poll_minutes" type="number" min="5"></label>
+            <label data-check="times">Times (24-hour, comma separated) <input name="check_times" placeholder="07:00, 18:00"></label>
+            <label data-check="times">Time zone
+              <select name="check_timezone">
+                <option value="America/Denver">Mountain (Utah)</option><option value="America/Phoenix">Arizona</option>
+                <option value="America/Chicago">Central (Tennessee)</option><option value="America/New_York">Eastern</option>
+                <option value="America/Los_Angeles">Pacific</option></select></label>
           </div>
         </div>
 
