@@ -41,8 +41,25 @@ class BodyStyleTest(unittest.TestCase):
                 mock.patch.object(sources, "_http", lambda url, **kw: seen.append(url) or {"itemSummaries": []}):
             sources.ebay(PICKUP, SETTINGS)
         q = urllib.parse.parse_qs(urllib.parse.urlparse(seen[0]).query)
-        self.assertTrue(q["q"][0].startswith("(pickup,truck,f-150"))
+        self.assertEqual(q["q"], ["(f-150,silverado,ram,tacoma,sierra,tundra,ranger,colorado)"])
         self.assertEqual((q["limit"], q["category_ids"]), (["200"], ["6001"]))
+
+    def test_ebay_too_large_asks_for_less(self):
+        seen = []
+
+        def http(url, **kw):
+            seen.append(urllib.parse.parse_qs(urllib.parse.urlparse(url).query)["q"][0])
+            if len(seen) < 3:
+                raise sources.SourceError('HTTP 400 from api.ebay.com: {"errors":[{"errorId":12023}]}')
+            return {"itemSummaries": []}
+        with mock.patch.object(sources, "_ebay_access_token", lambda s: "t"), mock.patch.object(sources, "_http", http):
+            sources.ebay(PICKUP, SETTINGS)
+        self.assertEqual(seen, ["(f-150,silverado,ram,tacoma,sierra,tundra,ranger,colorado)",
+                                "(f-150,silverado,ram,tacoma)", "pickup"])
+        with mock.patch.object(sources, "_ebay_access_token", lambda s: "t"),                 mock.patch.object(sources, "_http", lambda url, **kw: (_ for _ in ()).throw(
+                    sources.SourceError("HTTP 400: 12023"))):
+            with self.assertRaises(sources.SourceError):  # still too large with just "pickup": say so
+                sources.ebay(PICKUP, SETTINGS)
 
     @mock.patch.object(sources, "CRAIGSLIST_GAP_SECONDS", 0)
     def test_craigslist_type_filter(self):
