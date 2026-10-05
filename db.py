@@ -133,6 +133,7 @@ CREATE TABLE IF NOT EXISTS listings (
     miles INTEGER,
     title_status TEXT,
     size TEXT,                       -- clothing: the listing's size, when the source or title says
+    make TEXT,                       -- vehicles: Ford, Chevrolet... (for sorting)
     UNIQUE (watch_id, source, source_id)
 );
 CREATE INDEX IF NOT EXISTS idx_listings_watch ON listings(watch_id, first_seen);
@@ -269,7 +270,8 @@ def conn() -> sqlite3.Connection:
                 if col not in cols:
                     _conn.execute(f"ALTER TABLE watches ADD COLUMN {col} {ddl}")
             lcols = {r["name"] for r in _conn.execute("PRAGMA table_info(listings)")}
-            for col, ddl in (("year", "INTEGER"), ("miles", "INTEGER"), ("title_status", "TEXT"), ("size", "TEXT")):
+            for col, ddl in (("year", "INTEGER"), ("miles", "INTEGER"), ("title_status", "TEXT"), ("size", "TEXT"),
+                             ("make", "TEXT")):
                 if col not in lcols:
                     _conn.execute(f"ALTER TABLE listings ADD COLUMN {col} {ddl}")
             mcols = {r["name"] for r in _conn.execute("PRAGMA table_info(machines)")}
@@ -360,6 +362,13 @@ def conn() -> sqlite3.Connection:
                         srcs.insert(at + 1, "offerup")
                         _conn.execute("UPDATE watches SET sources = ? WHERE id = ?", (json.dumps(srcs), r["id"]))
                 _conn.execute("PRAGMA user_version = 8")
+            if _conn.execute("PRAGMA user_version").fetchone()[0] < 9:
+                # Sorting cars by make arrived: fill it in for the vehicle finds already stored.
+                import matching
+                for r in _conn.execute("SELECT id, title FROM listings WHERE year IS NOT NULL AND make IS NULL").fetchall():
+                    _conn.execute("UPDATE listings SET make = ? WHERE id = ?",
+                                  (matching.vehicle_make(r["title"]) or None, r["id"]))
+                _conn.execute("PRAGMA user_version = 9")
             _conn.execute("CREATE INDEX IF NOT EXISTS idx_watches_user ON watches(user_id)")
             _conn.execute("CREATE INDEX IF NOT EXISTS idx_machines_user ON machines(user_id)")
             _conn.commit()
