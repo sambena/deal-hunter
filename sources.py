@@ -50,7 +50,7 @@ _ebay_token: dict = {"value": None, "expires": 0.0, "client": None}
 def _ebay_access_token(settings: dict) -> str:
     cid, secret = settings["ebay_client_id"], settings["ebay_client_secret"]
     if not cid or not secret:
-        raise SourceError("eBay keys not set (Settings > eBay)")
+        raise SourceError("eBay keys not set (Admin > eBay)")
     if _ebay_token["value"] and _ebay_token["client"] == cid and time.time() < _ebay_token["expires"] - 60:
         return _ebay_token["value"]
     basic = base64.b64encode(f"{cid}:{secret}".encode()).decode()
@@ -300,7 +300,7 @@ def reddit(watch: dict, settings: dict) -> list[dict]:
 def bestbuy(watch: dict, settings: dict) -> list[dict]:
     key = settings.get("bestbuy_api_key")
     if not key:
-        raise SourceError("Best Buy API key not set (Settings > Best Buy)")
+        raise SourceError("Best Buy API key not set (Admin > Best Buy)")
     words = [re.sub(r"[^A-Za-z0-9]", "", w) for w in search_terms(watch["query"]).split()]
     words = [w for w in words if w]
     if not words:
