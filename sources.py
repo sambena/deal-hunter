@@ -68,7 +68,30 @@ def _ebay_access_token(settings: dict) -> str:
 
 
 EBAY_CARS_TRUCKS = "6001"  # eBay Motors > Cars & Trucks
-EBAY_MOTORS_PARTS = "6028"  # eBay Motors > Parts & Accessories: the categories eBay checks fitment in
+EBAY_MOTORS_PARTS = "6028"  # eBay Motors > Parts & Accessories
+EBAY_MOTORS_TREE = "100"  # eBay's category tree for eBay Motors US
+_parts_category_cache: dict = {}
+
+
+def _ebay_parts_category(query: str, token: str) -> str | None:
+    """The leaf parts category eBay suggests for a search ("brake pads" -> Brake Pads). eBay only checks
+    fitment in leaf categories, not in Parts & Accessories as a whole."""
+    if query in _parts_category_cache:
+        return _parts_category_cache[query]
+    found = None
+    try:
+        data = _http(f"https://api.ebay.com/commerce/taxonomy/v1/category_tree/{EBAY_MOTORS_TREE}/"
+                     "get_category_suggestions?" + urllib.parse.urlencode({"q": query}),
+                     headers={"Authorization": f"Bearer {token}"})
+        for sug in data.get("categorySuggestions") or []:
+            ancestors = {a.get("categoryId") for a in sug.get("categoryTreeNodeAncestors") or []}
+            if EBAY_MOTORS_PARTS in ancestors:
+                found = (sug.get("category") or {}).get("categoryId")
+                break
+    except SourceError:
+        found = None  # no suggestion: search without the fitment check rather than fail
+    _parts_category_cache[query] = found
+    return found
 
 
 def ebay(watch: dict, settings: dict) -> list[dict]:
@@ -110,8 +133,10 @@ def _ebay_search(watch: dict, settings: dict, local: bool) -> list[dict]:
         params["category_ids"] = EBAY_CARS_TRUCKS  # vehicles only, not parts that mention the model
     fits = watch.get("fits")  # a parts watch linked to one of the person's vehicles
     if fits:
-        params["category_ids"] = EBAY_MOTORS_PARTS
-        params["compatibility_filter"] = f"Year:{fits['year']};Make:{fits['make']};Model:{fits['model']}"
+        leaf = _ebay_parts_category(q, token)
+        params["category_ids"] = leaf or EBAY_MOTORS_PARTS
+        if leaf:
+            params["compatibility_filter"] = f"Year:{fits['year']};Make:{fits['make']};Model:{fits['model']}"
     if filters:
         params["filter"] = ",".join(filters)
     headers = {
@@ -120,8 +145,16 @@ def _ebay_search(watch: dict, settings: dict, local: bool) -> list[dict]:
     }
     if zip_code:
         headers["X-EBAY-C-ENDUSERCTX"] = f"contextualLocation=country%3DUS%2Czip%3D{zip_code}"
-    data = _http("https://api.ebay.com/buy/browse/v1/item_summary/search?" + urllib.parse.urlencode(params),
-                 headers=headers)
+    url = "https://api.ebay.com/buy/browse/v1/item_summary/search?"
+    try:
+        data = _http(url + urllib.parse.urlencode(params), headers=headers)
+    except SourceError as e:
+        if "compatibility_filter" not in params or "12506" not in str(e):
+            raise
+        # 12506: "The category ID submitted does not support fitment." Search without the check.
+        params.pop("compatibility_filter")
+        _parts_category_cache[q] = None
+        data = _http(url + urllib.parse.urlencode(params), headers=headers)
     out = []
     for it in data.get("itemSummaries", []):
         price = it.get("price") or it.get("currentBidPrice") or {}
