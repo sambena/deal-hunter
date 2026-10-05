@@ -253,11 +253,13 @@ const aiOn = () => state.settings.ai_provider && state.settings.ai_provider !== 
 // ---- tabs -----------------------------------------------------------------------
 
 function showTab(name) {
+  if (name === "admin" && !(state.me && state.me.role === "admin")) name = "settings";
+  if (!$("#tab-" + name)) name = "finds";
   $$("nav button").forEach(b => b.classList.toggle("active", b.dataset.tab === name));
   $$(".tab").forEach(t => (t.hidden = t.id !== "tab-" + name));
   try { localStorage.setItem("tab", name); } catch {}
   if (name === "finds") loadListings();
-  if (name === "settings") fillSettings();
+  if (name === "settings" || name === "admin") fillSettings();
 }
 $$("nav button").forEach(b => b.addEventListener("click", () => showTab(b.dataset.tab)));
 
@@ -265,6 +267,9 @@ $$("nav button").forEach(b => b.addEventListener("click", () => showTab(b.datase
 
 async function refresh() {
   state = await api("GET", "/api/state");
+  const isAdmin = state.me && state.me.role === "admin";
+  $("#admin-nav").hidden = !isAdmin;
+  $$("[data-admin-only]").forEach(el => (el.hidden = !isAdmin));
   const newTotal = state.watches.reduce((n, w) => n + w.new_count, 0);
   $("#new-badge").hidden = !newTotal;
   $("#new-badge").textContent = newTotal;
@@ -1051,16 +1056,19 @@ async function showAiSpend() {
   } catch (e) { box.textContent = e.message; }
 }
 
+// Settings: each person's own. Admin: the shared ones (people, sources and keys, checking, API).
+const SETTINGS_FORMS = ["#settings-form", "#admin-form"];
+
 function fillSettings() {
   const s = state.settings, f = $("#settings-form");
   const admin = state.me && state.me.role === "admin";
-  $$("[data-admin]", f).forEach(el => (el.hidden = !admin));  // shared settings are the admin's
+  $$("[data-admin]", f).forEach(el => (el.hidden = !admin));
   fillAccount().catch(() => {});
   fillPeople().catch(err => toast(err.message, true));
   fillAiChoices();
   const owner = state.ai.owner || "the admin";
   $("#ai-source-shared").textContent = `Use ${owner}'s AI (shared with you)`;
-  for (const el of f.elements) {
+  for (const el of SETTINGS_FORMS.flatMap(sel => [...$(sel).elements])) {
     if (!el.name) continue;
     if (el.name.startsWith("src_")) { el.checked = !!s.sources_enabled?.[el.name.slice(4)]; continue; }
     const v = s[el.name];
@@ -1092,24 +1100,26 @@ $("#api-key-new").addEventListener("click", e => busy(e.target, async () => {
 $("#settings-form [name=ai_provider]").addEventListener("change", showAiProvider);
 $("#settings-form [name=ai_source]").addEventListener("change", showAiProvider);
 
-$("#settings-form").addEventListener("submit", async e => {
+SETTINGS_FORMS.forEach(sel => $(sel).addEventListener("submit", async e => {
   e.preventDefault();
-  const f = e.target, out = { sources_enabled: {} };
+  const f = e.target, out = {}, sources = {};
   for (const el of f.elements) {
     if (!el.name) continue;
-    if (el.name.startsWith("src_")) out.sources_enabled[el.name.slice(4)] = el.checked;
+    if (el.name.startsWith("src_")) sources[el.name.slice(4)] = el.checked;
     else if (el.type === "checkbox") out[el.name] = el.checked;
     else if (el.tagName === "TEXTAREA") out[el.name] = el.value.split("\n").map(s => s.trim()).filter(Boolean);
     else if (el.type === "number") out[el.name] = Number(el.value);
     else out[el.name] = el.value.trim();
   }
+  // Only the admin form has the source switches; merge them so switches on other pages are kept.
+  if (Object.keys(sources).length) out.sources_enabled = { ...state.settings.sources_enabled, ...sources };
   try {
     await api("PUT", "/api/settings", out);
     await refresh();
     fillSettings();
-    toast("Settings saved");
+    toast(f.id === "admin-form" ? "Admin settings saved" : "Settings saved");
   } catch (err) { toast(err.message, true); }
-});
+}));
 
 $("#test-discord").addEventListener("click", e => busy(e.target, async () => {
   await api("POST", "/api/test-discord");

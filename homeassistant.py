@@ -57,7 +57,7 @@ class HAError(Exception):
 def fetch_devices(url: str, token: str, local_ok: bool = True) -> list[dict]:
     """local_ok: the admin's Home Assistant may be on the home network; anyone else's must be public."""
     if not url or not token:
-        raise HAError("Add your Home Assistant address and token in Settings > Home Assistant")
+        raise HAError("Add your Home Assistant address and token in Admin > Home Assistant")
     if "?" in url or "#" in url:
         raise HAError("The Home Assistant address can't contain ? or #")
     req = urllib.request.Request(url.strip().rstrip("/") + "/api/template",

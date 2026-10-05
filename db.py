@@ -41,7 +41,7 @@ DEFAULT_SETTINGS = {
     "ai_provider": "off",  # off | ollama | claude
     "ollama_url": "http://192.168.86.82:11434",  # the home Ollama gateway on the Frigate box (LAN/VPN only)
     "ollama_model": "qwen3.5:4b",
-    "api_key": "",  # for other apps calling the API port; made in Settings > API
+    "api_key": "",  # for other apps calling the API port; made in Admin > API
     "ha_url": "",  # Home Assistant, for importing devices into My hardware
     "ha_token": "",
     "anthropic_api_key": "",
@@ -65,6 +65,15 @@ USER_KEYS = {"zip_code", "local_radius_miles", "junk_terms", "discord_enabled", 
              "discord_deals_only", "ai_provider", "ollama_url", "ollama_model", "anthropic_api_key", "claude_model",
              "openai_api_key", "openai_model", "gemini_api_key", "gemini_model", "gemini_free_tier",
              "ai_monthly_limit", "ai_confirm", "ai_source", "ha_url", "ha_token"}
+
+# What a member (not the admin) may see and change: their area, junk words, Discord and their own AI.
+# Everything else, including their Home Assistant link, is the admin's (Sam, 2026-10-04).
+MEMBER_KEYS = {"zip_code", "local_radius_miles", "junk_terms", "discord_enabled", "discord_webhook",
+               "discord_deals_only", "ai_source", "ai_provider", "ollama_url", "ollama_model", "anthropic_api_key",
+               "claude_model", "openai_api_key", "openai_model", "gemini_api_key", "gemini_model",
+               "gemini_free_tier", "ai_monthly_limit", "ai_confirm"}
+# Shared settings a member's pages still need to read (which sources are switched on, how often checks run).
+MEMBER_READS = {"sources_enabled", "poll_minutes"}
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -385,7 +394,7 @@ def update_settings(changes: dict, user_id: int | None = None, shared_allowed: b
     """Personal keys go to the person's own settings; shared keys only when allowed (the admin)."""
     uid = user_id if user_id is not None else current_user_id()
     for key, value in changes.items():
-        if key not in DEFAULT_SETTINGS:
+        if key not in DEFAULT_SETTINGS or (not shared_allowed and key not in MEMBER_KEYS):
             continue
         if key in USER_KEYS:
             execute("INSERT OR REPLACE INTO user_settings (user_id, key, value) VALUES (?, ?, ?)",
@@ -394,11 +403,14 @@ def update_settings(changes: dict, user_id: int | None = None, shared_allowed: b
             execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, json.dumps(value)))
 
 
-def public_settings(user_id: int | None = None) -> dict:
-    """Settings safe to send to the browser: secrets become booleans."""
+def public_settings(user_id: int | None = None, admin: bool = True) -> dict:
+    """Settings safe to send to the browser: secrets become booleans; a member only gets their own."""
     s = get_settings(user_id)
+    if not admin:
+        s = {k: v for k, v in s.items() if k in MEMBER_KEYS or k in MEMBER_READS}
     for key in SECRET_KEYS:
-        s[key] = bool(s[key])
+        if key in s:
+            s[key] = bool(s[key])
     return s
 
 

@@ -14,6 +14,7 @@
       <button data-tab="watches">Watches</button>
       <button data-tab="hardware">My hardware</button>
       <button data-tab="settings">Settings</button>
+      <button data-tab="admin" id="admin-nav" hidden>Admin</button>
     </nav>
     <div class="status" id="poll-status"></div>
   </header>
@@ -124,7 +125,7 @@
           spare or replacement.</p>
         <div class="row">
           <button id="add-machine" class="primary">Add device</button>
-          <button id="ha-import">Import from Home Assistant</button>
+          <button id="ha-import" data-admin-only>Import from Home Assistant</button>
           <button id="radar">Deal radar</button>
           <span class="spacer"></span>
           <select id="kind-filter"><option value="">All kinds</option></select>
@@ -154,125 +155,19 @@
           <div id="acct-devices"></div>
         </div>
 
-        <div class="panel" data-admin>
-          <h2>People</h2>
-          <p class="muted">Invite friends and family. Each person has their own watches, finds, devices and AI settings;
-            you see their name, how many watches they have and their AI spend, not what they're watching.</p>
-          <div class="grid">
-            <label>Who it's for (just a note) <input id="invite-note" placeholder="e.g. Laura"></label>
-            <label>Watch limit <input id="invite-limit" type="number" min="0" value="10"></label>
-          </div>
-          <div class="row"><button type="button" class="primary" id="invite-new">Create invite link</button></div>
-          <div id="invite-result" hidden>
-            <label>Send this link (it works once, for 7 days) <input id="invite-link" readonly></label>
-            <div class="row"><button type="button" class="small" id="invite-copy">Copy link</button></div>
-          </div>
-          <div id="people-list"></div>
-        </div>
-
         <div class="panel">
-          <h2>Checking</h2>
-          <div class="grid" data-admin>
-            <label>Check every (minutes) <input name="poll_minutes" type="number" min="5"></label>
-          </div>
-          <label>Junk words, always filtered (one per line) <textarea name="junk_terms" rows="6"></textarea></label>
+          <h2>Junk words</h2>
+          <p class="muted">Finds with these words in the title (or description) are always hidden. One per line.</p>
+          <label><textarea name="junk_terms" rows="6"></textarea></label>
         </div>
 
         <div class="panel">
           <h2>Local area</h2>
           <p class="muted">Local sources only show things you can pick up within this distance. eBay also uses the ZIP for shipping estimates.</p>
-          <label class="toggle" data-admin><input type="checkbox" name="src_ksl"> KSL Classifieds (Utah). Free, no key. Private sellers near you, pickup only</label>
-          <label class="toggle" data-admin><input type="checkbox" name="src_craigslist"> Craigslist. Free, no key. Anywhere in the US, pickup only</label>
-          <label class="toggle" data-admin><input type="checkbox" name="src_offerup"> OfferUp. Free, no key. Anywhere in the US, up to 50 miles</label>
-          <label class="toggle" data-admin><input type="checkbox" name="src_ksl_cars"> KSL Cars (Utah). Free, no key. Dealers and private sellers, for car and truck watches</label>
           <div class="grid">
             <label>Your ZIP code <input name="zip_code" inputmode="numeric" placeholder="84057"></label>
             <label>Radius (miles) <input name="local_radius_miles" type="number" min="1" max="500"></label>
           </div>
-        </div>
-
-        <div class="panel" data-admin>
-          <h2>eBay</h2>
-          <label class="toggle"><input type="checkbox" name="src_ebay"> Enabled</label>
-          <label class="toggle"><input type="checkbox" name="src_ebay_local"> Local pickup search (uses Local area)</label>
-          <p class="muted">Free. Covers both the nationwide search and local pickup.</p>
-          <details class="help guide">
-            <summary>How to get an eBay key (free)</summary>
-            <ol>
-              <li>Go to <a href="https://developer.ebay.com/signin" target="_blank" rel="noopener">developer.ebay.com</a> and join the Developers Program. Your normal eBay login works.</li>
-              <li>Open <b>Application Keys</b> and create a keyset under <b>Production</b> (not Sandbox). Give the app any name, e.g. "Deal Hunter".</li>
-              <li>eBay asks about <b>marketplace account deletion notifications</b> before it switches the keyset on. Choose the exemption: you are <i>not persisting eBay data</i>.</li>
-              <li>Copy the <b>App ID (Client ID)</b> and the <b>Cert ID (Client Secret)</b> into the boxes below, then press <b>Save settings</b>.</li>
-            </ol>
-            <p>The free tier allows 5,000 searches a day, far more than Deal Hunter uses.</p>
-          </details>
-          <div class="grid">
-            <label>App ID (Client ID) <input name="ebay_client_id"></label>
-            <label>Cert ID (Client Secret) <input name="ebay_client_secret" type="password" autocomplete="off"></label>
-          </div>
-        </div>
-
-        <div class="panel" data-admin>
-          <h2>Reddit</h2>
-          <label class="toggle"><input type="checkbox" name="src_reddit"> Enabled</label>
-          <label>Subreddits (one per line) <textarea name="reddit_subs" rows="3"></textarea></label>
-          <p class="muted">No key needed. Only "selling" posts are matched: [H] item [W] PayPal/cash, or [FS].
-            Prices are guessed from the post text, so check the post. Nothing to set up.</p>
-        </div>
-
-        <div class="panel" data-admin>
-          <h2>Retail deals</h2>
-          <label class="toggle"><input type="checkbox" name="src_slickdeals"> Slickdeals</label>
-          <label class="toggle"><input type="checkbox" name="src_buildapcsales"> r/buildapcsales</label>
-          <label>Skip Slickdeals deals older than (days) <input name="deal_max_age_days" type="number" min="1" max="365"></label>
-          <p class="muted">Free, nothing to set up. Community-posted sales from Amazon, Newegg, Walmart, Best Buy,
-            Micro Center and other stores. Prices are read from the post title, so check the post before you buy.</p>
-        </div>
-
-        <div class="panel" data-admin>
-          <h2>Best Buy open-box <span class="pill">experimental</span></h2>
-          <label class="toggle"><input type="checkbox" name="src_bestbuy"> Enabled</label>
-          <p class="muted">Free, if Best Buy approves you.</p>
-          <details class="help guide">
-            <summary>How to get a Best Buy key (free)</summary>
-            <ol>
-              <li>Go to <a href="https://developer.bestbuy.com/" target="_blank" rel="noopener">developer.bestbuy.com</a> and choose <b>Get API Key</b>.</li>
-              <li>Sign up and confirm your email. Best Buy sometimes asks for a business email or reviews new sign-ups by hand, so the key can take a while or be refused.</li>
-              <li>Copy the key from your account page into the box below, tick <b>Enabled</b>, and save.</li>
-            </ol>
-            <p>It only finds open-box items for products that match your watch, and doesn't know which store they're in.</p>
-          </details>
-          <label>API key <input name="bestbuy_api_key" type="password" autocomplete="off"></label>
-        </div>
-
-        <div class="panel" data-admin>
-          <h2>API</h2>
-          <p class="muted">Let your own apps and scripts use Deal Hunter (watches, finds, My hardware) over your home
-            network or VPN. Every call needs this key. <a href="api.html" target="_blank" rel="noopener">How to use the API</a></p>
-          <p id="api-status" class="muted"></p>
-          <div class="row"><button type="button" id="api-key-new">Create API key</button></div>
-          <div id="api-key-box" hidden>
-            <label>Your new API key (copy it now; it won't be shown again) <input id="api-key-value" readonly></label>
-          </div>
-        </div>
-
-        <div class="panel">
-          <h2>Home Assistant</h2>
-          <p class="muted">Optional. Lets My hardware import your TVs, phones, speakers, network gear and appliances.
-            Deal Hunter only reads the device list; it never changes anything in Home Assistant.</p>
-          <div class="grid">
-            <label>Home Assistant address (local is best) <input name="ha_url" placeholder="http://homeassistant.local:8123"></label>
-            <label>Long-lived access token <input name="ha_token" type="password" autocomplete="off" data-ph="from your Home Assistant profile"></label>
-          </div>
-          <details class="help guide">
-            <summary>How to get a Home Assistant token (free)</summary>
-            <ol>
-              <li>In Home Assistant, click your name at the bottom left to open your <b>Profile</b>, then the <b>Security</b> tab.</li>
-              <li>Under <b>Long-lived access tokens</b>, click <b>Create token</b> and name it "Deal Hunter".</li>
-              <li>Copy the token (it's only shown once), paste it here with your Home Assistant address, and save.</li>
-            </ol>
-            <p>The token can do anything your account can, so keep it private. You can delete it from the same page any time.</p>
-          </details>
         </div>
 
         <div class="panel">
@@ -388,6 +283,130 @@
         <div class="row sticky-save">
           <button type="submit" class="primary">Save settings</button>
           <span id="settings-msg" class="muted"></span>
+        </div>
+      </form>
+    </section>
+    <!-- ADMIN (only the admin sees this tab; the server enforces it too) -->
+    <section id="tab-admin" class="tab" hidden>
+      <form id="admin-form">
+        <div class="panel">
+          <h2>People</h2>
+          <p class="muted">Invite friends and family. Each person has their own watches, finds, devices and AI settings;
+            you see their name, how many watches they have and their AI spend, not what they're watching.</p>
+          <div class="grid">
+            <label>Who it's for (just a note) <input id="invite-note" placeholder="e.g. Laura"></label>
+            <label>Watch limit <input id="invite-limit" type="number" min="0" value="10"></label>
+          </div>
+          <div class="row"><button type="button" class="primary" id="invite-new">Create invite link</button></div>
+          <div id="invite-result" hidden>
+            <label>Send this link (it works once, for 7 days) <input id="invite-link" readonly></label>
+            <div class="row"><button type="button" class="small" id="invite-copy">Copy link</button></div>
+          </div>
+          <div id="people-list"></div>
+        </div>
+
+        <div class="panel">
+          <h2>Checking</h2>
+          <div class="grid">
+            <label>Check every (minutes) <input name="poll_minutes" type="number" min="5"></label>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Local sources</h2>
+          <p class="muted">Free, no keys. They search near each person's own ZIP code and radius.</p>
+          <label class="toggle"><input type="checkbox" name="src_ksl"> KSL Classifieds (Utah). Free, no key. Private sellers near you, pickup only</label>
+          <label class="toggle"><input type="checkbox" name="src_craigslist"> Craigslist. Free, no key. Anywhere in the US, pickup only</label>
+          <label class="toggle"><input type="checkbox" name="src_offerup"> OfferUp. Free, no key. Anywhere in the US, up to 50 miles</label>
+          <label class="toggle"><input type="checkbox" name="src_ksl_cars"> KSL Cars (Utah). Free, no key. Dealers and private sellers, for car and truck watches</label>
+        </div>
+
+        <div class="panel">
+          <h2>eBay</h2>
+          <label class="toggle"><input type="checkbox" name="src_ebay"> Enabled</label>
+          <label class="toggle"><input type="checkbox" name="src_ebay_local"> Local pickup search (uses Local area)</label>
+          <p class="muted">Free. Covers both the nationwide search and local pickup.</p>
+          <details class="help guide">
+            <summary>How to get an eBay key (free)</summary>
+            <ol>
+              <li>Go to <a href="https://developer.ebay.com/signin" target="_blank" rel="noopener">developer.ebay.com</a> and join the Developers Program. Your normal eBay login works.</li>
+              <li>Open <b>Application Keys</b> and create a keyset under <b>Production</b> (not Sandbox). Give the app any name, e.g. "Deal Hunter".</li>
+              <li>eBay asks about <b>marketplace account deletion notifications</b> before it switches the keyset on. Choose the exemption: you are <i>not persisting eBay data</i>.</li>
+              <li>Copy the <b>App ID (Client ID)</b> and the <b>Cert ID (Client Secret)</b> into the boxes below, then press <b>Save settings</b>.</li>
+            </ol>
+            <p>The free tier allows 5,000 searches a day, far more than Deal Hunter uses.</p>
+          </details>
+          <div class="grid">
+            <label>App ID (Client ID) <input name="ebay_client_id"></label>
+            <label>Cert ID (Client Secret) <input name="ebay_client_secret" type="password" autocomplete="off"></label>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Reddit</h2>
+          <label class="toggle"><input type="checkbox" name="src_reddit"> Enabled</label>
+          <label>Subreddits (one per line) <textarea name="reddit_subs" rows="3"></textarea></label>
+          <p class="muted">No key needed. Only "selling" posts are matched: [H] item [W] PayPal/cash, or [FS].
+            Prices are guessed from the post text, so check the post. Nothing to set up.</p>
+        </div>
+
+        <div class="panel">
+          <h2>Retail deals</h2>
+          <label class="toggle"><input type="checkbox" name="src_slickdeals"> Slickdeals</label>
+          <label class="toggle"><input type="checkbox" name="src_buildapcsales"> r/buildapcsales</label>
+          <label>Skip Slickdeals deals older than (days) <input name="deal_max_age_days" type="number" min="1" max="365"></label>
+          <p class="muted">Free, nothing to set up. Community-posted sales from Amazon, Newegg, Walmart, Best Buy,
+            Micro Center and other stores. Prices are read from the post title, so check the post before you buy.</p>
+        </div>
+
+        <div class="panel">
+          <h2>Best Buy open-box <span class="pill">experimental</span></h2>
+          <label class="toggle"><input type="checkbox" name="src_bestbuy"> Enabled</label>
+          <p class="muted">Free, if Best Buy approves you.</p>
+          <details class="help guide">
+            <summary>How to get a Best Buy key (free)</summary>
+            <ol>
+              <li>Go to <a href="https://developer.bestbuy.com/" target="_blank" rel="noopener">developer.bestbuy.com</a> and choose <b>Get API Key</b>.</li>
+              <li>Sign up and confirm your email. Best Buy sometimes asks for a business email or reviews new sign-ups by hand, so the key can take a while or be refused.</li>
+              <li>Copy the key from your account page into the box below, tick <b>Enabled</b>, and save.</li>
+            </ol>
+            <p>It only finds open-box items for products that match your watch, and doesn't know which store they're in.</p>
+          </details>
+          <label>API key <input name="bestbuy_api_key" type="password" autocomplete="off"></label>
+        </div>
+
+        <div class="panel">
+          <h2>Home Assistant</h2>
+          <p class="muted">Optional. Lets My hardware import your TVs, phones, speakers, network gear and appliances.
+            Deal Hunter only reads the device list; it never changes anything in Home Assistant.</p>
+          <div class="grid">
+            <label>Home Assistant address (local is best) <input name="ha_url" placeholder="http://homeassistant.local:8123"></label>
+            <label>Long-lived access token <input name="ha_token" type="password" autocomplete="off" data-ph="from your Home Assistant profile"></label>
+          </div>
+          <details class="help guide">
+            <summary>How to get a Home Assistant token (free)</summary>
+            <ol>
+              <li>In Home Assistant, click your name at the bottom left to open your <b>Profile</b>, then the <b>Security</b> tab.</li>
+              <li>Under <b>Long-lived access tokens</b>, click <b>Create token</b> and name it "Deal Hunter".</li>
+              <li>Copy the token (it's only shown once), paste it here with your Home Assistant address, and save.</li>
+            </ol>
+            <p>The token can do anything your account can, so keep it private. You can delete it from the same page any time.</p>
+          </details>
+        </div>
+
+        <div class="panel">
+          <h2>API</h2>
+          <p class="muted">Let your own apps and scripts use Deal Hunter (watches, finds, My hardware) over your home
+            network or VPN. Every call needs this key. <a href="api.html" target="_blank" rel="noopener">How to use the API</a></p>
+          <p id="api-status" class="muted"></p>
+          <div class="row"><button type="button" id="api-key-new">Create API key</button></div>
+          <div id="api-key-box" hidden>
+            <label>Your new API key (copy it now; it won't be shown again) <input id="api-key-value" readonly></label>
+          </div>
+        </div>
+
+        <div class="row sticky-save">
+          <button type="submit" class="primary">Save admin settings</button>
         </div>
       </form>
     </section>

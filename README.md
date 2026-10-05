@@ -64,6 +64,13 @@ Vehicles in My hardware take a VIN and odometer: **Look up** fills in make, mode
 NHTSA's free VIN decoder, **Recalls** lists NHTSA safety recalls for that model year, and **Find parts** starts a watch linked to the
 vehicle: its eBay searches only show parts eBay lists as fitting that year/make/model.
 
+## Admin and members
+
+The first account is the admin. The **Admin** tab (admin only) holds People (invites, limits), how often
+checks run, every source's switch and keys, Home Assistant and the API key. Everyone else's **Settings**
+has only their own: account, junk words, ZIP and radius, Discord, and their AI (shared or their own key).
+The server enforces this too: members can't read or change the shared settings or import from Home Assistant.
+
 ## AI (optional, off by default)
 
 Settings > AI. It only runs when you press an AI button:

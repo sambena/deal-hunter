@@ -60,6 +60,11 @@ def is_admin() -> bool:
     return me()["role"] == "admin"
 
 
+def require_admin() -> None:
+    if not is_admin():
+        raise HTTPError(403, "only the admin can do that")
+
+
 # ---- API --------------------------------------------------------------------
 
 @route("GET", "/api/state")
@@ -67,7 +72,7 @@ def get_state(body, params):
     return {
         "watches": db.list_watches(),
         "machines": db.list_machines(),
-        "settings": db.public_settings(),
+        "settings": db.public_settings(admin=is_admin()),
         "me": auth.public_user(me()),
         "api_port": API_PORT["port"],
         "ai": {**ai.catalog(), "budget": ai.budget(ai.settings_for()),
@@ -354,6 +359,7 @@ def suggest_upgrades(body, params, mid):
 
 @route("GET", "/api/import/ha")
 def ha_candidates(body, params):
+    require_admin()
     s = db.get_settings()
     try:
         devices = homeassistant.candidates(s["ha_url"], s["ha_token"], db.list_machines(), local_ok=is_admin())
@@ -365,6 +371,7 @@ def ha_candidates(body, params):
 @route("POST", "/api/import/ha")
 def ha_import(body, params):
     """Add the ticked devices. A computer that matches one already here is linked to it, not added again."""
+    require_admin()
     machines = db.list_machines()
     known = {r for m in machines for r in (m.get("source_ref") or "").split()}
     added = linked = 0
@@ -440,7 +447,7 @@ def put_settings(body, params):
     except netguard.BlockedURL as e:
         raise HTTPError(400, str(e)) from e
     db.update_settings(changes, shared_allowed=is_admin())  # members can only change their own settings
-    return db.public_settings()
+    return db.public_settings(admin=is_admin())
 
 
 @route("POST", "/api/api-key")
