@@ -179,6 +179,10 @@ def list_listings(body, params):
     if params.get("watch"):
         where.append("l.watch_id = ?")
         args.append(int(params["watch"]))
+    if params.get("source"):  # one or more, comma separated: "ebay,ebay_local"
+        wanted = [s for s in params["source"].split(",") if s.strip()][:20]
+        where.append(f"l.source IN ({','.join('?' * len(wanted))})")
+        args += [s.strip() for s in wanted]
     since = params.get("since_id")
     if since is not None:
         # For apps that alert: only finds added after the last one they saw, oldest first, any status unless asked.
