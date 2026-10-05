@@ -68,6 +68,13 @@ def _ebay_access_token(settings: dict) -> str:
 
 
 EBAY_CARS_TRUCKS = "6001"  # eBay Motors > Cars & Trucks
+# The best-selling models of each body style, most common first, for eBay keyword searches.
+EBAY_BODY_MODELS = {
+    "pickup": ["f-150", "silverado", "ram", "tacoma", "sierra", "tundra", "ranger", "colorado"],
+    "suv": ["rav4", "cr-v", "equinox", "explorer", "4runner", "tahoe", "wrangler", "highlander"],
+    "van": ["sprinter", "transit", "express", "promaster"],
+    "minivan": ["odyssey", "sienna", "pacifica", "grand caravan"],
+}
 EBAY_MOTORS_PARTS = "6028"  # eBay Motors > Parts & Accessories
 EBAY_MOTORS_TREE = "100"  # eBay's category tree for eBay Motors US
 _parts_category_cache: dict = {}
@@ -110,13 +117,18 @@ def _ebay_search(watch: dict, settings: dict, local: bool) -> list[dict]:
     token = _ebay_access_token(settings)
     groups, _ = parse_query(watch["query"])
     vehicle = watch.get("kind") == "vehicle"
-    if vehicle:  # a body style isn't in eBay titles: search its common models instead
-        body, rest = matching.body_style(watch["query"])
+    # A body style isn't in eBay titles, so a vehicle watch searches its most common models instead. eBay
+    # refuses searches whose answer is too large (error 12023), so each retry asks for fewer models.
+    body, rest = matching.body_style(watch["query"]) if vehicle else (None, "")
+    model_counts = [8, 4, 0] if body else [None]
+
+    def keywords(n):
+        gs = parse_query(rest)[0] if body else groups
         if body:
-            groups, _ = parse_query(rest)
-            groups.append([m for m in matching.BODY_MODELS[body] if not m.isdigit()][:20])
-    # eBay keyword syntax: (a,b) means a OR b.
-    q = " ".join(g[0] if len(g) == 1 else "(" + ",".join(g) + ")" for g in groups)
+            gs = gs + [EBAY_BODY_MODELS.get(body, [body])[:n] if n else [body]]
+        # eBay keyword syntax: (a,b) means a OR b.
+        return " ".join(g[0] if len(g) == 1 else "(" + ",".join(g) + ")" for g in gs)
+    q = keywords(model_counts[0])
     filters = []
     lo, hi = watch.get("min_price"), watch.get("max_price")
     if lo is not None or hi is not None:
@@ -151,15 +163,21 @@ def _ebay_search(watch: dict, settings: dict, local: bool) -> list[dict]:
     if zip_code:
         headers["X-EBAY-C-ENDUSERCTX"] = f"contextualLocation=country%3DUS%2Czip%3D{zip_code}"
     url = "https://api.ebay.com/buy/browse/v1/item_summary/search?"
-    try:
-        data = _http(url + urllib.parse.urlencode(params), headers=headers)
-    except SourceError as e:
-        if "compatibility_filter" not in params or "12506" not in str(e):
-            raise
-        # 12506: "The category ID submitted does not support fitment." Search without the check.
-        params.pop("compatibility_filter")
-        _parts_category_cache[q] = None
-        data = _http(url + urllib.parse.urlencode(params), headers=headers)
+    tries = iter(model_counts[1:])
+    while True:
+        try:
+            data = _http(url + urllib.parse.urlencode(params), headers=headers)
+            break
+        except SourceError as e:
+            if "compatibility_filter" in params and "12506" in str(e):
+                # 12506: "The category ID submitted does not support fitment." Search without the check.
+                params.pop("compatibility_filter")
+                _parts_category_cache[q] = None
+                continue
+            fewer = next(tries, False) if "12023" in str(e) else False
+            if fewer is False:
+                raise
+            params["q"] = keywords(fewer)  # 12023: "results in a response that is too large"
     out = []
     for it in data.get("itemSummaries", []):
         price = it.get("price") or it.get("currentBidPrice") or {}
