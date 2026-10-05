@@ -546,6 +546,37 @@ function suggestExclude(title, watch) {
 
 // ---- watches --------------------------------------------------------------------
 
+// Price history: a small chart of the lowest and median asking price found each day, with the typical line.
+async function showPrices(row, id) {
+  const open = row.nextElementSibling;
+  if (open && open.classList.contains("prices-row")) { open.remove(); return; }
+  const h = await api("GET", `/api/watches/${id}/history?days=90`);
+  const cols = row.children.length;
+  row.insertAdjacentHTML("afterend", `<tr class="prices-row"><td colspan="${cols}">${priceChart(h)}</td></tr>`);
+}
+
+function priceChart(h) {
+  if (!h.points.length) return `<p class="muted">No prices found in the last ${h.days} days yet.</p>`;
+  const W = 560, H = 140, P = 28;
+  const vals = h.points.flatMap(p => [p.min, p.median]).concat(h.typical ? [h.typical] : []);
+  const lo = Math.min(...vals) * 0.95, hi = Math.max(...vals) * 1.05 || 1;
+  const t0 = Date.parse(h.points[0].date), t1 = Date.parse(h.points[h.points.length - 1].date);
+  const x = d => P + (t1 > t0 ? (Date.parse(d) - t0) / (t1 - t0) : 0.5) * (W - 2 * P);
+  const y = v => H - P + 8 - ((v - lo) / (hi - lo || 1)) * (H - 2 * P);
+  const line = h.points.map(p => `${x(p.date).toFixed(1)},${y(p.median).toFixed(1)}`).join(" ");
+  const dots = h.points.map(p => `<circle cx="${x(p.date).toFixed(1)}" cy="${y(p.min).toFixed(1)}" r="3" class="pc-min">
+    <title>${esc(p.date)}: lowest ${money(p.min)}, median ${money(p.median)} (${p.count} found)</title></circle>`).join("");
+  const typical = h.typical ? `<line x1="${P}" x2="${W - P}" y1="${y(h.typical).toFixed(1)}" y2="${y(h.typical).toFixed(1)}" class="pc-typ"/>
+    <text x="${W - P}" y="${(y(h.typical) - 4).toFixed(1)}" text-anchor="end" class="pc-lab">typical ${money(h.typical)}</text>` : "";
+  const best = h.best_now != null ? `Cheapest now ${money(h.best_now)}${h.best_label ? ` · <span class="deal ${h.best_label}">${h.best_label} price</span>`
+    : h.typical ? " · about typical" : ""}` : "";
+  return `<div class="prices"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Asking prices over the last ${h.days} days">
+      ${typical}<polyline points="${line}" class="pc-med"/>${dots}
+      <text x="${P}" y="${H - 4}" class="pc-lab">${esc(h.points[0].date)}</text>
+      <text x="${W - P}" y="${H - 4}" text-anchor="end" class="pc-lab">${esc(h.points[h.points.length - 1].date)}</text></svg>
+    <p class="meta">Line: median asking price each day · dots: the lowest that day${h.typical ? " · dashed: typical" : " · typical shows after 5 prices"}. ${best}</p></div>`;
+}
+
 function renderWatches() {
   const box = $("#watch-list");
   const watches = focusWatches();
@@ -573,6 +604,7 @@ function renderWatches() {
       <td class="row">
         <button class="small" data-act="view">View</button>
         <button class="small" data-act="run">Check</button>
+        <button class="small" data-act="prices">Prices</button>
         <button class="small" data-act="edit">Edit</button>
         <button class="small danger" data-act="delete">Delete</button>
       </td></tr>`).join("")}
@@ -597,6 +629,8 @@ $("#watch-list").addEventListener("click", async e => {
       $("#f-status").value = "active";
       showTab("finds");
       return;
+    case "prices":
+      return showPrices(row, id).catch(err => toast(err.message, true));
     case "run":
       await busy(el, async () => {
         const r = await api("POST", `/api/watches/${id}/run`);

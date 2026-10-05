@@ -137,3 +137,8 @@ input[type=color] { width: 44px; height: 30px; padding: 2px; }
 .chip { border-radius: 999px; padding: 3px 10px; font-size: 13px; }
 .chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .kind-head { margin: 18px 2px 8px; font-size: 15px; color: var(--muted); }
+.prices svg { width: 100%; max-width: 560px; height: auto; display: block; }
+.prices .pc-med { fill: none; stroke: var(--accent); stroke-width: 2; }
+.prices .pc-min { fill: var(--good); }
+.prices .pc-typ { stroke: var(--muted); stroke-dasharray: 5 4; }
+.prices .pc-lab { fill: var(--muted); font-size: 11px; }

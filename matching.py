@@ -217,6 +217,16 @@ def vehicle_history(year: int | None, history: list[tuple[float, int | None]]) -
     return near if len(near) >= 5 else [t for t, _ in history]
 
 
+def typical_price(history: list[float]) -> float | None:
+    """The usual asking price: the median of a watch's prices with the extremes trimmed (needs 5+)."""
+    prices = sorted(p for p in history if p and p > 0)
+    if len(prices) < 5:
+        return None
+    # Trim the extremes so a $1 auction or a $9999 troll listing doesn't skew it.
+    cut = len(prices) // 10
+    return statistics.median(prices[cut:len(prices) - cut] if cut else prices)
+
+
 def deal_pct(total: float | None, history: list[float]) -> float | None:
     """How far below the typical asking price this is, as a fraction (0.2 = 20% under).
 
@@ -224,13 +234,7 @@ def deal_pct(total: float | None, history: list[float]) -> float | None:
     """
     if total is None:
         return None
-    prices = sorted(p for p in history if p and p > 0)
-    if len(prices) < 5:
-        return None
-    # Trim the extremes so a $1 auction or a $9999 troll listing doesn't skew it.
-    cut = len(prices) // 10
-    trimmed = prices[cut:len(prices) - cut] if cut else prices
-    median = statistics.median(trimmed)
+    median = typical_price(history)
     return round((median - total) / median, 3) if median else None
 
 

@@ -9,6 +9,7 @@ import mimetypes
 import secrets
 import threading
 import re
+import statistics
 import sys
 import time
 from http.cookies import SimpleCookie
@@ -143,6 +144,33 @@ def poll_all(body, params):
     else:
         poller.poll_user(me()["id"])  # just this person's
     return {"ok": True}
+
+
+@route("GET", r"/api/watches/(\d+)/history")
+def watch_history(body, params, wid):
+    """Asking prices a watch has found, by day: for a small chart and "good price vs typical"."""
+    watch = db.get_watch(int(wid))
+    if not watch:
+        raise HTTPError(404, "watch not found")
+    try:
+        days = max(1, min(365, int(params.get("days", 90))))
+    except ValueError:
+        days = 90
+    since = time.time() - days * 86400
+    rows = db.query("""SELECT first_seen, total, status FROM listings WHERE watch_id = ? AND total IS NOT NULL
+                       AND first_seen >= ? ORDER BY first_seen""", (watch["id"], since))
+    by_day: dict = {}
+    for r in rows:
+        by_day.setdefault(time.strftime("%Y-%m-%d", time.gmtime(r["first_seen"])), []).append(r["total"])
+    points = [{"date": d, "min": min(p), "median": round(statistics.median(p), 2), "count": len(p)}
+              for d, p in sorted(by_day.items())]
+    typical = matching.typical_price([r["total"] for r in rows])
+    live = [r["total"] for r in rows if r["status"] in ("new", "seen", "starred")]
+    best = min(live) if live else None
+    pct = matching.deal_pct(best, [r["total"] for r in rows]) if best is not None else None
+    return {"watch_id": watch["id"], "days": days, "points": points,
+            "typical": round(typical, 2) if typical else None,  # null until 5+ prices
+            "best_now": best, "best_label": matching.deal_label(pct), "best_pct": pct}
 
 
 @route("GET", "/api/listings")
