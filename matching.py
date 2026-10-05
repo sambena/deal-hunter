@@ -85,6 +85,40 @@ TITLE_STATUS = (("salvage", "salvage"), ("rebuilt", "rebuilt"), ("rebuild title"
                 ("branded title", "branded"), ("lemon", "branded"), ("flood", "salvage"))
 
 
+# Body styles aren't in listing titles ("2005 Ford F-150 XLT"), so for a vehicle watch a body-style word
+# matches the common models of that style, and sources that can filter by body style do so themselves.
+BODY_STYLES = {"pickup": "pickup", "pickups": "pickup", "truck": "pickup", "trucks": "pickup", "suv": "suv",
+               "suvs": "suv", "van": "van", "vans": "van", "minivan": "minivan", "sedan": "sedan",
+               "coupe": "coupe", "convertible": "convertible", "hatchback": "hatchback", "wagon": "wagon"}
+BODY_MODELS = {
+    "pickup": ["pickup", "truck", "f-150", "f150", "f-250", "f250", "f-350", "f350", "silverado", "sierra", "ram",
+               "1500", "2500", "3500", "tacoma", "tundra", "ranger", "colorado", "canyon", "frontier", "titan",
+               "ridgeline", "gladiator", "s-10", "s10", "dakota", "maverick", "santa cruz", "avalanche", "f-100",
+               "c10", "k10", "cybertruck", "lightning", "rivian"],
+    "suv": ["suv", "4runner", "tahoe", "suburban", "explorer", "expedition", "highlander", "pilot", "cr-v", "crv",
+            "rav4", "equinox", "traverse", "durango", "grand cherokee", "cherokee", "wrangler", "bronco", "forester",
+            "outback", "pathfinder", "rogue", "cx-5", "cx-9", "tucson", "santa fe", "sorento", "telluride", "yukon",
+            "escalade", "land cruiser", "sequoia", "edge", "escape", "acadia", "x5", "q5", "model y", "model x"],
+    "van": ["van", "sprinter", "transit", "express", "savana", "promaster", "econoline", "e-150", "e-250"],
+    "minivan": ["minivan", "odyssey", "sienna", "pacifica", "caravan", "grand caravan", "carnival", "sedona", "quest"],
+    "sedan": ["sedan"], "coupe": ["coupe"], "convertible": ["convertible"], "hatchback": ["hatchback"],
+    "wagon": ["wagon"],
+}
+
+
+def body_style(query: str) -> tuple[str | None, str]:
+    """('pickup', 'ford') for "ford pickup": the body style asked for, and the rest of the search words."""
+    groups, _ = parse_query(query)
+    body, rest = None, []
+    for g in groups:
+        styles = {BODY_STYLES.get(a.lower()) for a in g} - {None}
+        if styles and body is None:
+            body = styles.pop()
+        else:
+            rest.append(g[0] if len(g) == 1 else "|".join(g))
+    return body, " ".join(rest)
+
+
 def vehicle_year(title: str) -> int | None:
     """The model year, which listings put first: "2018 Toyota Tacoma TRD"."""
     m = YEAR_RE.search(title or "")
@@ -175,10 +209,13 @@ def check(title: str, watch: dict, junk_terms: list[str], total: float | None,
     if watch.get("kind") == "vehicle":
         junk_terms = VEHICLE_JUNK
     groups, q_excludes = parse_query(watch["query"])
+    if watch.get("kind") == "vehicle":  # "pickup" also matches an F-150 or a Silverado
+        groups = [g + BODY_MODELS[BODY_STYLES[a.lower()]] if any(a.lower() in BODY_STYLES for a in g) else g
+                  for g in groups for a in g[:1]]
     hn, hc = normalize(title), compact(title)
     for group in groups:
         if not any(_contains(hn, hc, alt) for alt in group):
-            return False, f"missing '{'|'.join(group)}'"
+            return False, f"missing '{'|'.join(group[:3])}'"
     full = f"{title} {extra_text}"
     fn, fc = normalize(full), compact(full)
     for term in [*q_excludes, *watch.get("exclude", [])]:
