@@ -78,7 +78,8 @@ curl -X POST -H "Authorization: Bearer YOUR_KEY" -H "Content-Type: application/j
         <tr><td><code>POST /api/machines/ID/specs</code></td><td>Fill in a PC's parts from <code>{"text": ...}</code>: the Get specs command's output, or other text with <code>"use_ai": true</code>.</td></tr>
         <tr><td><code>POST /api/machines/ID/suggest</code></td><td>Upgrade ideas; <code>{"use_ai": true}</code> for AI.</td></tr>
         <tr><td><code>POST /api/radar</code></td><td>Deal radar proposals for every device; <code>{"use_ai": true}</code> includes non-PCs.</td></tr>
-              <tr><td><code>POST /api/vin</code></td><td>Decode a VIN (NHTSA): <code>{vin}</code> → <code>{vin, make, model, year, trim, body, drive, engine, warning}</code>.</td></tr>
+              <tr><td>Parts that fit</td><td>A watch whose <code>machine_id</code> is a vehicle with make, model and year searches eBay Motors Parts &amp; Accessories with eBay's fitment check; finds say "fits your …" or "may fit".</td></tr>
+        <tr><td><code>POST /api/vin</code></td><td>Decode a VIN (NHTSA): <code>{vin}</code> → <code>{vin, make, model, year, trim, body, drive, engine, warning}</code>.</td></tr>
         <tr><td><code>GET /api/machines/ID/recalls</code></td><td>Safety recalls NHTSA lists for the device's make/model/year: <code>{vehicle, recalls: [{campaign, date, component, summary, consequence, remedy, park_it, url}]}</code>.</td></tr>
       </table></div>
 

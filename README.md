@@ -61,7 +61,8 @@ desktop platforms (X99, X299, Intel 100–800 series, AM4, AM5) from the
 motherboard chipset or CPU and suggest better drop-in CPUs and RAM kits.
 
 Vehicles in My hardware take a VIN and odometer: **Look up** fills in make, model, year and trim from
-NHTSA's free VIN decoder, and **Recalls** lists NHTSA safety recalls for that model year.
+NHTSA's free VIN decoder, **Recalls** lists NHTSA safety recalls for that model year, and **Find parts** starts a watch linked to the
+vehicle: its eBay searches only show parts eBay lists as fitting that year/make/model.
 
 ## AI (optional, off by default)
 

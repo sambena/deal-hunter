@@ -67,7 +67,17 @@ VEHICLE_ONLY = {"ksl_cars"}  # and these only search for vehicles
 def fetch_key(name: str, watch: dict, settings: dict) -> str:
     vehicle = [watch.get(k) for k in VEHICLE_FILTERS] if watch.get("kind") == "vehicle" else None
     return json.dumps([name, watch.get("query"), [watch.get(k) for k in WATCH_FILTERS.get(name, ())], vehicle,
-                       [str(settings.get(k)) for k in FETCH_SETTINGS]])
+                       watch.get("fits"), [str(settings.get(k)) for k in FETCH_SETTINGS]])
+
+
+def vehicle_fit(watch: dict) -> dict | None:
+    """A watch linked to one of the owner's vehicles searches for parts that fit it (eBay's fitment check)."""
+    if not watch.get("machine_id") or watch.get("kind") == "vehicle":
+        return None
+    m = db.get_machine(watch["machine_id"])
+    if not m or m.get("kind") != "vehicle" or not (m.get("make") and m.get("model") and m.get("year")):
+        return None
+    return {"year": m["year"], "make": m["make"], "model": m["model"]}
 
 
 def fetch(name: str, watch: dict, settings: dict, shared: dict | None = None) -> list[dict]:
@@ -92,6 +102,9 @@ def fetch(name: str, watch: dict, settings: dict, shared: dict | None = None) ->
 
 def run_watch(watch: dict, settings: dict, shared: dict | None = None) -> dict:
     """Poll one watch. Returns {new: int, errors: [..]}. `shared` holds this pass's requests (see fetch)."""
+    fits = vehicle_fit(watch)
+    if fits:
+        watch = {**watch, "fits": fits}
     vehicle = watch.get("kind") == "vehicle"
     # (price, model year) of everything found so far; vehicles compare with similar model years.
     history = [(r["total"], r["year"]) for r in db.query(
