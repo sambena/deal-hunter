@@ -76,15 +76,6 @@ MEMBER_KEYS = {"zip_code", "local_radius_miles", "junk_terms", "discord_enabled"
 # Shared settings a member's pages still need to read (which sources are switched on, how often checks run).
 MEMBER_READS = {"sources_enabled", "poll_minutes"}
 
-# What a member (not the admin) may see and change: their area, junk words, Discord and their own AI.
-# Everything else, including their Home Assistant link, is the admin's (Sam, 2026-10-04).
-MEMBER_KEYS = {"zip_code", "local_radius_miles", "junk_terms", "discord_enabled", "discord_webhook",
-               "discord_deals_only", "ai_source", "ai_provider", "ollama_url", "ollama_model", "anthropic_api_key",
-               "claude_model", "openai_api_key", "openai_model", "gemini_api_key", "gemini_model",
-               "gemini_free_tier", "ai_monthly_limit", "ai_confirm"}
-# Shared settings a member's pages still need to read (which sources are switched on, how often checks run).
-MEMBER_READS = {"sources_enabled", "poll_minutes"}
-
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS watches (
