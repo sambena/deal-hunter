@@ -445,6 +445,10 @@ def draft_watches(body, params):
 def put_settings(body, params):
     # Blank secret fields in the form mean "keep the current value".
     changes = {k: v for k, v in body.items() if not (k in db.SECRET_KEYS and v in ("", None, True))}
+    if "sizes" in changes:  # {"department", "shoe", "top", "pants"}: short strings only
+        sizes = changes["sizes"] if isinstance(changes["sizes"], dict) else {}
+        changes["sizes"] = {k: " ".join(str(sizes.get(k) or "").split())[:20]
+                            for k in ("department", "shoe", "top", "pants") if sizes.get(k)}
     # Addresses the server will fetch: Discord only for webhooks, and public addresses only for members.
     current = db.get_settings()
     try:

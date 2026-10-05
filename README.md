@@ -22,6 +22,7 @@ set `"host": "0.0.0.0"`. There's no login, so only do that on your home network.
 | KSL Classifieds | None | Utah classifieds near your ZIP (Settings > Local area) |
 | Craigslist | None | Classifieds near your ZIP, anywhere in the US; listings outside your radius are dropped |
 | OfferUp | None | Listings near your ZIP, anywhere in the US; OfferUp's radius tops out at 50 miles |
+| Poshmark | None | Clothes and shoes in your department and size, shipped (clothing watches only) |
 | KSL Cars | None | Utah used cars and trucks, dealers and private sellers (car and truck watches only) |
 | Reddit | None | r/hardwareswap and r/homelabsales by default, via RSS. Prices are guessed from the post text |
 | Best Buy open-box | Free: developer.bestbuy.com | Experimental |
@@ -69,9 +70,17 @@ and most other gear also get **Recalls**, from the Consumer Product Safety Commi
 searches the brand's recalls and keeps the ones naming your model ("Your model") or the same kind of
 product ("check your model": compare the model number on the recall page).
 
+## Clothes and shoes
+
+Pick "Clothes or shoes" in the watch form: who it's for (men, women, kids) and a size ("10.5", "M",
+"32x30"). Save **My sizes** in Settings once and the form fills them in with one click. Poshmark is
+searched in that department and size; eBay, Slickdeals and local listings are matched by the size in the
+title: another size is dropped, no size shown keeps it as "size not listed". Depop, thredUP and Mercari
+block programs, so they aren't searched.
+
 ## Focus
 
-The picker at the top (Everything / Tech / Cars & trucks / Home & gear) is saved to each person's account.
+The picker at the top (Everything / Tech / Cars & trucks / Home & gear / Clothes & shoes) is saved to each person's account.
 It shows only that category's watches, finds and My Stuff, starts new watches in it (Cars & trucks starts a
 car or truck watch), and changes the colour and names ("My Garage" for cars). A watch's category is
 automatic (car watches are cars; a watch for one of your things takes that thing's category, so parts for

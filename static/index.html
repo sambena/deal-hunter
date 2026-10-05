@@ -14,6 +14,7 @@
       <option value="tech">💻 Tech</option>
       <option value="cars">🚗 Cars &amp; trucks</option>
       <option value="home">🏠 Home &amp; gear</option>
+      <option value="clothes">👕 Clothes &amp; shoes</option>
     </select>
     <nav>
       <button data-tab="finds" class="active">Finds <span id="new-badge" class="badge" hidden></span></button>
@@ -68,10 +69,11 @@
           <div class="grid">
             <label title="Which focus shows this watch">Category
               <select name="category"><option value="">Automatic</option><option value="tech">💻 Tech</option>
-                <option value="cars">🚗 Cars &amp; trucks</option><option value="home">🏠 Home &amp; gear</option></select>
+                <option value="cars">🚗 Cars &amp; trucks</option><option value="home">🏠 Home &amp; gear</option>
+                <option value="clothes">👕 Clothes &amp; shoes</option></select>
             </label>
             <label>Looking for
-              <select name="kind"><option value="item">Things (hardware, gear…)</option><option value="vehicle">A car or truck</option></select>
+              <select name="kind"><option value="item">Things (hardware, gear…)</option><option value="vehicle">A car or truck</option><option value="clothing">Clothes or shoes</option></select>
             </label>
             <label>Name <input name="name" required placeholder="i9-10980XE for X299 box"></label>
             <label>Query <input name="query" required placeholder='10980xe   or   n100|n150 "mini pc"'></label>
@@ -82,6 +84,12 @@
             <label data-vehicle hidden>Model year from <input name="year_min" type="number" min="1900" max="2100" placeholder="2015"></label>
             <label data-vehicle hidden>Model year to <input name="year_max" type="number" min="1900" max="2100" placeholder="2020"></label>
             <label data-vehicle hidden>Max miles <input name="max_miles" type="number" min="0" step="1000" placeholder="120000"></label>
+            <label data-clothing hidden>For
+              <select name="department"><option value="">Anyone</option><option value="men">Men</option>
+                <option value="women">Women</option><option value="kids">Kids</option></select>
+            </label>
+            <label data-clothing hidden>Size <input name="size" placeholder="10.5, M, 32x30 (blank = any)">
+              <span id="size-buttons" class="row"></span></label>
             <label title="Only the cheapest finds stay; the rest are hidden and never alert. Starred finds always stay.">Keep only the cheapest
               <select name="keep_cheapest"><option value="">All finds</option><option value="3">3</option><option value="5">5</option><option value="10">10</option><option value="20">20</option></select>
             </label>
@@ -100,6 +108,7 @@
               <label><input type="checkbox" name="src-craigslist" checked> Craigslist</label>
               <label><input type="checkbox" name="src-offerup" checked> OfferUp</label>
               <label><input type="checkbox" name="src-ksl_cars"> KSL Cars</label>
+              <label><input type="checkbox" name="src-poshmark"> Poshmark</label>
               <label><input type="checkbox" name="src-reddit" checked> Reddit</label>
               <label><input type="checkbox" name="src-slickdeals" checked> Slickdeals</label>
               <label><input type="checkbox" name="src-buildapcsales" checked> r/buildapcsales</label>
@@ -137,6 +146,7 @@
           <button class="primary" data-add-kind="pc">+ Computer</button>
           <button class="primary" data-add-kind="vehicle">+ Car or truck</button>
           <button class="primary" data-add-kind="appliance">+ Appliance</button>
+          <button class="primary" data-add-kind="clothing">+ Clothes or shoes</button>
           <button data-add-kind="">+ Something else</button>
           <span class="spacer"></span>
           <button id="ha-import" data-admin-only>Import from Home Assistant</button>
@@ -172,6 +182,18 @@
           <h2>Junk words</h2>
           <p class="muted">Finds with these words in the title (or description) are always hidden. One per line.</p>
           <label><textarea name="junk_terms" rows="6"></textarea></label>
+        </div>
+
+        <div class="panel">
+          <h2>My sizes</h2>
+          <p class="muted">Used to fill in new clothes and shoes watches. Only you see them.</p>
+          <div class="grid">
+            <label>Usually shop <select name="sizes.department"><option value="">Anyone</option><option value="men">Men</option>
+              <option value="women">Women</option><option value="kids">Kids</option></select></label>
+            <label>Shoe size <input name="sizes.shoe" placeholder="10.5"></label>
+            <label>Tops <input name="sizes.top" placeholder="M"></label>
+            <label>Pants <input name="sizes.pants" placeholder="32x30"></label>
+          </div>
         </div>
 
         <div class="panel">
@@ -332,6 +354,7 @@
           <label class="toggle"><input type="checkbox" name="src_craigslist"> Craigslist. Free, no key. Anywhere in the US, pickup only</label>
           <label class="toggle"><input type="checkbox" name="src_offerup"> OfferUp. Free, no key. Anywhere in the US, up to 50 miles</label>
           <label class="toggle"><input type="checkbox" name="src_ksl_cars"> KSL Cars (Utah). Free, no key. Dealers and private sellers, for car and truck watches</label>
+          <label class="toggle"><input type="checkbox" name="src_poshmark"> Poshmark. Free, no key. Clothes and shoes in your size, shipped (clothing watches)</label>
         </div>
 
         <div class="panel">

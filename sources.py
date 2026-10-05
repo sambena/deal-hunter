@@ -21,6 +21,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
+import matching
 from matching import parse_query, search_terms
 
 USER_AGENT = "deal-hunter/0.1 (personal hardware watcher)"
@@ -596,6 +597,80 @@ def ksl_cars(watch: dict, settings: dict) -> list[dict]:
     return out
 
 
+# ---- Poshmark (clothes, shoes; ships anywhere) --------------------------------
+# The search page carries its results in window.__INITIAL_STATE__ ($_search.gridData.data). It filters by
+# department and size itself, so a clothing watch gets listings in its size; newest first.
+
+POSHMARK_GAP_SECONDS = 3
+_poshmark_last = {"at": 0.0}
+POSHMARK_CONDITIONS = {"nwt": "new with tags", "ret": "new (retail)", "uln": "like new", "ug": "used, good",
+                       "uf": "used, fair"}
+
+
+def _poshmark_listings(page: str) -> list[dict]:
+    at = page.find("window.__INITIAL_STATE__")
+    if at < 0:
+        raise SourceError("couldn't find listings on the Poshmark page (did the site change?)")
+    try:
+        state, _ = json.JSONDecoder().raw_decode(page, page.index("{", at))
+        return state["$_search"]["gridData"]["data"] or []
+    except (ValueError, KeyError, TypeError) as e:
+        raise SourceError("couldn't read the Poshmark page (did the site change?)") from e
+
+
+def poshmark(watch: dict, settings: dict) -> list[dict]:
+    terms = search_terms(watch["query"])
+    if not terms:
+        return []
+    params = [("query", terms), ("type", "listings"), ("sort_by", "added_desc")]
+    if watch.get("department"):
+        params.append(("department", watch["department"].title()))
+    size = matching.norm_size(watch.get("size"))
+    if size:
+        params.append(("size[]", size.split("x")[0]))  # Poshmark lists pants by waist
+    wait = POSHMARK_GAP_SECONDS - (time.time() - _poshmark_last["at"])
+    if wait > 0:
+        time.sleep(wait)
+    req = urllib.request.Request("https://poshmark.com/search?" + urllib.parse.urlencode(params), headers=KSL_HEADERS)
+    try:
+        with urllib.request.urlopen(req, timeout=25) as resp:
+            page = resp.read().decode("utf-8", "replace")
+    except urllib.error.HTTPError as e:
+        if e.code in (403, 429):
+            raise SourceError(f"Poshmark's bot protection blocked the request (HTTP {e.code}); "
+                              "it usually clears on a later check") from e
+        raise SourceError(f"HTTP {e.code} from Poshmark") from e
+    except urllib.error.URLError as e:
+        raise SourceError(f"Network error reaching Poshmark: {e.reason}") from e
+    finally:
+        _poshmark_last["at"] = time.time()
+    out = []
+    for r in _poshmark_listings(page):
+        if not r.get("id") or (r.get("inventory") or {}).get("status", "available") != "available":
+            continue
+        try:
+            price = float((r.get("price_amount") or {}).get("val"))
+        except (TypeError, ValueError):
+            price = None
+        dept = (r.get("department") or {}).get("display") or ""
+        out.append({
+            "source": "poshmark",
+            "source_id": r["id"],
+            "title": r.get("title") or "",
+            "price": price,
+            "shipping": None,  # Poshmark adds its flat shipping at checkout
+            "currency": "USD",
+            "url": f"https://poshmark.com/listing/{r['id']}",
+            "image": r.get("picture_url"),
+            "location": "",
+            "condition": POSHMARK_CONDITIONS.get(r.get("condition"), "used"),
+            "buying": " · ".join(x for x in ("Poshmark", r.get("brand") or "", dept) if x),
+            "text": "",
+            "size": r.get("size") or "",
+        })
+    return out
+
+
 # ---- Craigslist (local; the search page's own JSON API) ---------------------
 # sapi.craigslist.org answers the search page with packed rows: offsets from a base id/date, the price,
 # "area:place~lat~lon", then tagged lists ([4, images...], [6, slug], [13, uuid]) and the title last.
@@ -810,7 +885,8 @@ def offerup(watch: dict, settings: dict) -> list[dict]:
 
 SOURCES = {"ebay": ebay, "ebay_local": ebay_local, "reddit": reddit, "bestbuy": bestbuy,
            "slickdeals": slickdeals, "buildapcsales": buildapcsales, "ksl": ksl, "craigslist": craigslist,
-           "offerup": offerup, "ksl_cars": ksl_cars}
+           "offerup": offerup, "ksl_cars": ksl_cars,
+           "poshmark": poshmark}
 
 # Sources that see the same items under the same ids; a listing is stored once per family.
 SOURCE_FAMILY = {"ebay_local": "ebay"}

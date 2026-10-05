@@ -5,17 +5,21 @@ const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 let state = { watches: [], machines: [], settings: {}, poller: {} };
 
 // Source keys, in form order, and how they're shown.
-const SOURCES = { ebay: "eBay", ebay_local: "eBay local pickup", ksl: "KSL Classifieds", craigslist: "Craigslist", offerup: "OfferUp", ksl_cars: "KSL Cars", reddit: "Reddit", slickdeals: "Slickdeals",
+const SOURCES = { ebay: "eBay", ebay_local: "eBay local pickup", ksl: "KSL Classifieds", craigslist: "Craigslist", offerup: "OfferUp", ksl_cars: "KSL Cars", poshmark: "Poshmark", reddit: "Reddit", slickdeals: "Slickdeals",
   buildapcsales: "r/buildapcsales", bestbuy: "Best Buy open-box" };
 // Where car and truck watches can search (the others are for hardware and gear).
 const VEHICLE_SOURCES = ["ebay", "ebay_local", "ksl_cars", "craigslist", "offerup"];
+// Clothes and shoes: where they're sold. Poshmark is only for these; KSL Cars only for vehicles.
+const CLOTHING_SOURCES = ["ebay", "ebay_local", "poshmark", "craigslist", "offerup", "ksl", "slickdeals"];
+const DEPARTMENTS = { men: "Men's ", women: "Women's ", kids: "Kids' " };
+const CLOTHING_DEFAULTS = ["ebay", "poshmark", "slickdeals"];
 const NEW_WATCH_SOURCES = ["ebay", "ebay_local", "ksl", "craigslist", "offerup", "reddit", "slickdeals", "buildapcsales"];
 const sourceName = s => SOURCES[s] || s;
 // Small brand-coloured tag in the corner of each find's photo (same text and colours as the Android app).
 const SOURCE_TAGS = {
   ebay: ["eBay", "#E53238"], ebay_local: ["eBay local", "#86B817", "#1A2E05"], ksl: ["KSL", "#0D5EA6"],
   reddit: ["Reddit", "#FF4500"], buildapcsales: ["r/bapcs", "#FF4500"], slickdeals: ["Slick", "#2B6CB0"],
-  bestbuy: ["Best Buy", "#0046BE", "#FFE000"], craigslist: ["CL", "#5A1A8C"], ksl_cars: ["KSL Cars", "#0D5EA6"], offerup: ["OfferUp", "#00AB80"],
+  bestbuy: ["Best Buy", "#0046BE", "#FFE000"], craigslist: ["CL", "#5A1A8C"], ksl_cars: ["KSL Cars", "#0D5EA6"], poshmark: ["Posh", "#7F0353"], offerup: ["OfferUp", "#00AB80"],
 };
 function sourceTag(s) {
   const [text, bg, fg] = SOURCE_TAGS[s] || [sourceName(s), "#4B5563"];
@@ -32,16 +36,17 @@ function stored(key, fallback) {
 function store(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} }
 // My Stuff covers everything owned. PCs and servers list their parts; anything else is a make/model.
 const KINDS = { pc: "PC", server: "Server", tv: "TV", monitor: "Monitor", phone: "Phone", tablet: "Tablet",
-  audio: "Speaker / audio", network: "Network", console: "Game console", printer: "Printer", appliance: "Appliance", kitchen: "Kitchen",
+  audio: "Speaker / audio", network: "Network", console: "Game console", printer: "Printer", appliance: "Appliance", kitchen: "Kitchen", clothing: "Clothing", shoes: "Shoes",
   "smart home": "Smart home", vehicle: "Car / truck", other: "Other" };
 const KIND_ICONS = { pc: "💻", server: "🗄️", tv: "📺", monitor: "🖥️", phone: "📱", tablet: "📱", audio: "🔊",
-  network: "📶", console: "🎮", printer: "🖨️", appliance: "🧊", kitchen: "🍳", "smart home": "🏠", vehicle: "🚗", other: "📦" };
+  network: "📶", console: "🎮", printer: "🖨️", appliance: "🧊", kitchen: "🍳", clothing: "👕", shoes: "👟", "smart home": "🏠", vehicle: "🚗", other: "📦" };
 // Focus: one person's view of Deal Hunter (everything, or just tech, cars or home), saved to their account.
 const FOCUS = {
   all: { brand: "Deal Hunter", stuff: "My Stuff", accent: "" },
   tech: { brand: "Deal Hunter · Tech", stuff: "My Tech", accent: "#4ea1ff" },
   cars: { brand: "Deal Hunter · Cars & trucks", stuff: "My Garage", accent: "#f97316" },
   home: { brand: "Deal Hunter · Home & gear", stuff: "My Home", accent: "#22c55e" },
+  clothes: { brand: "Deal Hunter · Clothes & shoes", stuff: "My Closet", accent: "#a855f7" },
 };
 const focus = () => (FOCUS[state.settings?.focus] ? state.settings.focus : "all");
 const inFocus = w => focus() === "all" || (w && w.category === focus());
@@ -59,7 +64,9 @@ function applyFocus() {
   // Add buttons that fit the focus.
   $$("[data-add-kind]").forEach(b => (b.hidden = (b.dataset.addKind === "pc" && ["cars", "home"].includes(f))
     || (b.dataset.addKind === "vehicle" && ["tech", "home"].includes(f))
-    || (b.dataset.addKind === "appliance" && ["tech", "cars"].includes(f))));
+    || (b.dataset.addKind === "appliance" && ["tech", "cars", "clothes"].includes(f))
+    || (b.dataset.addKind === "clothing" && ["tech", "cars", "home"].includes(f))
+    || (b.dataset.addKind === "pc" && f === "clothes") || (b.dataset.addKind === "vehicle" && f === "clothes")));
 }
 
 $("#focus-pick").addEventListener("change", async e => {
@@ -386,6 +393,8 @@ function findCard(l) {
       <div><span class="price">${l.source === "reddit" && l.total != null ? "≈" : ""}${money(l.total)}</span>${ship}${deal}
         ${l.source === "reddit" ? `<span class="meta">${l.total == null ? "see post" : "guessed from post"}</span>` : ""}</div>
       <div class="meta">${esc(sourceName(l.source))} · ${esc(l.condition || "")} ${l.location ? "· " + esc(l.location) : ""}</div>
+      ${(state.watches.find(w => w.id === l.watch_id) || {}).kind === "clothing" ? `<div class="vehicle-facts">${
+        l.size ? `<span>Size ${esc(l.size)}</span>` : `<span class="meta">size not listed</span>`}</div>` : ""}
       ${l.year != null || l.miles != null || l.title_status ? `<div class="vehicle-facts">${l.year != null ? `<span>${l.year}</span>` : ""}${
         l.miles != null ? `<span>${Number(l.miles).toLocaleString()} mi</span>` : `<span class="meta">miles not listed</span>`}${
         l.title_status ? `<span class="title-flag" title="Not a clean title">${esc(l.title_status)} title</span>` : ""}</div>` : ""}
@@ -419,16 +428,38 @@ $("#listings").addEventListener("click", e => {
 // Car or truck: show the year and mileage fields, and only the sources that list vehicles.
 function showWatchKind(setDefaults) {
   const f = $("#watch-form");
-  const vehicle = f.kind.value === "vehicle";
+  const vehicle = f.kind.value === "vehicle", clothing = f.kind.value === "clothing";
   $$("#watch-form [data-vehicle]").forEach(el => (el.hidden = !vehicle));
+  $$("#watch-form [data-clothing]").forEach(el => (el.hidden = !clothing));
+  const usable = vehicle ? VEHICLE_SOURCES : clothing ? CLOTHING_SOURCES
+    : Object.keys(SOURCES).filter(s => s !== "ksl_cars" && s !== "poshmark");
+  const defaults = vehicle ? VEHICLE_SOURCES : clothing ? CLOTHING_DEFAULTS : NEW_WATCH_SOURCES;
   Object.keys(SOURCES).forEach(s => {
     const box = f["src-" + s];
-    box.closest("label").hidden = vehicle ? !VEHICLE_SOURCES.includes(s) : s === "ksl_cars";
-    if (setDefaults) box.checked = vehicle ? VEHICLE_SOURCES.includes(s) : NEW_WATCH_SOURCES.includes(s);
+    box.closest("label").hidden = !usable.includes(s);
+    if (setDefaults) box.checked = defaults.includes(s);
   });
-  f.name.placeholder = vehicle ? "Tacoma for hauling" : "i9-10980XE for X299 box";
-  f.query.placeholder = vehicle ? "toyota tacoma   or   f150|f-150" : '10980xe   or   n100|n150 "mini pc"';
+  if (clothing && setDefaults) {  // fill in from My sizes
+    const mine = state.settings.sizes || {};
+    if (mine.department) f.department.value = mine.department;
+  }
+  if (clothing) showSizeButtons();
+  f.name.placeholder = vehicle ? "Tacoma for hauling" : clothing ? "Running shoes" : "i9-10980XE for X299 box";
+  f.query.placeholder = vehicle ? "toyota tacoma   or   f150|f-150" : clothing ? 'nike pegasus   or   "air max"'
+    : '10980xe   or   n100|n150 "mini pc"';
 }
+
+// Buttons that fill the size from My sizes (Settings): "Shoe 10.5", "Top M", "Pants 32x30".
+function showSizeButtons() {
+  const mine = state.settings.sizes || {};
+  $("#size-buttons").innerHTML = [["shoe", "Shoe"], ["top", "Top"], ["pants", "Pants"]].filter(([k]) => mine[k])
+    .map(([k, label]) => `<button type="button" class="small" data-size="${esc(mine[k])}">${label} ${esc(mine[k])}</button>`).join("")
+    || `<span class="muted">Save your sizes in Settings to fill this in with one click.</span>`;
+}
+$("#size-buttons").addEventListener("click", e => {
+  const b = e.target.closest("[data-size]");
+  if (b) $("#watch-form [name=size]").value = b.dataset.size;
+});
 $("#watch-form [name=kind]").addEventListener("change", () => showWatchKind(!$("#watch-form").id.value));
 $("#watch-form [name=color]").addEventListener("input", () => { $("#watch-form [name=color_auto]").checked = false; });
 $("#f-group").addEventListener("change", e => { store("groupFinds", e.target.checked); loadListings(); });
@@ -533,6 +564,7 @@ function renderWatches() {
         ${w.notes ? `<br><span class="muted">${esc(w.notes)}</span>` : ""}
         ${w.last_error ? `<div class="error">${esc(w.last_error)}</div>` : ""}</td>
       <td>${w.min_price != null ? money(w.min_price) : "$0"} – ${w.max_price != null ? money(w.max_price) : "any"}${w.keep_cheapest ? ` · cheapest ${w.keep_cheapest}` : ""}<br>
+        ${w.kind === "clothing" ? `<span class="muted">👕 ${esc(DEPARTMENTS[w.department] || "")}size ${esc(w.size || "any")}</span><br>` : ""}
         ${w.kind === "vehicle" ? `<span class="muted">🚗 ${w.year_min || "any"}–${w.year_max || "any"}${w.max_miles ? ` · ≤${Number(w.max_miles).toLocaleString()} mi` : ""}</span><br>` : ""}
         <span class="muted">${esc(w.condition)} · ${esc(w.sources.map(sourceName).join(", "))}</span></td>
       <td>${w.new_count ? `<b>${w.new_count} new</b> / ` : ""}${w.total_count}</td>
@@ -594,6 +626,8 @@ function editWatch(w, returnTo = null) {
     f.year_min.value = w.year_min ?? "";
     f.year_max.value = w.year_max ?? "";
     f.max_miles.value = w.max_miles ?? "";
+    f.size.value = w.size || "";
+    f.department.value = w.department || "";
     f.name.value = w.name;
     f.query.value = w.query;
     f.exclude.value = w.exclude.join(", ");
@@ -611,6 +645,7 @@ function editWatch(w, returnTo = null) {
   }
   f.category.value = w ? (w.category_choice || "") : "";
   if (!w && focus() === "cars") { f.kind.value = "vehicle"; showWatchKind(true); }
+  else if (!w && focus() === "clothes") { f.kind.value = "clothing"; showWatchKind(true); }
   else showWatchKind(false);
   if (!w && focus() !== "all") f.category.value = focus();
   $("#watch-form-title").textContent = w ? `Edit "${w.name}"` : "New watch";
@@ -633,6 +668,8 @@ function formToWatch(f) {
     min_price: f.min_price.value,
     max_price: f.max_price.value,
     kind: f.kind.value,
+    size: f.kind.value === "clothing" ? f.size.value.trim() : null,
+    department: f.kind.value === "clothing" ? f.department.value || null : null,
     category: f.category.value || null,
     year_min: f.kind.value === "vehicle" ? f.year_min.value : null,
     year_max: f.kind.value === "vehicle" ? f.year_max.value : null,
@@ -1147,7 +1184,8 @@ function fillSettings() {
   for (const el of SETTINGS_FORMS.flatMap(sel => [...$(sel).elements])) {
     if (!el.name) continue;
     if (el.name.startsWith("src_")) { el.checked = !!s.sources_enabled?.[el.name.slice(4)]; continue; }
-    const v = s[el.name];
+    const [group, sub] = el.name.split(".");  // "sizes.shoe" lives in the sizes setting
+    const v = sub ? (s[group] || {})[sub] : s[el.name];
     if (el.type === "checkbox") el.checked = !!v;
     else if (el.type === "password") { el.value = ""; el.placeholder = v === true ? "saved (leave blank to keep)" : (el.dataset.ph || ""); }
     else if (Array.isArray(v)) el.value = v.join("\n");
@@ -1182,6 +1220,10 @@ SETTINGS_FORMS.forEach(sel => $(sel).addEventListener("submit", async e => {
   for (const el of f.elements) {
     if (!el.name) continue;
     if (el.name.startsWith("src_")) sources[el.name.slice(4)] = el.checked;
+    else if (el.name.includes(".")) {
+      const [group, sub] = el.name.split(".");
+      out[group] = { ...(out[group] || {}), [sub]: el.value.trim() };
+    }
     else if (el.type === "checkbox") out[el.name] = el.checked;
     else if (el.tagName === "TEXTAREA") out[el.name] = el.value.split("\n").map(s => s.trim()).filter(Boolean);
     else if (el.type === "number") out[el.name] = Number(el.value);
