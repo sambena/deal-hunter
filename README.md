@@ -64,6 +64,14 @@ Vehicles in My Stuff take a VIN and odometer: **Look up** fills in make, model, 
 NHTSA's free VIN decoder, **Recalls** lists NHTSA safety recalls for that model year, and **Find parts** starts a watch linked to the
 vehicle: its eBay searches only show parts eBay lists as fitting that year/make/model.
 
+## Focus
+
+The picker at the top (Everything / Tech / Cars & trucks / Home & gear) is saved to each person's account.
+It shows only that category's watches, finds and My Stuff, starts new watches in it (Cars & trucks starts a
+car or truck watch), and changes the colour and names ("My Garage" for cars). A watch's category is
+automatic (car watches are cars; a watch for one of your things takes that thing's category, so parts for
+your truck are cars; anything else is tech) unless you pick one in the watch form.
+
 ## Admin and members
 
 The first account is the admin. The **Admin** tab (admin only) holds People (invites, limits), how often
