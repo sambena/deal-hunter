@@ -30,6 +30,14 @@ const WATCH_PALETTE = ["#3B82F6", "#F97316", "#A855F7", "#14B8A6", "#EC4899", "#
   "#06B6D4", "#8B5CF6"];
 const watchColor = w => (w && w.color) || WATCH_PALETTE[((w ? w.id : 0) % 10 + 10) % 10];
 const colorOf = id => watchColor(state.watches.find(w => w.id === id) || { id });
+// "in 12m", "in 3h 20m", or at a clock time when it's further off.
+function nextIn(seconds) {
+  const m = Math.max(0, Math.round(seconds / 60));
+  if (m < 60) return `in ${m}m`;
+  if (m < 6 * 60) return `in ${Math.floor(m / 60)}h ${m % 60}m`;
+  return "at " + new Date(Date.now() + seconds * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
 function stored(key, fallback) {
   try { const v = localStorage.getItem(key); return v === null ? fallback : JSON.parse(v); } catch { return fallback; }
 }
@@ -320,7 +328,7 @@ async function refresh() {
   document.title = newTotal ? `(${newTotal}) Deal Hunter` : "Deal Hunter";
   const p = state.poller;
   $("#poll-status").textContent = p.running ? "Checking…" :
-    `Last check ${ago(p.last_cycle)}` + (p.next_cycle ? ` · next in ${Math.max(0, Math.round((p.next_cycle - state.now) / 60))}m` : "");
+    `Last check ${ago(p.last_cycle)}` + (p.next_cycle ? ` · next ${nextIn(p.next_cycle - state.now)}` : "");
   const f = p.fetches || {};
   $("#poll-status").title = f.made ? `Last full check: ${f.made} searches sent, ${f.shared || 0} answered from an identical search` : "";
   renderWatchSelects();
@@ -1236,11 +1244,12 @@ function fillSettings() {
     const v = sub ? (s[group] || {})[sub] : s[el.name];
     if (el.type === "checkbox") el.checked = !!v;
     else if (el.type === "password") { el.value = ""; el.placeholder = v === true ? "saved (leave blank to keep)" : (el.dataset.ph || ""); }
-    else if (Array.isArray(v)) el.value = v.join("\n");
+    else if (Array.isArray(v)) el.value = v.join(el.name === "check_times" ? ", " : "\n");
     else el.value = v ?? "";
   }
   showAiProvider();
   showAiSpend();
+  showCheckMode();
   const port = state.api_port;
   $("#api-status").innerHTML = (s.api_key ? "An API key is set. " : "No API key yet, so the API is off. ") +
     (port ? `Apps use <code>http://${esc(location.hostname === "localhost" ? "localhost" : "THIS-SERVER")}:${port}</code>
@@ -1260,6 +1269,12 @@ $("#api-key-new").addEventListener("click", e => busy(e.target, async () => {
 }));
 
 $("#settings-form [name=ai_provider]").addEventListener("change", showAiProvider);
+// Checking: show the minutes or the set times, whichever is chosen.
+function showCheckMode() {
+  const mode = $("#admin-form [name=check_mode]").value;
+  $$("#admin-form [data-check]").forEach(el => (el.hidden = el.dataset.check !== mode));
+}
+$("#admin-form [name=check_mode]").addEventListener("change", showCheckMode);
 $("#settings-form [name=ai_source]").addEventListener("change", showAiProvider);
 
 SETTINGS_FORMS.forEach(sel => $(sel).addEventListener("submit", async e => {

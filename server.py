@@ -473,6 +473,10 @@ def draft_watches(body, params):
 def put_settings(body, params):
     # Blank secret fields in the form mean "keep the current value".
     changes = {k: v for k, v in body.items() if not (k in db.SECRET_KEYS and v in ("", None, True))}
+    if "check_times" in changes:
+        changes["check_times"] = poller.clean_times(changes["check_times"])
+    if "check_mode" in changes and changes["check_mode"] not in ("interval", "times"):
+        changes.pop("check_mode")
     if "sizes" in changes:  # {"department", "shoe", "top", "pants"}: short strings only
         sizes = changes["sizes"] if isinstance(changes["sizes"], dict) else {}
         changes["sizes"] = {k: " ".join(str(sizes.get(k) or "").split())[:20]

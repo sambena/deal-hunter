@@ -17,6 +17,9 @@ _lock = threading.RLock()
 
 DEFAULT_SETTINGS = {
     "poll_minutes": 15,
+    "check_mode": "interval",  # interval: every poll_minutes | times: at check_times each day
+    "check_times": ["07:00", "18:00"],  # "HH:MM", in check_timezone
+    "check_timezone": "America/Denver",
     "junk_terms": [
         "for parts", "parts only", "not working", "non working", "broken", "as is", "as-is",
         "untested", "box only", "empty box", "bent pin", "cracked", "damaged", "faulty",
@@ -75,7 +78,7 @@ MEMBER_KEYS = {"zip_code", "local_radius_miles", "junk_terms", "discord_enabled"
                "claude_model", "openai_api_key", "openai_model", "gemini_api_key", "gemini_model",
                "gemini_free_tier", "ai_monthly_limit", "ai_confirm", "focus", "sizes"}
 # Shared settings a member's pages still need to read (which sources are switched on, how often checks run).
-MEMBER_READS = {"sources_enabled", "poll_minutes"}
+MEMBER_READS = {"sources_enabled", "poll_minutes", "check_mode", "check_times", "check_timezone"}
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
