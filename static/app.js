@@ -787,6 +787,16 @@ $("#kind-chips").addEventListener("click", e => {
 $("#machines").addEventListener("change", e => {
   if (e.target.matches("[data-f=kind]")) e.target.closest(".machine").dataset.kind = e.target.value;
 });
+// Typing or pasting a whole VIN looks it up straight away; a new car is then saved too, so the VIN is all
+// there is to enter.
+$("#machines").addEventListener("input", e => {
+  if (!e.target.matches("[data-f=vin]")) return;
+  const vin = e.target.value.replace(/[\s-]/g, "").toUpperCase();
+  const card = e.target.closest(".machine");
+  if (!/^[A-HJ-NPR-Z0-9]{17}$/.test(vin) || card.dataset.vinDone === vin) return;
+  card.dataset.vinDone = vin;
+  lookUpVin(card, $("[data-act=vin]", card), !card.dataset.id).catch(err => toast(err.message, true));
+});
 
 // Deal radar: a proposed watch for every device (rules for PCs, one AI request for the rest); the user ticks.
 const RADAR_SKIP = ["pc", "server", "smart home", "vehicle"];
@@ -900,7 +910,7 @@ function machineCard(m) {
       <label>Price paid ($) <input data-f="price_paid" type="number" min="0" step="0.01" value="${m.price_paid ?? ""}"></label>
       <label>Notes <input data-f="notes" value="${esc(m.notes)}" placeholder="use, size, PSU wattage, limits…"></label>
       <label class="vehicle-only">VIN <span class="row"><input data-f="vin" value="${esc(m.vin || "")}" maxlength="17"
-        placeholder="17 characters, on the dash or door"><button type="button" class="small" data-act="vin">Look up</button></span></label>
+        placeholder="Paste or type it: the rest fills in"><button type="button" class="small" data-act="vin">Look up</button></span></label>
       <label class="vehicle-only">Odometer (miles) <input data-f="odometer" type="number" min="0" step="1" value="${m.odometer ?? ""}"></label>
     </div>
     <div class="custom">${(m.custom || []).map(customRow).join("")}</div>
@@ -972,7 +982,7 @@ async function fillSpecs(card, btn) {
 }
 
 // Vehicles: a VIN fills in make, model, year and trim (NHTSA's free decoder); Recalls lists NHTSA campaigns.
-async function lookUpVin(card, btn) {
+async function lookUpVin(card, btn, save = false) {
   await busy(btn, async () => {
     const v = await api("POST", "/api/vin", { vin: $("[data-f=vin]", card).value });
     $("[data-f=vin]", card).value = v.vin;
@@ -980,10 +990,14 @@ async function lookUpVin(card, btn) {
     $("[data-f=model]", card).value = v.model;  // just the model: recalls and parts searches need it plain
     if (v.year) $("[data-f=year]", card).value = v.year;
     const name = $("[data-f=name]", card);
-    if (!name.value.trim()) name.value = `${v.year || ""} ${v.make} ${v.model} ${v.trim}`.trim();
+    // Fill the name unless the person typed their own (a name from an earlier lookup follows the new VIN).
+    if (!name.value.trim() || name.value === card.dataset.autoName) {
+      name.value = card.dataset.autoName = `${v.year || ""} ${v.make} ${v.model} ${v.trim}`.trim();
+    }
     const spec = [v.body, v.drive, v.engine].filter(Boolean).join(" · ");
+    if (save) await saveMachine(card);
     toast(`${v.year || ""} ${v.make} ${v.model} ${v.trim}${spec ? " · " + spec : ""}` + (v.warning ? ` (note: ${v.warning})` : "") +
-      " · press Save to keep it");
+      (save ? " · saved" : " · press Save to keep it"));
   });
 }
 
