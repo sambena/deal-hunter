@@ -5,7 +5,7 @@ const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 let state = { watches: [], machines: [], settings: {}, poller: {} };
 
 // Source keys, in form order, and how they're shown.
-const SOURCES = { ebay: "eBay", ebay_local: "eBay local pickup", ksl: "KSL Classifieds", craigslist: "Craigslist", offerup: "OfferUp", reddit: "Reddit", slickdeals: "Slickdeals",
+const SOURCES = { ebay: "eBay", ebay_local: "eBay local pickup", ksl: "KSL Classifieds", craigslist: "Craigslist", offerup: "OfferUp", ksl_cars: "KSL Cars", reddit: "Reddit", slickdeals: "Slickdeals",
   buildapcsales: "r/buildapcsales", bestbuy: "Best Buy open-box" };
 // Where car and truck watches can search (the others are for hardware and gear).
 const VEHICLE_SOURCES = ["ebay", "ebay_local", "ksl_cars", "craigslist", "offerup"];
@@ -15,7 +15,7 @@ const sourceName = s => SOURCES[s] || s;
 const SOURCE_TAGS = {
   ebay: ["eBay", "#E53238"], ebay_local: ["eBay local", "#86B817", "#1A2E05"], ksl: ["KSL", "#0D5EA6"],
   reddit: ["Reddit", "#FF4500"], buildapcsales: ["r/bapcs", "#FF4500"], slickdeals: ["Slick", "#2B6CB0"],
-  bestbuy: ["Best Buy", "#0046BE", "#FFE000"], craigslist: ["CL", "#5A1A8C"], offerup: ["OfferUp", "#00AB80"],
+  bestbuy: ["Best Buy", "#0046BE", "#FFE000"], craigslist: ["CL", "#5A1A8C"], ksl_cars: ["KSL Cars", "#0D5EA6"], offerup: ["OfferUp", "#00AB80"],
 };
 function sourceTag(s) {
   const [text, bg, fg] = SOURCE_TAGS[s] || [sourceName(s), "#4B5563"];
@@ -380,7 +380,7 @@ function showWatchKind(setDefaults) {
   $$("#watch-form [data-vehicle]").forEach(el => (el.hidden = !vehicle));
   Object.keys(SOURCES).forEach(s => {
     const box = f["src-" + s];
-    box.closest("label").hidden = vehicle && !VEHICLE_SOURCES.includes(s);
+    box.closest("label").hidden = vehicle ? !VEHICLE_SOURCES.includes(s) : s === "ksl_cars";
     if (setDefaults) box.checked = vehicle ? VEHICLE_SOURCES.includes(s) : NEW_WATCH_SOURCES.includes(s);
   });
   f.name.placeholder = vehicle ? "Tacoma for hauling" : "i9-10980XE for X299 box";

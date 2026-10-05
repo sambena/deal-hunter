@@ -61,6 +61,7 @@ WATCH_FILTERS["craigslist"] = WATCH_FILTERS["offerup"] = ("min_price", "max_pric
 VEHICLE_FILTERS = ("kind", "year_min", "year_max", "max_miles")
 # The sources that can search for cars and trucks; vehicle watches skip the rest (Reddit, Best Buy...).
 VEHICLE_SOURCES = {"ebay", "ebay_local", "craigslist", "offerup", "ksl_cars"}
+VEHICLE_ONLY = {"ksl_cars"}  # and these only search for vehicles
 
 
 def fetch_key(name: str, watch: dict, settings: dict) -> str:
@@ -103,7 +104,8 @@ def run_watch(watch: dict, settings: dict, shared: dict | None = None) -> dict:
     limited = bool(watch.get("keep_cheapest"))
     # Local searches go first so an item that is both local and national is stored as local.
     for name in sorted(watch["sources"], key=lambda n: n != "ebay_local"):
-        if not enabled.get(name) or name not in SOURCES or (vehicle and name not in VEHICLE_SOURCES):
+        if (not enabled.get(name) or name not in SOURCES or (vehicle and name not in VEHICLE_SOURCES)
+                or (not vehicle and name in VEHICLE_ONLY)):
             continue
         try:
             items = fetch(name, watch, settings, shared)
