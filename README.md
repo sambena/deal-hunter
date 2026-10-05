@@ -54,13 +54,13 @@ Cars.com, Autotrader, CarGurus, Carvana, CarMax, TrueCar and Facebook block prog
 - After a watch has seen 5+ prices, new finds are marked "good" (10%+ under the
   typical asking price) or "great" (25%+).
 
-## My hardware
+## My Stuff
 
 Add a machine's parts and press **Find upgrades**. Built-in rules recognise
 desktop platforms (X99, X299, Intel 100–800 series, AM4, AM5) from the
 motherboard chipset or CPU and suggest better drop-in CPUs and RAM kits.
 
-Vehicles in My hardware take a VIN and odometer: **Look up** fills in make, model, year and trim from
+Vehicles in My Stuff take a VIN and odometer: **Look up** fills in make, model, year and trim from
 NHTSA's free VIN decoder, **Recalls** lists NHTSA safety recalls for that model year, and **Find parts** starts a watch linked to the
 vehicle: its eBay searches only show parts eBay lists as fitting that year/make/model.
 

@@ -30,10 +30,13 @@ function stored(key, fallback) {
   try { const v = localStorage.getItem(key); return v === null ? fallback : JSON.parse(v); } catch { return fallback; }
 }
 function store(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} }
-// My hardware covers everything owned. PCs and servers list their parts; anything else is a make/model.
+// My Stuff covers everything owned. PCs and servers list their parts; anything else is a make/model.
 const KINDS = { pc: "PC", server: "Server", tv: "TV", monitor: "Monitor", phone: "Phone", tablet: "Tablet",
   audio: "Speaker / audio", network: "Network", console: "Game console", printer: "Printer", appliance: "Appliance",
-  "smart home": "Smart home", vehicle: "Vehicle", other: "Other" };
+  "smart home": "Smart home", vehicle: "Car / truck", other: "Other" };
+const KIND_ICONS = { pc: "💻", server: "🗄️", tv: "📺", monitor: "🖥️", phone: "📱", tablet: "📱", audio: "🔊",
+  network: "📶", console: "🎮", printer: "🖨️", appliance: "🧺", "smart home": "🏠", vehicle: "🚗", other: "📦" };
+const kindIcon = k => KIND_ICONS[k || "pc"] || "📦";
 const kindOptions = cur => Object.entries(KINDS).map(([k, label]) =>
   `<option value="${esc(k)}" ${k === cur ? "selected" : ""}>${esc(label)}</option>`).join("");
 // Best Buy's API branding guidelines: their logo, linked, wherever their data appears.
@@ -306,7 +309,7 @@ async function loadListings() {
   if (!listings.length) {
     box.className = "cards";
     box.innerHTML = `<div class="empty">${state.watches.length ? "Nothing here yet. New matches show up after each check."
-      : "No watches yet. Add one on the Watches tab, or add your machines under My hardware to find upgrades."}</div>`;
+      : "No watches yet. Add one on the Watches tab, or add your computers, cars and gear under My Stuff to find upgrades and parts."}</div>`;
     return;
   }
   if (!$("#f-group").checked || $("#f-watch").value) {
@@ -668,17 +671,37 @@ function partRow(p = { category: "cpu", model: "" }) {
     <button class="small danger" data-act="rm-part">✕</button></div>`;
 }
 
+// My Stuff: chips with a count per kind (click to show just that kind), cards grouped under kind headings.
+let stuffKind = stored("stuffKind", "");
+
 function renderMachines() {
-  const box = $("#machines"), want = $("#kind-filter").value;
+  const box = $("#machines");
   const order = Object.keys(KINDS);
-  const list = state.machines.filter(m => !want || (m.kind || "pc") === want)
+  const counts = {};
+  state.machines.forEach(m => (counts[m.kind || "pc"] = (counts[m.kind || "pc"] || 0) + 1));
+  if (stuffKind && !counts[stuffKind]) stuffKind = "";
+  $("#kind-chips").innerHTML = state.machines.length ? [["", `All · ${state.machines.length}`],
+    ...order.filter(k => counts[k]).map(k => [k, `${kindIcon(k)} ${KINDS[k]} · ${counts[k]}`])]
+    .map(([k, label]) => `<button type="button" class="chip${k === stuffKind ? " on" : ""}" data-kind="${esc(k)}">${esc(label)}</button>`).join("") : "";
+  const list = state.machines.filter(m => !stuffKind || (m.kind || "pc") === stuffKind)
     .sort((a, b) => order.indexOf(a.kind || "pc") - order.indexOf(b.kind || "pc") || a.name.localeCompare(b.name));
-  box.innerHTML = list.map(m => machineCard(m)).join("") ||
-    `<p class="muted">${state.machines.length ? "Nothing of that kind." : "Nothing here yet. Add a device, or import from Home Assistant."}</p>`;
+  let html = "", last = null;
+  for (const m of list) {
+    const k = m.kind || "pc";
+    if (k !== last) html += `<h3 class="kind-head">${kindIcon(k)} ${esc(KINDS[k] || k)}</h3>`;
+    last = k;
+    html += machineCard(m);
+  }
+  box.innerHTML = html || `<p class="muted">Nothing here yet. Add a computer, a car or anything else you own.</p>`;
 }
 
-$("#kind-filter").insertAdjacentHTML("beforeend", kindOptions(""));
-$("#kind-filter").addEventListener("change", renderMachines);
+$("#kind-chips").addEventListener("click", e => {
+  const chip = e.target.closest(".chip");
+  if (!chip) return;
+  stuffKind = chip.dataset.kind;
+  store("stuffKind", stuffKind);
+  renderMachines();
+});
 $("#machines").addEventListener("change", e => {
   if (e.target.matches("[data-f=kind]")) e.target.closest(".machine").dataset.kind = e.target.value;
 });
@@ -928,9 +951,13 @@ async function saveMachine(card) {
   return Number(card.dataset.id);
 }
 
-$("#add-machine").addEventListener("click", () => {
-  $("#machines").insertAdjacentHTML("afterbegin", machineCard({ name: "", notes: "", parts: [] }));
-});
+$$("[data-add-kind]").forEach(b => b.addEventListener("click", () => {
+  const kind = b.dataset.addKind || "other";
+  $("#machines").insertAdjacentHTML("afterbegin", machineCard({ name: "", notes: "", parts: [], kind }));
+  const card = $("#machines .machine");
+  card.scrollIntoView({ behavior: "smooth", block: "center" });
+  $(kind === "vehicle" ? "[data-f=vin]" : "[data-f=name]", card).focus();
+}));
 
 $("#machines").addEventListener("click", async e => {
   const btn = e.target.closest("button[data-act]");

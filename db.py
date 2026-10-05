@@ -42,7 +42,7 @@ DEFAULT_SETTINGS = {
     "ollama_url": "http://192.168.86.82:11434",  # the home Ollama gateway on the Frigate box (LAN/VPN only)
     "ollama_model": "qwen3.5:4b",
     "api_key": "",  # for other apps calling the API port; made in Admin > API
-    "ha_url": "",  # Home Assistant, for importing devices into My hardware
+    "ha_url": "",  # Home Assistant, for importing devices into My Stuff
     "ha_token": "",
     "anthropic_api_key": "",
     "openai_api_key": "",
