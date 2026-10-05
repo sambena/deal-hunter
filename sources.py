@@ -31,14 +31,35 @@ class SourceError(Exception):
     pass
 
 
+# eBay's errors in words people can act on (the error id stays at the end, for retries and support).
+EBAY_ERRORS = {
+    12023: "this search matches too much to return; add a model, a year range or a price limit",
+    12506: "eBay can't check which parts fit in this category",
+    1001: "the eBay keys aren't accepted; check them in Admin > eBay",
+}
+
+
+def _readable_error(code: int, host: str, body: str) -> str:
+    """One short sentence for a source's HTTP error instead of its raw JSON."""
+    try:
+        errors = json.loads(body).get("errors") or []
+    except (ValueError, AttributeError):
+        errors = []
+    if errors and isinstance(errors[0], dict):
+        eid = errors[0].get("errorId")
+        what = EBAY_ERRORS.get(eid) or str(errors[0].get("message") or "").split(". ")[0][:160]
+        return f"{'eBay' if 'ebay' in host else host}: {what} (error {eid})"
+    return f"HTTP {code} from {host}: {body[:160]}"
+
+
 def _http(url: str, *, data: bytes | None = None, headers: dict | None = None, timeout: int = 20):
     req = urllib.request.Request(url, data=data, headers={"User-Agent": USER_AGENT, **(headers or {})})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             return json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", "replace")[:300]
-        raise SourceError(f"HTTP {e.code} from {urllib.parse.urlparse(url).netloc}: {body}") from e
+        body = e.read().decode("utf-8", "replace")[:2000]
+        raise SourceError(_readable_error(e.code, urllib.parse.urlparse(url).netloc, body)) from e
     except urllib.error.URLError as e:
         raise SourceError(f"Network error: {e.reason}") from e
 
@@ -120,7 +141,10 @@ def _ebay_search(watch: dict, settings: dict, local: bool) -> list[dict]:
     # A body style isn't in eBay titles, so a vehicle watch searches its most common models instead. eBay
     # refuses searches whose answer is too large (error 12023), so each retry asks for fewer models.
     body, rest = matching.body_style(watch["query"]) if vehicle else (None, "")
-    model_counts = [8, 4, 0] if body else [None]
+    # (models, results) to try in turn while eBay answers 12023 "too large": first fewer results, then
+    # fewer models, then just the body word.
+    attempts = [(8, "200"), (8, "50"), (4, "50"), (0, "50")] if body else [(None, "200" if vehicle else "50"),
+                                                                           (None, "50")]
 
     def keywords(n):
         gs = parse_query(rest)[0] if body else groups
@@ -128,7 +152,7 @@ def _ebay_search(watch: dict, settings: dict, local: bool) -> list[dict]:
             gs = gs + [EBAY_BODY_MODELS.get(body, [body])[:n] if n else [body]]
         # eBay keyword syntax: (a,b) means a OR b.
         return " ".join(g[0] if len(g) == 1 else "(" + ",".join(g) + ")" for g in gs)
-    q = keywords(model_counts[0])
+    q = keywords(attempts[0][0])
     filters = []
     lo, hi = watch.get("min_price"), watch.get("max_price")
     if lo is not None or hi is not None:
@@ -145,7 +169,7 @@ def _ebay_search(watch: dict, settings: dict, local: bool) -> list[dict]:
         radius = max(1, int(float(settings.get("local_radius_miles") or 50)))
         filters += ["deliveryOptions:{SELLER_ARRANGED_LOCAL_PICKUP}", "pickupCountry:US",
                     f"pickupPostalCode:{zip_code}", f"pickupRadius:{radius}", "pickupRadiusUnit:mi"]
-    params = {"q": q, "limit": "200" if vehicle else "50", "sort": "newlyListed"}
+    params = {"q": q, "limit": attempts[0][1], "sort": "newlyListed"}
     if vehicle:
         params["category_ids"] = EBAY_CARS_TRUCKS  # vehicles only, not parts that mention the model
     fits = watch.get("fits")  # a parts watch linked to one of the person's vehicles
@@ -163,7 +187,7 @@ def _ebay_search(watch: dict, settings: dict, local: bool) -> list[dict]:
     if zip_code:
         headers["X-EBAY-C-ENDUSERCTX"] = f"contextualLocation=country%3DUS%2Czip%3D{zip_code}"
     url = "https://api.ebay.com/buy/browse/v1/item_summary/search?"
-    tries = iter(model_counts[1:])
+    tries = iter(attempts[1:])
     while True:
         try:
             data = _http(url + urllib.parse.urlencode(params), headers=headers)
@@ -174,10 +198,10 @@ def _ebay_search(watch: dict, settings: dict, local: bool) -> list[dict]:
                 params.pop("compatibility_filter")
                 _parts_category_cache[q] = None
                 continue
-            fewer = next(tries, False) if "12023" in str(e) else False
-            if fewer is False:
+            smaller = next(tries, None) if "12023" in str(e) else None
+            if smaller is None:
                 raise
-            params["q"] = keywords(fewer)  # 12023: "results in a response that is too large"
+            params["q"], params["limit"] = keywords(smaller[0]), smaller[1]  # 12023: "...too large to return"
     out = []
     for it in data.get("itemSummaries", []):
         price = it.get("price") or it.get("currentBidPrice") or {}

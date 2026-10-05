@@ -48,14 +48,25 @@ class BodyStyleTest(unittest.TestCase):
         seen = []
 
         def http(url, **kw):
-            seen.append(urllib.parse.parse_qs(urllib.parse.urlparse(url).query)["q"][0])
-            if len(seen) < 3:
-                raise sources.SourceError('HTTP 400 from api.ebay.com: {"errors":[{"errorId":12023}]}')
+            q = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
+            seen.append((q["q"][0], q["limit"][0]))
+            if len(seen) < 4:
+                raise sources.SourceError("eBay: this search matches too much to return (error 12023)")
             return {"itemSummaries": []}
         with mock.patch.object(sources, "_ebay_access_token", lambda s: "t"), mock.patch.object(sources, "_http", http):
             sources.ebay(PICKUP, SETTINGS)
-        self.assertEqual(seen, ["(f-150,silverado,ram,tacoma,sierra,tundra,ranger,colorado)",
-                                "(f-150,silverado,ram,tacoma)", "pickup"])
+        eight = "(f-150,silverado,ram,tacoma,sierra,tundra,ranger,colorado)"
+        self.assertEqual(seen, [(eight, "200"), (eight, "50"), ("(f-150,silverado,ram,tacoma)", "50"), ("pickup", "50")])
+
+    def test_readable_errors(self):
+        body = ('{"errors":[{"errorId":12023,"domain":"API_BROWSE","message":"This keyword search results in a '
+                'response that is too large to return. Either change the keyword or add filters."}]}')
+        self.assertEqual(sources._readable_error(400, "api.ebay.com", body),
+                         "eBay: this search matches too much to return; add a model, a year range or a price limit"
+                         " (error 12023)")
+        self.assertEqual(sources._readable_error(400, "api.ebay.com", '{"errors":[{"errorId":9,"message":"Odd thing. More."}]}'),
+                         "eBay: Odd thing (error 9)")
+        self.assertEqual(sources._readable_error(503, "x.com", "<html>down</html>"), "HTTP 503 from x.com: <html>down</html>")
         with mock.patch.object(sources, "_ebay_access_token", lambda s: "t"),                 mock.patch.object(sources, "_http", lambda url, **kw: (_ for _ in ()).throw(
                     sources.SourceError("HTTP 400: 12023"))):
             with self.assertRaises(sources.SourceError):  # still too large with just "pickup": say so
