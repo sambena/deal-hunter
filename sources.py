@@ -109,6 +109,12 @@ def _ebay_search(watch: dict, settings: dict, local: bool) -> list[dict]:
         raise SourceError("set your ZIP code in Settings > Local area")
     token = _ebay_access_token(settings)
     groups, _ = parse_query(watch["query"])
+    vehicle = watch.get("kind") == "vehicle"
+    if vehicle:  # a body style isn't in eBay titles: search its common models instead
+        body, rest = matching.body_style(watch["query"])
+        if body:
+            groups, _ = parse_query(rest)
+            groups.append([m for m in matching.BODY_MODELS[body] if not m.isdigit()][:20])
     # eBay keyword syntax: (a,b) means a OR b.
     q = " ".join(g[0] if len(g) == 1 else "(" + ",".join(g) + ")" for g in groups)
     filters = []
@@ -119,7 +125,6 @@ def _ebay_search(watch: dict, settings: dict, local: bool) -> list[dict]:
     cond = {"used": "USED", "new": "NEW"}.get(watch.get("condition", "any"))
     if cond:
         filters.append(f"conditions:{{{cond}}}")
-    vehicle = watch.get("kind") == "vehicle"
     if not watch.get("include_auctions"):
         # eBay Motors sells many vehicles as classified ads (contact the seller) rather than Buy It Now.
         filters.append("buyingOptions:{FIXED_PRICE|BEST_OFFER" + ("|CLASSIFIED_AD}" if vehicle else "}"))
@@ -128,7 +133,7 @@ def _ebay_search(watch: dict, settings: dict, local: bool) -> list[dict]:
         radius = max(1, int(float(settings.get("local_radius_miles") or 50)))
         filters += ["deliveryOptions:{SELLER_ARRANGED_LOCAL_PICKUP}", "pickupCountry:US",
                     f"pickupPostalCode:{zip_code}", f"pickupRadius:{radius}", "pickupRadiusUnit:mi"]
-    params = {"q": q, "limit": "50", "sort": "newlyListed"}
+    params = {"q": q, "limit": "200" if vehicle else "50", "sort": "newlyListed"}
     if vehicle:
         params["category_ids"] = EBAY_CARS_TRUCKS  # vehicles only, not parts that mention the model
     fits = watch.get("fits")  # a parts watch linked to one of the person's vehicles
@@ -537,15 +542,87 @@ def ksl(watch: dict, settings: dict) -> list[dict]:
 # path as key/value pairs; a keyword like "toyota tacoma" is read by KSL as make + model. Page 1 is the
 # newest listings (plus a featured one or two, which matching drops if they don't fit).
 
+# KSL's body styles ("pickup" as a keyword would be read as the old Toyota Pickup model).
+KSL_BODY = {"pickup": "Truck", "suv": "SUV", "van": "Van", "minivan": "Minivan", "sedan": "Sedan",
+            "coupe": "Coupe", "convertible": "Convertible", "hatchback": "Hatchback", "wagon": "Wagon"}
+KSL_CARS_PAGES = 5  # about 20 listings a page, newest first
+_ksl_action: dict = {"id": None}
+
+
+def _ksl_flight(page: str) -> str:
+    """The page's Next.js payload, joined back into one string."""
+    out = []
+    for chunk in re.findall(r'self\.__next_f\.push\(\[1,"(.*?)"\]\)', page, re.S):
+        try:
+            out.append(json.loads(f'"{chunk}"'))
+        except ValueError:
+            continue
+    return "".join(out)
+
+
+def _ksl_page_info(flight: str) -> tuple[dict | None, dict]:
+    """(searchParams for asking for more pages, pageInfo {hasNextPage, endCursor, total})."""
+    params, info = None, {}
+    at = flight.find('"searchParams":')
+    if at >= 0:
+        try:
+            params, _ = json.JSONDecoder().raw_decode(flight, at + len('"searchParams":'))
+        except ValueError:
+            params = None
+    at = flight.find('"pageInfo":')
+    if at >= 0:
+        try:
+            pi, _ = json.JSONDecoder().raw_decode(flight, at + len('"pageInfo":'))
+            info = (pi[0] if isinstance(pi, list) and pi else pi) or {}
+        except ValueError:
+            info = {}
+    return params, info
+
+
+def _ksl_action_id(page: str) -> str | None:
+    """The id of the page's "more results" server action, found in its JavaScript (changes when KSL deploys)."""
+    if _ksl_action["id"]:
+        return _ksl_action["id"]
+    for src in dict.fromkeys(re.findall(r'(https://[a-z.-]*ksl\.com/_next/static/chunks/[\w./-]+\.js)', page)):
+        try:
+            with urllib.request.urlopen(urllib.request.Request(src, headers=KSL_HEADERS), timeout=20) as resp:
+                js = resp.read().decode("utf-8", "replace")
+        except (urllib.error.URLError, TimeoutError):
+            continue
+        m = re.search(r'createServerReference\)\("([0-9a-f]{40,44})",[^)]*"search"\)', js)
+        if m:
+            _ksl_action["id"] = m.group(1)
+            return m.group(1)
+    return None
+
+
+def _ksl_more(url: str, action: str, params: dict, cursor: str) -> tuple[list[dict], dict]:
+    body = json.dumps([None, "0", {"featuredCount": 1, "featuredPosition": 0, "spotlightCount": 1,
+                                   "spotlightPosition": 10, "listingCount": 18}, params, cursor]).encode()
+    req = urllib.request.Request(url, data=body, headers={
+        **KSL_HEADERS, "Accept": "text/x-component", "Content-Type": "text/plain;charset=UTF-8",
+        "Next-Action": action, "Origin": "https://cars.ksl.com", "Referer": url})
+    with urllib.request.urlopen(req, timeout=25) as resp:
+        text = resp.read().decode("utf-8", "replace")
+    for line in text.splitlines():
+        if line.startswith("1:"):
+            data = json.loads(line[2:])
+            return data.get("items") or [], data.get("pageInfo") or {}
+    raise ValueError("no results in KSL's answer")
+
+
 def ksl_cars(watch: dict, settings: dict) -> list[dict]:
     zip_code = str(settings.get("zip_code") or "").strip()
     if not zip_code:
         raise SourceError("set your ZIP code in Settings > Local area")
-    terms = search_terms(watch["query"])
-    if not terms:
+    body, rest = matching.body_style(watch["query"])
+    terms = search_terms(rest if body else watch["query"])
+    if not terms and not body:
         return []
     radius = max(1, int(float(settings.get("local_radius_miles") or 50)))
-    parts = [("keyword", terms)]
+    parts = [("keyword", terms)] if terms else []
+    if body in KSL_BODY:
+        parts.append(("body", KSL_BODY[body]))
     for key, field in (("yearFrom", "year_min"), ("yearTo", "year_max"), ("mileageTo", "max_miles"),
                        ("priceFrom", "min_price"), ("priceTo", "max_price")):
         if watch.get(field):
@@ -568,8 +645,26 @@ def ksl_cars(watch: dict, settings: dict) -> list[dict]:
         raise SourceError(f"Network error reaching KSL Cars: {e.reason}") from e
     finally:
         _ksl_last["at"] = time.time()  # shares the gap with KSL Classifieds (same site family)
+    rows = _ksl_results(page)
+    # Later pages come from the page's own "more results" action. If KSL changes it, page 1 still counts.
+    params, info = _ksl_page_info(_ksl_flight(page))
+    for _ in range(KSL_CARS_PAGES - 1):
+        if not (params and info.get("hasNextPage") and info.get("endCursor")):
+            break
+        action = _ksl_action_id(page)
+        if not action:
+            break
+        time.sleep(KSL_GAP_SECONDS)
+        try:
+            more, info = _ksl_more(url, action, params, info["endCursor"])
+        except (urllib.error.URLError, TimeoutError, ValueError):
+            _ksl_action["id"] = None  # look it up again next time (KSL redeployed?)
+            break
+        finally:
+            _ksl_last["at"] = time.time()
+        rows += more
     out, seen = [], set()
-    for r in _ksl_results(page):
+    for r in rows:
         if not r.get("id") or r["id"] in seen or r.get("listingType", "CAR") != "CAR":
             continue
         seen.add(r["id"])
@@ -582,6 +677,7 @@ def ksl_cars(watch: dict, settings: dict) -> list[dict]:
             "source": "ksl_cars",
             "source_id": str(r["id"]),
             "title": title,
+            "match_text": f"{title} {body}" if body else title,  # KSL already filtered by body style
             "price": float(r["price"]) if r.get("price") else None,
             "shipping": 0.0,
             "currency": "USD",
@@ -677,6 +773,9 @@ def poshmark(watch: dict, settings: dict) -> list[dict]:
 # Searches spill into nearby areas, so rows farther than the radius are dropped here.
 
 CRAIGSLIST_URL = "https://sapi.craigslist.org/web/v8/postings/search/full"
+# Craigslist's cars+trucks "type" filter (auto_bodytype); pickups are listed as pickup or truck.
+CRAIGSLIST_BODY = {"pickup": ["7", "9"], "suv": ["10"], "van": ["12"], "minivan": ["5"], "sedan": ["8"],
+                   "coupe": ["3"], "convertible": ["2"], "hatchback": ["4"], "wagon": ["11"]}
 CRAIGSLIST_GAP_SECONDS = 3
 _craigslist_last = {"at": 0.0}
 _places: dict = {}  # ZIP -> {lat, lon, city, state}, from Craigslist's answers (OfferUp needs it too)
@@ -694,6 +793,10 @@ def _craigslist_search(zip_code: str, radius: int, query: str, lo=None, hi=None,
     for key, field in (("min_auto_year", "year_min"), ("max_auto_year", "year_max"), ("max_auto_miles", "max_miles")):
         if vehicle and vehicle.get(field):
             params[key] = str(vehicle[field])
+    if vehicle and vehicle.get("_body") in CRAIGSLIST_BODY:
+        params["auto_bodytype"] = CRAIGSLIST_BODY[vehicle["_body"]]
+    if not query:
+        params.pop("query")
     if lo:
         params["min_price"] = str(int(lo))
     if hi:
@@ -702,7 +805,7 @@ def _craigslist_search(zip_code: str, radius: int, query: str, lo=None, hi=None,
     if wait > 0:
         time.sleep(wait)
     try:
-        data = _http(CRAIGSLIST_URL + "?" + urllib.parse.urlencode(params),
+        data = _http(CRAIGSLIST_URL + "?" + urllib.parse.urlencode(params, doseq=True),
                      headers={**KSL_HEADERS, "Accept": "application/json", "Referer": "https://www.craigslist.org/"})
     finally:
         _craigslist_last["at"] = time.time()
@@ -746,7 +849,12 @@ def craigslist(watch: dict, settings: dict) -> list[dict]:
     if not terms:
         return []
     radius = max(1, int(float(settings.get("local_radius_miles") or 50)))
-    vehicle = watch if watch.get("kind") == "vehicle" else None  # cars+trucks section, year/miles filters
+    vehicle = None
+    if watch.get("kind") == "vehicle":  # cars+trucks section, year/miles/body filters
+        body, rest = matching.body_style(watch["query"])
+        vehicle = {**watch, "_body": body}
+        if body:
+            terms = search_terms(rest)
     data = _craigslist_search(zip_code, radius, terms, watch.get("min_price"), watch.get("max_price"), vehicle)
     decode, home = data.get("decode") or {}, data.get("location") or {}
     if data and "minPostingId" not in decode and data.get("items"):
@@ -763,6 +871,7 @@ def craigslist(watch: dict, settings: dict) -> list[dict]:
             "source": "craigslist",
             "source_id": str(r["id"]),
             "title": r["title"],
+            "match_text": f"{r['title']} {vehicle['_body']}" if vehicle and vehicle.get("_body") else r["title"],
             "price": float(r["price"]) if r["price"] is not None else None,
             "shipping": 0.0,  # local pickup
             "currency": "USD",

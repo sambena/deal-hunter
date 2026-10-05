@@ -40,6 +40,10 @@ Pick "A car or truck" in the watch form: query = make and model (`toyota tacoma`
 max miles. Vehicle watches search eBay Motors (Cars & Trucks), Craigslist cars+trucks, OfferUp vehicles
 and KSL Cars (Utah). Finds show the year, miles and any salvage/rebuilt title; "% under typical" compares with
 the watch's finds within two model years. Ask AI gives a second opinion on price, miles and red flags.
+Body styles work as searches: `pickup` (or truck, suv, van, minivan, sedan, coupe, convertible,
+hatchback, wagon) uses KSL's and Craigslist's own body-style filters, eBay searches the common models of
+that style, and titles count if they name one (F-150, Silverado, Tacoma...). KSL Cars reads up to 5
+pages (about 100 newest listings) and eBay up to 200 a check.
 Cars.com, Autotrader, CarGurus, Carvana, CarMax, TrueCar and Facebook block programs, so they aren't searched.
 
 ## How matching works
