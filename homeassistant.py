@@ -1,4 +1,4 @@
-"""Import devices from Home Assistant into My hardware.
+"""Import devices from Home Assistant into My Stuff.
 
 Home Assistant's REST API has no device list, but its template endpoint can build one: every device
 behind an entity, with maker, model, area and which integrations/entity types it has. A rough guess

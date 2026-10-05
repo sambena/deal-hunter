@@ -233,7 +233,7 @@ def _ai_prompt(action: str, body: dict, ref: str | None = None) -> tuple[str, di
 
 
 # ---- deal radar -------------------------------------------------------------
-# One pass over My hardware proposing a watch per device: built-in rules for PCs (free), one AI request
+# One pass over My Stuff proposing a watch per device: built-in rules for PCs (free), one AI request
 # for everything else. Nothing is created until the user ticks and confirms.
 
 RADAR_SKIP_KINDS = {"smart home", "vehicle"}  # cheap gadgets and cars: not what this is for

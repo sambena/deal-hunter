@@ -12,7 +12,7 @@
     <nav>
       <button data-tab="finds" class="active">Finds <span id="new-badge" class="badge" hidden></span></button>
       <button data-tab="watches">Watches</button>
-      <button data-tab="hardware">My hardware</button>
+      <button data-tab="hardware">My Stuff</button>
       <button data-tab="settings">Settings</button>
       <button data-tab="admin" id="admin-nav" hidden>Admin</button>
     </nav>
@@ -119,17 +119,19 @@
     <!-- HARDWARE -->
     <section id="tab-hardware" class="tab" hidden>
       <div class="panel">
-        <p class="muted">Everything you own: PCs and servers with their parts, plus TVs, monitors, phones, tablets,
-          network gear, appliances and more. For PCs, <b>Find upgrades</b> suggests drop-in CPUs and RAM; for anything,
-          <b>Find upgrades with AI</b> suggests better models and accessories, and <b>Watch this model</b> looks for a
-          spare or replacement.</p>
+        <p class="muted">Everything you own: computers with their parts, cars and trucks, TVs, phones, speakers,
+          network gear, appliances and more. Computers get <b>Find upgrades</b> (drop-in CPUs and RAM); cars get
+          <b>Look up</b> by VIN, <b>Recalls</b> and <b>Find parts</b> that fit; anything can <b>Watch this model</b>
+          for a spare or replacement, or ask AI for upgrade ideas.</p>
         <div class="row">
-          <button id="add-machine" class="primary">Add device</button>
+          <button class="primary" data-add-kind="pc">+ Computer</button>
+          <button class="primary" data-add-kind="vehicle">+ Car or truck</button>
+          <button data-add-kind="">+ Something else</button>
+          <span class="spacer"></span>
           <button id="ha-import" data-admin-only>Import from Home Assistant</button>
           <button id="radar">Deal radar</button>
-          <span class="spacer"></span>
-          <select id="kind-filter"><option value="">All kinds</option></select>
         </div>
+        <div id="kind-chips" class="chips"></div>
         <div id="ha-import-box"></div>
         <div id="radar-box"></div>
       </div>
@@ -377,7 +379,7 @@
 
         <div class="panel">
           <h2>Home Assistant</h2>
-          <p class="muted">Optional. Lets My hardware import your TVs, phones, speakers, network gear and appliances.
+          <p class="muted">Optional. Lets My Stuff import your TVs, phones, speakers, network gear and appliances.
             Deal Hunter only reads the device list; it never changes anything in Home Assistant.</p>
           <div class="grid">
             <label>Home Assistant address (local is best) <input name="ha_url" placeholder="http://homeassistant.local:8123"></label>
@@ -396,7 +398,7 @@
 
         <div class="panel">
           <h2>API</h2>
-          <p class="muted">Let your own apps and scripts use Deal Hunter (watches, finds, My hardware) over your home
+          <p class="muted">Let your own apps and scripts use Deal Hunter (watches, finds, My Stuff) over your home
             network or VPN. Every call needs this key. <a href="api.html" target="_blank" rel="noopener">How to use the API</a></p>
           <p id="api-status" class="muted"></p>
           <div class="row"><button type="button" id="api-key-new">Create API key</button></div>
