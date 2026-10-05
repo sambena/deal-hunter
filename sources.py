@@ -730,6 +730,7 @@ def ksl_cars(watch: dict, settings: dict) -> list[dict]:
             "buying": f"KSL Cars · {dealer}" if dealer else f"KSL Cars · {seller}",
             "text": "",
             "year": r.get("makeYear"),
+            "make": r.get("make") or "",
             "miles": r.get("mileage") or None,  # private sellers sometimes leave 0
         })
     return out

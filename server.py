@@ -194,10 +194,17 @@ def list_listings(body, params):
     elif status != "all":
         where.append("l.status = ?")
         args.append(status)
+    # Finds without the sorted-on value (no miles stated, no price...) go last.
     order = {
         "newest": "l.first_seen DESC",
         "price": "l.total IS NULL, l.total ASC",
+        "price_desc": "l.total IS NULL, l.total DESC",
         "deal": "l.deal_pct IS NULL, l.deal_pct DESC",
+        "miles": "l.miles IS NULL, l.miles ASC",  # cars and trucks
+        "year_desc": "l.year IS NULL, l.year DESC, l.miles IS NULL, l.miles ASC",
+        "year_asc": "l.year IS NULL, l.year ASC",
+        "make": "l.make IS NULL, l.make COLLATE NOCASE ASC, l.year DESC",
+        "size": "l.size IS NULL, CAST(l.size AS REAL) = 0, CAST(l.size AS REAL), l.size",  # clothes
     }.get(params.get("sort"), "l.id ASC" if since is not None else "l.first_seen DESC")
     sql = f"""SELECT l.*, w.name AS watch_name FROM listings l JOIN watches w ON w.id = l.watch_id
               WHERE {' AND '.join(where)} ORDER BY {order} LIMIT 500"""

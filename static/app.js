@@ -352,6 +352,7 @@ function renderWatchSelects() {
 
 async function loadListings() {
   fillSourceFilter();
+  fillSortOptions();
   const q = new URLSearchParams({ watch: $("#f-watch").value, status: $("#f-status").value, sort: $("#f-sort").value });
   const src = $("#f-source").value;
   if (src) q.set("source", src === "ebay" ? "ebay,ebay_local" : src);  // eBay includes its local pickup search
@@ -532,7 +533,25 @@ $("#listings").addEventListener("click", async e => {
   await Promise.all([loadListings(), refresh()]);
 });
 
-["#f-watch", "#f-status", "#f-sort"].forEach(s => $(s).addEventListener("change", loadListings));
+["#f-watch", "#f-status"].forEach(s => $(s).addEventListener("change", loadListings));
+$("#f-sort").addEventListener("change", e => { store("findsSort", e.target.value); loadListings(); });
+// Sorting fits what's shown: cars add miles, year and make; clothes add size.
+const SORTS = {
+  common: [["newest", "Newest first"], ["price", "Cheapest first"], ["price_desc", "Priciest first"], ["deal", "Best deal first"]],
+  cars: [["miles", "Lowest miles"], ["year_desc", "Newest year"], ["year_asc", "Oldest year"], ["make", "Make A–Z"]],
+  clothes: [["size", "Size"]],
+};
+
+function fillSortOptions() {
+  const sel = $("#f-sort");
+  const watch = state.watches.find(w => w.id === Number($("#f-watch").value));
+  const kind = watch ? { vehicle: "cars", clothing: "clothes" }[watch.kind] : { cars: "cars", clothes: "clothes" }[focus()];
+  const opts = [...SORTS.common, ...(SORTS[kind] || [])];
+  const cur = sel.value || stored("findsSort", "newest");
+  sel.innerHTML = opts.map(([v, label]) => `<option value="${v}">${label}</option>`).join("");
+  sel.value = opts.some(([v]) => v === cur) ? cur : "newest";
+}
+
 // AI review: one request judging the finds on screen (up to the server's limit). A dialog first asks
 // for anything specific and which AI to use; bad deals can be hidden (to Dismissed, with Undo).
 let shownFinds = [];

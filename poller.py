@@ -171,11 +171,12 @@ def run_watch(watch: dict, settings: dict, shared: dict | None = None) -> dict:
             pct = matching.deal_pct(total, compare)
             lid = db.execute("""INSERT INTO listings (watch_id, source, source_id, title, price, shipping, total,
                 currency, url, image, location, condition, buying, first_seen, status, deal_pct,
-                year, miles, title_status, size)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                year, miles, title_status, size, make)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (watch["id"], it["source"], it["source_id"], it["title"], it["price"], it["shipping"], total,
                  it["currency"], it["url"], it["image"], it["location"], it["condition"], it["buying"],
-                 time.time(), "pruned" if limited else "new", pct, year, miles, status or None, size or None))
+                 time.time(), "pruned" if limited else "new", pct, year, miles, status or None, size or None,
+                 (it.get("make") or matching.vehicle_make(it["title"]) or None) if vehicle else None))
             if total is not None:
                 history.append((total, year))
             new_rows.append({**it, "id": lid, "total": total, "deal_pct": pct, "backlog": first_from_source})
