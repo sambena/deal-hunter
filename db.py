@@ -264,6 +264,8 @@ def conn() -> sqlite3.Connection:
                 _conn.execute("ALTER TABLE watches ADD COLUMN keep_cheapest INTEGER")
             if "color" not in cols:
                 _conn.execute("ALTER TABLE watches ADD COLUMN color TEXT")
+            if "last_check" not in cols:  # what each site returned on the last check, and why listings dropped
+                _conn.execute("ALTER TABLE watches ADD COLUMN last_check TEXT")
             for col, ddl in (("kind", "TEXT NOT NULL DEFAULT 'item'"), ("category", "TEXT"), ("year_min", "INTEGER"),
                              ("year_max", "INTEGER"), ("max_miles", "INTEGER"),
                              ("size", "TEXT"), ("department", "TEXT")):
@@ -449,6 +451,7 @@ def _watch_row(r: dict) -> dict:
     r["exclude"] = json.loads(r["exclude"])
     r["sources"] = json.loads(r["sources"])
     r["polled_sources"] = json.loads(r["polled_sources"])
+    r["last_check"] = json.loads(r.get("last_check") or "{}")
     r["enabled"] = bool(r["enabled"])
     r["include_auctions"] = bool(r["include_auctions"])
     return r

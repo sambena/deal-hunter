@@ -439,6 +439,54 @@ $("#listings").addEventListener("click", e => {
   cards.hidden ? folded.add(wid) : folded.delete(wid);
   store("foldedWatches", [...folded]);
 });
+// "Why does it find nothing?": what each site returned on the watch's last check, and why listings dropped.
+function diagnosisHtml(w) {
+  const rows = Object.entries((w && w.last_check) || {});
+  if (!rows.length) return "";
+  return `<ul class="diagnosis">${rows.map(([src, d]) => `<li><b>${esc(sourceName(src))}</b>: ${d.error ? `<span class="error">${esc(d.error)}</span>`
+    : `${d.raw} returned, ${d.kept} kept` + (Object.keys(d.dropped || {}).length
+      ? ` (${Object.entries(d.dropped).map(([why, n]) => `${n} ${esc(why)}`).join(", ")})` : "")}</li>`).join("")}</ul>`;
+}
+
+function showDiagnosis(w) {
+  const box = $("#tune-box");
+  const d = diagnosisHtml(w);
+  box.innerHTML = w && !w.total_count && w.last_polled
+    ? `<p><b>No finds yet.</b>${d ? " Last check:" : !w.sources.length ? " No sites are ticked for this watch." : ""}</p>${d}<p class="muted">${aiOn() ? "Press ✨ Improve with AI for a better search, or loosen it yourself."
+      : "Try fewer search words, wider limits or more sites (see Query tips)."}</p>` : "";
+  box.hidden = !box.innerHTML;
+}
+
+// ✨ Improve with AI: suggests a better version of the watch as it stands in the form; nothing is saved.
+async function tuneWatch() {
+  const f = $("#watch-form"), btn = $("#watch-tune");
+  const instructions = prompt("Anything to tell the AI? (optional)\ne.g. it finds nothing, too much junk, I want 4x4", "");
+  if (instructions === null) return;
+  const watch = { ...formToWatch(f), id: Number(f.id.value) || null };
+  const body = { watch, watch_id: watch.id, instructions };
+  await busy(btn, async () => {
+    if (!await aiGate("tune", body)) return;
+    const s = await api("POST", "/api/ai/tune-watch", body);
+    f.query.value = s.query;
+    f.exclude.value = s.exclude.join(", ");
+    f.min_price.value = s.min_price ?? "";
+    f.max_price.value = s.max_price ?? "";
+    if (f.kind.value === "vehicle") {
+      f.year_min.value = s.year_min ?? "";
+      f.year_max.value = s.year_max ?? "";
+      f.max_miles.value = s.max_miles ?? "";
+    }
+    if (f.kind.value === "clothing" && s.size !== null) f.size.value = s.size;
+    if (s.sources.length) Object.keys(SOURCES).forEach(k => (f["src-" + k].checked = s.sources.includes(k)));
+    const box = $("#tune-box");
+    box.innerHTML = `<p><b>✨ Suggested:</b> ${esc(s.reason)}</p>${s.diagnosis.length ? `<p class="muted">Last check:</p>`
+      + diagnosisHtml({ last_check: Object.fromEntries(s.diagnosis.map(d => [d.source, d])) }) : ""}
+      <p class="muted">The form is filled in; press <b>Save &amp; check now</b> to try it, or change anything first.</p>`;
+    box.hidden = false;
+  });
+}
+$("#watch-tune").addEventListener("click", () => tuneWatch());
+
 // Car or truck: show the year and mileage fields, and only the sources that list vehicles.
 function showWatchKind(setDefaults) {
   const f = $("#watch-form");
@@ -730,7 +778,8 @@ function renderWatches() {
         ${w.kind === "clothing" ? `<span class="muted">👕 ${esc(DEPARTMENTS[w.department] || "")}size ${esc(w.size || "any")}</span><br>` : ""}
         ${w.kind === "vehicle" ? `<span class="muted">🚗 ${w.year_min || "any"}–${w.year_max || "any"}${w.max_miles ? ` · ≤${Number(w.max_miles).toLocaleString()} mi` : ""}</span><br>` : ""}
         <span class="muted">${esc(w.condition)} · ${esc(w.sources.map(sourceName).join(", "))}</span></td>
-      <td>${w.new_count ? `<b>${w.new_count} new</b> / ` : ""}${w.total_count}</td>
+      <td>${w.new_count ? `<b>${w.new_count} new</b> / ` : ""}${w.total_count}${
+        !w.total_count && w.last_polled ? `<br><span class="error">No finds</span>${aiOn() ? ` <button class="small" data-act="tune">✨ Improve</button>` : ""}` : ""}</td>
       <td>${w.best_price != null ? money(w.best_price) : "–"}</td>
       <td>${ago(w.last_polled)}</td>
       <td class="row">
@@ -772,6 +821,9 @@ $("#watch-list").addEventListener("click", async e => {
     case "edit":
       editWatch(w);
       return;
+    case "tune":
+      editWatch(w);
+      return tuneWatch();
     case "delete":
       if (!confirm(`Delete "${w.name}" and all its finds?`)) return;
       await api("DELETE", `/api/watches/${id}`);
@@ -814,6 +866,9 @@ function editWatch(w, returnTo = null) {
   else if (!w && focus() === "clothes") { f.kind.value = "clothing"; showWatchKind(true); }
   else showWatchKind(false);
   if (!w && focus() !== "all") f.category.value = focus();
+  $("#watch-tune").hidden = !aiOn();
+  $("#watch-tune").classList.remove("primary");
+  showDiagnosis(w);
   $("#watch-form-title").textContent = w ? `Edit "${w.name}"` : "New watch";
   $("#watch-cancel").hidden = !w;
   showTab("watches");
@@ -862,11 +917,19 @@ $("#watch-form").addEventListener("submit", async e => {
       toast(`Saved · ${u.removed ? `${u.removed} removed · ` : ""}${r.new} new` +
         (r.errors.length ? ` · ${r.errors.join("; ")}` : ""), r.errors.length > 0);
     } else {
-      const r = await api("POST", "/api/watches", data);
+      const r = await api("POST", "/api/watches", data);  // the server searches it straight away
+      f.id.value = r.id;
       toast(`Watch added · ${r.new} found` + (r.errors.length ? ` · ${r.errors.join("; ")}` : ""), r.errors.length > 0);
     }
-    editWatch(null);
     await refresh();
+    // Nothing found: keep the watch open, show why, and offer AI help.
+    const saved = state.watches.find(w => w.id === Number(f.id.value));
+    if (saved && !saved.total_count) {
+      editWatch(saved, back);
+      $("#watch-tune").classList.add("primary");
+      return;
+    }
+    editWatch(null);
     if (back) showTab(back);
   });
 });

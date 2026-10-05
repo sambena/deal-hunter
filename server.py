@@ -264,6 +264,12 @@ def _ai_prompt(action: str, body: dict, ref: str | None = None) -> tuple[str, di
         if not str(body.get("description", "")).strip():
             raise HTTPError(400, "Describe what you're looking for")
         return (*ai.draft_prompt(body["description"], db.list_machines()), {})
+    if action == "tune":
+        watch = body.get("watch") or {}
+        if not str(watch.get("query") or "").strip():
+            raise HTTPError(400, "Type a search first")
+        return (*ai.tune_prompt(watch, _tune_context(body.get("watch_id")), _tune_sources(watch),
+                                str(body.get("instructions") or "")[:1000]), {"watch": watch})
     if action == "review":
         ids = [int(i) for i in (body.get("listing_ids") or [])][:ai.REVIEW_MAX]
         if not ids:
@@ -341,6 +347,81 @@ def _ai_settings(body: dict) -> dict:
 def ai_estimate(body, params):
     prompt, schema, _ = _ai_prompt(body.get("action"), body)
     return ai.estimate(_ai_settings(body), body["action"], prompt, schema)
+
+
+# What each site is, for the AI improving a watch (only the ones that watch's kind can use).
+SOURCE_HINTS = {
+    "ebay": "eBay, nationwide, shipped", "ebay_local": "eBay listings you can pick up near your ZIP",
+    "ksl": "KSL Classifieds, Utah, local pickup", "ksl_cars": "KSL Cars, Utah used cars and trucks",
+    "craigslist": "Craigslist near your ZIP", "offerup": "OfferUp near your ZIP",
+    "poshmark": "Poshmark, clothes and shoes", "reddit": "Reddit hardware swap subreddits",
+    "slickdeals": "Slickdeals retail sales", "buildapcsales": "r/buildapcsales retail PC part sales",
+    "bestbuy": "Best Buy open-box",
+}
+
+
+def _tune_sources(watch: dict) -> dict:
+    allowed = (poller.VEHICLE_SOURCES if watch.get("kind") == "vehicle" else
+               poller.CLOTHING_SOURCES if watch.get("kind") == "clothing" else
+               set(SOURCE_HINTS) - poller.VEHICLE_ONLY - poller.CLOTHING_ONLY)
+    on = db.get_settings()["sources_enabled"]
+    return {k: v for k, v in SOURCE_HINTS.items() if k in allowed and on.get(k)}
+
+
+def diagnosis(watch: dict) -> list[dict]:
+    """The last check, per site: {source, raw, kept, new, dropped: {reason: count}} or {source, error}."""
+    return [{"source": s, **d} for s, d in (watch.get("last_check") or {}).items()]
+
+
+def _tune_context(watch_id) -> str:
+    """How an existing watch's searches went: finds per site, errors, and some titles."""
+    try:
+        w = db.get_watch(int(watch_id)) if watch_id else None
+    except (TypeError, ValueError):
+        w = None
+    if not w:
+        return ""
+    lines = ["Last check, per site (what the site returned, what the watch kept, and why the rest were dropped):"]
+    lines += [f"- {d['source']}: " + (f"error: {d['error']}" if d.get("error") else
+                                      f"{d['raw']} returned, {d['kept']} kept" + (
+                                          " (dropped: " + ", ".join(f"{n} {why}" for why, n in d["dropped"].items()) + ")"
+                                          if d["dropped"] else ""))
+              for d in diagnosis(w)] or ["- (no check recorded yet)"]
+    counts = db.query("""SELECT source, COUNT(*) AS n, SUM(status = 'dismissed') AS dismissed FROM listings
+                         WHERE watch_id = ? GROUP BY source""", (w["id"],))
+    lines += ["Stored so far: " + ", ".join(f"{c['source']} {c['n']} ({c['dismissed'] or 0} dismissed as not wanted)"
+                                            for c in counts)] if counts else []
+    if w.get("last_error"):
+        lines.append(f"- errors: {w['last_error'][:400]}")
+    for label, status in (("Some finds", "status != 'dismissed'"), ("Finds they dismissed", "status = 'dismissed'")):
+        rows = db.query(f"""SELECT title, total FROM listings WHERE watch_id = ? AND {status}
+                            ORDER BY first_seen DESC LIMIT 10""", (w["id"],))
+        if rows:
+            lines.append(f"{label}: " + "; ".join(f"{r['title']} (${r['total'] or '?'})" for r in rows))
+    return "\n".join(lines) or "- searched, nothing found on any site"
+
+
+@route("POST", "/api/ai/tune-watch")
+def ai_tune_watch(body, params):
+    """A suggested better version of a watch (from the form, before or after saving). Nothing is saved:
+    the form shows it and the person saves if they like it."""
+    settings = _ai_settings(body)
+    prompt, schema, extra = _ai_prompt("tune", body)
+    try:
+        s = ai.run(settings, "tune", prompt, schema)
+    except ai.AIError as e:
+        raise HTTPError(400, str(e)) from e
+    usable = _tune_sources(extra["watch"])
+    sources = [x for x in s.get("sources") or [] if x in usable] or list(extra["watch"].get("sources") or [])
+    num = lambda v, kind=float: kind(v) if isinstance(v, (int, float)) and v > 0 else None  # noqa: E731
+    current = db.get_watch(int(body["watch_id"])) if str(body.get("watch_id") or "").isdigit() else None
+    return {"diagnosis": diagnosis(current) if current else [],
+            "query": str(s.get("query") or "").strip()[:200] or extra["watch"]["query"],
+            "exclude": [str(x).strip()[:40] for x in s.get("exclude") or [] if str(x).strip()][:30],
+            "min_price": num(s.get("min_price")), "max_price": num(s.get("max_price")),
+            "year_min": num(s.get("year_min"), int), "year_max": num(s.get("year_max"), int),
+            "max_miles": num(s.get("max_miles"), int), "size": (str(s["size"]).strip()[:20] or None) if s.get("size") else None,
+            "sources": sources, "reason": str(s.get("reason") or "")[:500]}
 
 
 @route("GET", "/api/ai/choices")
