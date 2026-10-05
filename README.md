@@ -121,6 +121,11 @@ Dismissed; Undo brings them back; starred finds are never hidden). Each find get
 the AI can suggest tightening a watch (exclude words, a price limit, a minimum year, a mileage cap) that you
 apply with one click.
 
+A new watch is searched as soon as it's saved. If a watch finds nothing, it stays open with what each
+site returned on its last check (e.g. "eBay: 40 returned, 0 kept (38 over the max price)"), and **✨ Improve
+with AI** on the watch form suggests a better search (query, excludes, limits, sites) with a reason; it
+fills the form, and nothing changes until you save.
+
 ## Discord
 
 Settings > Discord: paste a channel webhook URL and tick the toggle. By default it

@@ -68,6 +68,7 @@ ACTIONS = {
     "radar": {"label": "Deal radar", "typical_out": 2500, "max_out": 8000},
     # Up to REVIEW_MAX finds in one request, about 60 tokens of answer each.
     "review": {"label": "AI review of finds", "typical_out": 2500, "max_out": 9000},
+    "tune": {"label": "Improve a watch with AI", "typical_out": 500, "max_out": 3000},
 }
 REVIEW_MAX = 40
 
@@ -756,3 +757,50 @@ price limit, a minimum model year or a mileage cap. Use null (or []) for anythin
 watch_changes empty when the watch is fine. Never loosen a limit the person set.
 
 {chr(10).join(parts)}""", REVIEW_SCHEMA
+
+
+TUNE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "query": {"type": "string"},
+        "exclude": {"type": "array", "items": {"type": "string"}},
+        "min_price": {"type": ["number", "null"]}, "max_price": {"type": ["number", "null"]},
+        "year_min": {"type": ["integer", "null"]}, "year_max": {"type": ["integer", "null"]},
+        "max_miles": {"type": ["integer", "null"]}, "size": {"type": ["string", "null"]},
+        "sources": {"type": "array", "items": {"type": "string"}},
+        "reason": {"type": "string"},
+    },
+    "required": ["query", "exclude", "min_price", "max_price", "year_min", "year_max", "max_miles", "size",
+                 "sources", "reason"],
+    "additionalProperties": False,
+}
+
+
+def tune_prompt(watch: dict, context: str, sources: dict, instructions: str) -> tuple[str, dict]:
+    """A better version of one watch: its search words, excludes, limits and sites."""
+    kind = {"vehicle": "a car or truck", "clothing": "clothes or shoes"}.get(watch.get("kind"), "an item")
+    fields = {k: watch.get(k) for k in ("name", "query", "exclude", "min_price", "max_price", "condition", "year_min",
+                                        "year_max", "max_miles", "size", "department", "sources") if watch.get(k)}
+    asked = instructions.strip() or "(nothing extra)"
+    return f"""Improve this Deal Hunter watch, a saved search for {kind} that's run on several sites.
+
+How searching works: every word in the query must be in a listing's title (case and punctuation ignored);
+a|b means either word; "two words" is a phrase; -word excludes. Car and truck watches: a body style word
+(pickup, suv, van, minivan, sedan, coupe, convertible, hatchback, wagon) searches that style, and a finding
+must have a model year. Clothing watches: the size is matched too. Too many words, a too-specific model
+name or price limits that are too tight find nothing; too few words find junk.
+
+The watch now:
+{json.dumps(fields, indent=1)}
+
+How its last searches went:
+{context or "(not searched yet)"}
+
+Sites it can use (key: what it is):
+{chr(10).join(f"- {k}: {v}" for k, v in sources.items())}
+
+What the person says, which outranks your defaults: {asked}
+
+Give the improved watch: the full query (use the syntax above), the full exclude list, limits (null = none),
+and the sites to search (keys from the list). Keep what's already right; change only what helps it find the
+thing they want at a good price. reason: two short sentences on what you changed and why.""", TUNE_SCHEMA

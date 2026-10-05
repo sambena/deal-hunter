@@ -150,3 +150,6 @@ dialog#review-dialog::backdrop { background: rgba(0, 0, 0, .55); }
 #review-tweaks { margin-bottom: 12px; }
 #review-tweaks h3 { margin: 0 0 8px; }
 #review-tweaks .tweak { border-top: 1px solid var(--line); padding: 8px 0; display: flex; flex-direction: column; gap: 4px; }
+.tune { margin-top: 10px; border-left: 3px solid var(--accent); padding: 4px 12px; }
+.tune p { margin: 6px 0; }
+.diagnosis { margin: 4px 0; padding-left: 18px; font-size: 13px; }

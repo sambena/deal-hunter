@@ -107,6 +107,18 @@ def fetch(name: str, watch: dict, settings: dict, shared: dict | None = None) ->
     return [dict(it) for it in shared[key]]
 
 
+def drop_reason(why: str) -> str:
+    """matching's reason for a rejected listing, grouped the way a person reads them."""
+    for start, label in (("missing", "title missing a search word"), ("excluded", "excluded words"),
+                         ("junk", "junk words (parts, broken...)"), ("over max price", "over the max price"),
+                         ("under min price", "under the min price"), ("no model year", "no model year (parts, ads)"),
+                         ("older", "older than wanted"), ("newer", "newer than wanted"),
+                         ("too many miles", "too many miles")):
+        if why.startswith(start):
+            return label
+    return why or "other"
+
+
 def run_watch(watch: dict, settings: dict, shared: dict | None = None) -> dict:
     """Poll one watch. Returns {new: int, errors: [..]}. `shared` holds this pass's requests (see fetch)."""
     fits = vehicle_fit(watch)
@@ -119,6 +131,8 @@ def run_watch(watch: dict, settings: dict, shared: dict | None = None) -> dict:
     polled = set(watch["polled_sources"])
     enabled = settings["sources_enabled"]
     new_rows, errors = [], []
+    # What each site returned this check and why listings were dropped, for "why does it find nothing?"
+    diagnosis: dict = {}
     # With a "keep the cheapest N" limit, new finds are stored hidden and only the ones that make the cut
     # become 'new' (so nothing reading the database alerts on one that's about to be hidden).
     limited = bool(watch.get("keep_cheapest"))
@@ -135,7 +149,12 @@ def run_watch(watch: dict, settings: dict, shared: dict | None = None) -> dict:
         except SourceError as e:
             errors.append(f"{name}: {e}")
             state["source_errors"][name] = str(e)
+            diagnosis[name] = {"error": str(e)[:300]}
             continue
+        diag = diagnosis[name] = {"raw": len(items), "kept": 0, "new": 0, "dropped": {}}
+
+        def drop(reason: str) -> None:
+            diag["dropped"][reason] = diag["dropped"].get(reason, 0) + 1
         # A source's first successful check finds everything already listed;
         # store those but don't send them to Discord.
         first_from_source = name not in polled
@@ -144,29 +163,35 @@ def run_watch(watch: dict, settings: dict, shared: dict | None = None) -> dict:
             total = None
             if it["price"] is not None:
                 total = round(it["price"] + (it["shipping"] or 0), 2)
-            ok, _ = matching.check(it.get("match_text") or it["title"], watch, settings["junk_terms"],
-                                   total, it.get("text", ""))
+            ok, why = matching.check(it.get("match_text") or it["title"], watch, settings["junk_terms"],
+                                     total, it.get("text", ""))
             if not ok:
+                drop(drop_reason(why))
                 continue
             year = miles = status = size = None
             if watch.get("kind") == "clothing":
                 size = it.get("size") or matching.title_size(it["title"])
                 if not matching.check_size(size, watch)[0]:
+                    drop("other sizes")
                     continue
             if vehicle:
                 text = f"{it['title']} {it.get('text', '')}"
                 year = it.get("year") or matching.vehicle_year(it["title"])
                 miles = it.get("miles") if it.get("miles") is not None else matching.vehicle_miles(text)
                 status = it.get("title_status") or matching.title_status(text)
-                if not matching.check_vehicle(year, miles, watch)[0]:
+                ok, why = matching.check_vehicle(year, miles, watch)
+                if not ok:
+                    drop(drop_reason(why))
                     continue
             fam = family(it["source"])  # e.g. an eBay item found by both the national and local search
             exists = db.query(f"""SELECT id FROM listings WHERE watch_id = ? AND source_id = ?
                                   AND source IN ({','.join('?' * len(fam))})""",
                               (watch["id"], it["source_id"], *fam))
+            diag["kept"] += 1
             if exists:
                 db.execute("UPDATE listings SET seen_at = ? WHERE id = ?", (time.time(), exists[0]["id"]))
                 continue
+            diag["new"] += 1
             compare = matching.vehicle_history(year, history) if vehicle else [t for t, _ in history]
             pct = matching.deal_pct(total, compare)
             lid = db.execute("""INSERT INTO listings (watch_id, source, source_id, title, price, shipping, total,
@@ -180,8 +205,8 @@ def run_watch(watch: dict, settings: dict, shared: dict | None = None) -> dict:
             if total is not None:
                 history.append((total, year))
             new_rows.append({**it, "id": lid, "total": total, "deal_pct": pct, "backlog": first_from_source})
-    db.execute("UPDATE watches SET last_polled = ?, last_error = ?, polled_sources = ? WHERE id = ?",
-               (time.time(), "; ".join(errors) or None, json.dumps(sorted(polled)), watch["id"]))
+    db.execute("UPDATE watches SET last_polled = ?, last_error = ?, polled_sources = ?, last_check = ? WHERE id = ?",
+               (time.time(), "; ".join(errors) or None, json.dumps(sorted(polled)), json.dumps(diagnosis), watch["id"]))
     if limited and new_rows:
         # Only the cheapest N stay; a new find that didn't make the cut stays hidden and never alerts.
         db.prune_cheapest(watch, {r["id"] for r in new_rows})
