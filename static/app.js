@@ -36,6 +36,38 @@ const KINDS = { pc: "PC", server: "Server", tv: "TV", monitor: "Monitor", phone:
   "smart home": "Smart home", vehicle: "Car / truck", other: "Other" };
 const KIND_ICONS = { pc: "💻", server: "🗄️", tv: "📺", monitor: "🖥️", phone: "📱", tablet: "📱", audio: "🔊",
   network: "📶", console: "🎮", printer: "🖨️", appliance: "🧺", "smart home": "🏠", vehicle: "🚗", other: "📦" };
+// Focus: one person's view of Deal Hunter (everything, or just tech, cars or home), saved to their account.
+const FOCUS = {
+  all: { brand: "Deal Hunter", stuff: "My Stuff", accent: "" },
+  tech: { brand: "Deal Hunter · Tech", stuff: "My Tech", accent: "#4ea1ff" },
+  cars: { brand: "Deal Hunter · Cars & trucks", stuff: "My Garage", accent: "#f97316" },
+  home: { brand: "Deal Hunter · Home & gear", stuff: "My Stuff", accent: "#22c55e" },
+};
+const focus = () => (FOCUS[state.settings?.focus] ? state.settings.focus : "all");
+const inFocus = w => focus() === "all" || (w && w.category === focus());
+const focusWatches = () => state.watches.filter(inFocus);
+const focusMachines = () => state.machines.filter(m => focus() === "all" || m.category === focus());
+
+function applyFocus() {
+  const f = focus(), look = FOCUS[f];
+  document.documentElement.dataset.focus = f;
+  document.documentElement.style.setProperty("--accent", look.accent || "");
+  if (!look.accent) document.documentElement.style.removeProperty("--accent");
+  $("#brand").textContent = look.brand;
+  $("#focus-pick").value = f;
+  $('nav button[data-tab="hardware"]').textContent = look.stuff;
+  // Add buttons that fit the focus.
+  $$("[data-add-kind]").forEach(b => (b.hidden = (b.dataset.addKind === "pc" && ["cars", "home"].includes(f))
+    || (b.dataset.addKind === "vehicle" && ["tech", "home"].includes(f))));
+}
+
+$("#focus-pick").addEventListener("change", async e => {
+  await api("PUT", "/api/settings", { focus: e.target.value });
+  await refresh();
+  if (!$("#tab-finds").hidden) loadListings();
+  if (!$("#tab-hardware").hidden) renderMachines();
+});
+
 const kindIcon = k => KIND_ICONS[k || "pc"] || "📦";
 const kindOptions = cur => Object.entries(KINDS).map(([k, label]) =>
   `<option value="${esc(k)}" ${k === cur ? "selected" : ""}>${esc(label)}</option>`).join("");
@@ -273,7 +305,8 @@ async function refresh() {
   const isAdmin = state.me && state.me.role === "admin";
   $("#admin-nav").hidden = !isAdmin;
   $$("[data-admin-only]").forEach(el => (el.hidden = !isAdmin));
-  const newTotal = state.watches.reduce((n, w) => n + w.new_count, 0);
+  applyFocus();
+  const newTotal = state.watches.filter(inFocus).reduce((n, w) => n + w.new_count, 0);
   $("#new-badge").hidden = !newTotal;
   $("#new-badge").textContent = newTotal;
   document.title = newTotal ? `(${newTotal}) Deal Hunter` : "Deal Hunter";
@@ -291,7 +324,7 @@ function renderWatchSelects() {
   const sel = $("#f-watch");
   const cur = sel.value;
   sel.innerHTML = `<option value="">All watches</option>` +
-    state.watches.map(w => `<option value="${w.id}">${esc(w.name)}${w.new_count ? ` (${w.new_count} new)` : ""}</option>`).join("");
+    focusWatches().map(w => `<option value="${w.id}">${esc(w.name)}${w.new_count ? ` (${w.new_count} new)` : ""}</option>`).join("");
   sel.value = cur;
   const msel = $("#watch-form [name=machine_id]");
   const mcur = msel.value;
@@ -303,7 +336,8 @@ function renderWatchSelects() {
 
 async function loadListings() {
   const q = new URLSearchParams({ watch: $("#f-watch").value, status: $("#f-status").value, sort: $("#f-sort").value });
-  const { listings } = await api("GET", "/api/listings?" + q);
+  const shown = new Set(focusWatches().map(w => w.id));
+  const listings = (await api("GET", "/api/listings?" + q)).listings.filter(l => shown.has(l.watch_id));
   const box = $("#listings");
   $("#f-group").checked = stored("groupFinds", true);
   if (!listings.length) {
@@ -482,11 +516,15 @@ function suggestExclude(title, watch) {
 
 function renderWatches() {
   const box = $("#watch-list");
-  if (!state.watches.length) { box.innerHTML = `<p class="muted">No watches yet.</p>`; return; }
+  const watches = focusWatches();
+  if (!watches.length) {
+    box.innerHTML = `<p class="muted">${state.watches.length ? "No watches in this focus. Pick Everything at the top to see them all." : "No watches yet."}</p>`;
+    return;
+  }
   const machineName = id => (state.machines.find(m => m.id === id) || {}).name;
   box.innerHTML = `<div class="table-wrap"><table>
     <tr><th>On</th><th>Name / query</th><th>Price range</th><th>Finds</th><th>Best</th><th>Checked</th><th></th></tr>
-    ${state.watches.map(w => `<tr data-id="${w.id}">
+    ${watches.map(w => `<tr data-id="${w.id}">
       <td><input type="checkbox" data-act="toggle" ${w.enabled ? "checked" : ""}></td>
       <td><span class="dot" style="background:${watchColor(w)}"></span><b>${esc(w.name)}</b><br><code>${esc(w.query)}</code>
         ${w.exclude.length ? `<span class="muted"> not: ${esc(w.exclude.join(", "))}</span>` : ""}
@@ -570,7 +608,10 @@ function editWatch(w, returnTo = null) {
     f.include_auctions.checked = w.include_auctions;
     Object.keys(SOURCES).forEach(s => (f["src-" + s].checked = w.sources.includes(s)));
   }
-  showWatchKind(false);
+  f.category.value = w ? (w.category_choice || "") : "";
+  if (!w && focus() === "cars") { f.kind.value = "vehicle"; showWatchKind(true); }
+  else showWatchKind(false);
+  if (!w && focus() !== "all") f.category.value = focus();
   $("#watch-form-title").textContent = w ? `Edit "${w.name}"` : "New watch";
   $("#watch-cancel").hidden = !w;
   showTab("watches");
@@ -591,6 +632,7 @@ function formToWatch(f) {
     min_price: f.min_price.value,
     max_price: f.max_price.value,
     kind: f.kind.value,
+    category: f.category.value || null,
     year_min: f.kind.value === "vehicle" ? f.year_min.value : null,
     year_max: f.kind.value === "vehicle" ? f.year_max.value : null,
     max_miles: f.kind.value === "vehicle" ? f.max_miles.value : null,
@@ -677,13 +719,14 @@ let stuffKind = stored("stuffKind", "");
 function renderMachines() {
   const box = $("#machines");
   const order = Object.keys(KINDS);
+  const mine = focusMachines();
   const counts = {};
-  state.machines.forEach(m => (counts[m.kind || "pc"] = (counts[m.kind || "pc"] || 0) + 1));
+  mine.forEach(m => (counts[m.kind || "pc"] = (counts[m.kind || "pc"] || 0) + 1));
   if (stuffKind && !counts[stuffKind]) stuffKind = "";
-  $("#kind-chips").innerHTML = state.machines.length ? [["", `All · ${state.machines.length}`],
+  $("#kind-chips").innerHTML = mine.length ? [["", `All · ${mine.length}`],
     ...order.filter(k => counts[k]).map(k => [k, `${kindIcon(k)} ${KINDS[k]} · ${counts[k]}`])]
     .map(([k, label]) => `<button type="button" class="chip${k === stuffKind ? " on" : ""}" data-kind="${esc(k)}">${esc(label)}</button>`).join("") : "";
-  const list = state.machines.filter(m => !stuffKind || (m.kind || "pc") === stuffKind)
+  const list = mine.filter(m => !stuffKind || (m.kind || "pc") === stuffKind)
     .sort((a, b) => order.indexOf(a.kind || "pc") - order.indexOf(b.kind || "pc") || a.name.localeCompare(b.name));
   let html = "", last = null;
   for (const m of list) {
@@ -692,7 +735,8 @@ function renderMachines() {
     last = k;
     html += machineCard(m);
   }
-  box.innerHTML = html || `<p class="muted">Nothing here yet. Add a computer, a car or anything else you own.</p>`;
+  box.innerHTML = html || `<p class="muted">${state.machines.length && focus() !== "all"
+    ? "Nothing of yours in this focus yet." : "Nothing here yet. Add a computer, a car or anything else you own."}</p>`;
 }
 
 $("#kind-chips").addEventListener("click", e => {

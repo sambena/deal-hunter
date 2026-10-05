@@ -8,7 +8,13 @@
 </head>
 <body>
   <header>
-    <h1>Deal Hunter</h1>
+    <h1 id="brand">Deal Hunter</h1>
+    <select id="focus-pick" title="What you're hunting: shows only that, everywhere (saved to your account)">
+      <option value="all">🔎 Everything</option>
+      <option value="tech">💻 Tech</option>
+      <option value="cars">🚗 Cars &amp; trucks</option>
+      <option value="home">🏠 Home &amp; gear</option>
+    </select>
     <nav>
       <button data-tab="finds" class="active">Finds <span id="new-badge" class="badge" hidden></span></button>
       <button data-tab="watches">Watches</button>
@@ -60,6 +66,10 @@
         <form id="watch-form">
           <input type="hidden" name="id">
           <div class="grid">
+            <label title="Which focus shows this watch">Category
+              <select name="category"><option value="">Automatic</option><option value="tech">💻 Tech</option>
+                <option value="cars">🚗 Cars &amp; trucks</option><option value="home">🏠 Home &amp; gear</option></select>
+            </label>
             <label>Looking for
               <select name="kind"><option value="item">Things (hardware, gear…)</option><option value="vehicle">A car or truck</option></select>
             </label>

@@ -53,6 +53,7 @@ DEFAULT_SETTINGS = {
     "ai_monthly_limit": 5.0,  # US dollars; AI buttons stop working once a request could pass it
     "ai_confirm": True,  # show the cost and ask before each paid AI request
     "ai_source": "shared",  # members: "shared" = the admin's AI on their allowance, "own" = their own key
+    "focus": "all",  # what this person mostly hunts: all | tech | cars | home (filters and themes the pages)
     "claude_model": "claude-opus-5-5",
 }
 
@@ -64,14 +65,14 @@ SECRET_KEYS = {"ebay_client_secret", "bestbuy_api_key", "discord_webhook", "anth
 USER_KEYS = {"zip_code", "local_radius_miles", "junk_terms", "discord_enabled", "discord_webhook",
              "discord_deals_only", "ai_provider", "ollama_url", "ollama_model", "anthropic_api_key", "claude_model",
              "openai_api_key", "openai_model", "gemini_api_key", "gemini_model", "gemini_free_tier",
-             "ai_monthly_limit", "ai_confirm", "ai_source", "ha_url", "ha_token"}
+             "ai_monthly_limit", "ai_confirm", "ai_source", "ha_url", "ha_token", "focus"}
 
 # What a member (not the admin) may see and change: their area, junk words, Discord and their own AI.
 # Everything else, including their Home Assistant link, is the admin's (Sam, 2026-10-04).
 MEMBER_KEYS = {"zip_code", "local_radius_miles", "junk_terms", "discord_enabled", "discord_webhook",
                "discord_deals_only", "ai_source", "ai_provider", "ollama_url", "ollama_model", "anthropic_api_key",
                "claude_model", "openai_api_key", "openai_model", "gemini_api_key", "gemini_model",
-               "gemini_free_tier", "ai_monthly_limit", "ai_confirm"}
+               "gemini_free_tier", "ai_monthly_limit", "ai_confirm", "focus"}
 # Shared settings a member's pages still need to read (which sources are switched on, how often checks run).
 MEMBER_READS = {"sources_enabled", "poll_minutes"}
 
@@ -97,6 +98,7 @@ CREATE TABLE IF NOT EXISTS watches (
     keep_cheapest INTEGER,           -- keep only this many cheapest finds; NULL = keep all
     color TEXT,                      -- "#RRGGBB" the person picked; NULL = from the palette by id
     kind TEXT NOT NULL DEFAULT 'item',  -- item | vehicle (cars, trucks: year range and miles)
+    category TEXT,                   -- tech | cars | home: which focus shows it (see watch_category)
     year_min INTEGER,
     year_max INTEGER,
     max_miles INTEGER
@@ -254,7 +256,7 @@ def conn() -> sqlite3.Connection:
                 _conn.execute("ALTER TABLE watches ADD COLUMN keep_cheapest INTEGER")
             if "color" not in cols:
                 _conn.execute("ALTER TABLE watches ADD COLUMN color TEXT")
-            for col, ddl in (("kind", "TEXT NOT NULL DEFAULT 'item'"), ("year_min", "INTEGER"),
+            for col, ddl in (("kind", "TEXT NOT NULL DEFAULT 'item'"), ("category", "TEXT"), ("year_min", "INTEGER"),
                              ("year_max", "INTEGER"), ("max_miles", "INTEGER")):
                 if col not in cols:
                     _conn.execute(f"ALTER TABLE watches ADD COLUMN {col} {ddl}")
@@ -418,13 +420,15 @@ def public_settings(user_id: int | None = None, admin: bool = True) -> dict:
 
 WATCH_FIELDS = ("name", "query", "exclude", "min_price", "max_price", "condition",
                 "include_auctions", "sources", "enabled", "notes", "machine_id", "keep_cheapest", "color",
-                "kind", "year_min", "year_max", "max_miles")
+                "kind", "year_min", "year_max", "max_miles", "category")
 # Changing any of these makes the next check find a fresh backlog of older listings.
 MATCH_FIELDS = ("query", "exclude", "min_price", "max_price", "condition", "include_auctions",
                 "kind", "year_min", "year_max", "max_miles")
 
 
 def _watch_row(r: dict) -> dict:
+    r["category_choice"] = r.get("category") if r.get("category") in CATEGORIES else None  # None = automatic
+    r["category"] = watch_category(r)
     r["exclude"] = json.loads(r["exclude"])
     r["sources"] = json.loads(r["sources"])
     r["polled_sources"] = json.loads(r["polled_sources"])
@@ -453,6 +457,27 @@ def get_watch(watch_id: int, any_user: bool = False) -> dict | None:
     return _watch_row(rows[0]) if rows else None
 
 
+# Focus categories. Devices belong by kind; a watch by its own choice, else what it's for.
+CATEGORIES = ("tech", "cars", "home")
+KIND_CATEGORY = {"pc": "tech", "server": "tech", "monitor": "tech", "phone": "tech", "tablet": "tech",
+                 "network": "tech", "console": "tech", "printer": "tech", "vehicle": "cars", "tv": "home",
+                 "audio": "home", "appliance": "home", "smart home": "home", "other": "home"}
+
+
+def watch_category(watch: dict) -> str:
+    """tech, cars or home: as chosen, else a car watch is cars, a watch for one of your things takes that
+    thing's category (parts for your truck are cars), and anything else is tech."""
+    if watch.get("category") in CATEGORIES:
+        return watch["category"]
+    if watch.get("kind") == "vehicle":
+        return "cars"
+    if watch.get("machine_id"):
+        m = get_machine(watch["machine_id"], any_user=True)
+        if m:
+            return KIND_CATEGORY.get(m.get("kind") or "pc", "tech")
+    return "tech"
+
+
 def _watch_values(data: dict) -> dict:
     out = {}
     for f in WATCH_FIELDS:
@@ -473,6 +498,8 @@ def _watch_values(data: dict) -> dict:
             v = v if v is None or v > 0 else None
         elif f == "kind":
             v = v if v in ("item", "vehicle") else "item"
+        elif f == "category":
+            v = v if v in CATEGORIES else None
         elif f in ("year_min", "year_max", "max_miles"):
             try:
                 v = int(float(v)) if v not in (None, "") else None
@@ -549,6 +576,7 @@ PARTS_KINDS = {"pc", "server"}
 
 
 def _machine_row(r: dict) -> dict:
+    r["category"] = KIND_CATEGORY.get(r.get("kind") or "pc", "tech")
     r["parts"] = json.loads(r["parts"])
     r["custom"] = json.loads(r.get("custom") or "[]")
     return r
