@@ -119,6 +119,31 @@ def body_style(query: str) -> tuple[str | None, str]:
     return body, " ".join(rest)
 
 
+# Makes as people write them in titles -> how they're shown and sorted.
+MAKE_ALIASES = {"chevy": "Chevrolet", "chev": "Chevrolet", "vw": "Volkswagen", "mercedes": "Mercedes-Benz",
+                "benz": "Mercedes-Benz", "mb": "Mercedes-Benz", "gmc": "GMC", "bmw": "BMW", "ram": "Ram",
+                "dodge": "Dodge", "landrover": "Land Rover", "alfa": "Alfa Romeo", "mini": "MINI", "kia": "Kia"}
+TWO_WORD_MAKES = {"land rover", "alfa romeo", "aston martin", "rolls royce", "mercedes benz", "am general"}
+
+
+def vehicle_make(title: str) -> str:
+    """The make, from the words after the model year: "2005 chevy silverado" -> "Chevrolet"."""
+    m = YEAR_RE.search(title or "")
+    words = re.findall(r"[A-Za-z][A-Za-z-]*", (title or "")[m.end():] if m else "")
+    if not words:
+        return ""
+    two = " ".join(words[:2]).lower().replace("-", " ")
+    if two in TWO_WORD_MAKES:
+        return MAKE_ALIASES.get(two.replace(" ", ""), two.title().replace("Mercedes Benz", "Mercedes-Benz"))
+    first = words[0].lower()
+    if first in MAKE_ALIASES:
+        return MAKE_ALIASES[first]
+    w = words[0]
+    if w != w.lower() and w != w.upper():
+        return w  # written with care already: "Mercedes-Benz", "McLaren"
+    return "-".join(p.capitalize() for p in w.split("-")) if len(w) > 3 else w.upper()
+
+
 def vehicle_year(title: str) -> int | None:
     """The model year, which listings put first: "2018 Toyota Tacoma TRD"."""
     m = YEAR_RE.search(title or "")
