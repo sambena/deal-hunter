@@ -32,16 +32,16 @@ function stored(key, fallback) {
 function store(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} }
 // My Stuff covers everything owned. PCs and servers list their parts; anything else is a make/model.
 const KINDS = { pc: "PC", server: "Server", tv: "TV", monitor: "Monitor", phone: "Phone", tablet: "Tablet",
-  audio: "Speaker / audio", network: "Network", console: "Game console", printer: "Printer", appliance: "Appliance",
+  audio: "Speaker / audio", network: "Network", console: "Game console", printer: "Printer", appliance: "Appliance", kitchen: "Kitchen",
   "smart home": "Smart home", vehicle: "Car / truck", other: "Other" };
 const KIND_ICONS = { pc: "💻", server: "🗄️", tv: "📺", monitor: "🖥️", phone: "📱", tablet: "📱", audio: "🔊",
-  network: "📶", console: "🎮", printer: "🖨️", appliance: "🧺", "smart home": "🏠", vehicle: "🚗", other: "📦" };
+  network: "📶", console: "🎮", printer: "🖨️", appliance: "🧊", kitchen: "🍳", "smart home": "🏠", vehicle: "🚗", other: "📦" };
 // Focus: one person's view of Deal Hunter (everything, or just tech, cars or home), saved to their account.
 const FOCUS = {
   all: { brand: "Deal Hunter", stuff: "My Stuff", accent: "" },
   tech: { brand: "Deal Hunter · Tech", stuff: "My Tech", accent: "#4ea1ff" },
   cars: { brand: "Deal Hunter · Cars & trucks", stuff: "My Garage", accent: "#f97316" },
-  home: { brand: "Deal Hunter · Home & gear", stuff: "My Stuff", accent: "#22c55e" },
+  home: { brand: "Deal Hunter · Home & gear", stuff: "My Home", accent: "#22c55e" },
 };
 const focus = () => (FOCUS[state.settings?.focus] ? state.settings.focus : "all");
 const inFocus = w => focus() === "all" || (w && w.category === focus());
@@ -58,7 +58,8 @@ function applyFocus() {
   $('nav button[data-tab="hardware"]').textContent = look.stuff;
   // Add buttons that fit the focus.
   $$("[data-add-kind]").forEach(b => (b.hidden = (b.dataset.addKind === "pc" && ["cars", "home"].includes(f))
-    || (b.dataset.addKind === "vehicle" && ["tech", "home"].includes(f))));
+    || (b.dataset.addKind === "vehicle" && ["tech", "home"].includes(f))
+    || (b.dataset.addKind === "appliance" && ["tech", "cars"].includes(f))));
 }
 
 $("#focus-pick").addEventListener("change", async e => {
@@ -876,7 +877,7 @@ function machineCard(m) {
       <button class="parts-only ${needed ? "primary" : ""}" data-act="get-specs">Get specs</button>
       <button class="primary parts-only" data-act="suggest">Find upgrades</button>
       <button class="primary gear-only" data-act="watch-model">Watch this model</button>
-      <button class="vehicle-only" data-act="recalls">Recalls</button>
+      <button class="gear-only" data-act="recalls" title="Safety recalls (NHTSA for cars, CPSC for everything else)">Recalls</button>
       <button class="primary vehicle-only" data-act="find-parts" title="Watch eBay for a part that fits this vehicle">Find parts</button>
       ${aiOn() ? `<button data-act="suggest-ai">Find upgrades with AI</button>` : ""}
       ${m.id ? `<button class="danger" data-act="delete">Delete</button>` : ""}
@@ -954,16 +955,20 @@ async function showRecalls(card, btn) {
   if (!box.hidden) { box.hidden = true; return; }
   await busy(btn, async () => {
     const id = await saveMachine(card);
-    const { recalls, vehicle } = await api("GET", `/api/machines/${id}/recalls`);
-    box.innerHTML = recalls.length ? `<p><b>${recalls.length} recall${recalls.length === 1 ? "" : "s"}</b> NHTSA lists for ${esc(vehicle)}.
-        A dealer fixes recalls free; check yours by VIN at <a href="https://www.nhtsa.gov/recalls" target="_blank" rel="noopener">nhtsa.gov/recalls</a>.</p>` +
+    const { recalls, vehicle, source } = await api("GET", `/api/machines/${id}/recalls`);
+    const car = source === "nhtsa";
+    box.innerHTML = recalls.length ? `<p><b>${recalls.length} recall${recalls.length === 1 ? "" : "s"}</b> ${car ? "NHTSA" : "the CPSC"} lists for ${esc(vehicle)}.
+        ${car ? `A dealer fixes recalls free; check yours by VIN at <a href="https://www.nhtsa.gov/recalls" target="_blank" rel="noopener">nhtsa.gov/recalls</a>.`
+          : "Recalls marked <i>check your model</i> are the same brand and kind of product: compare the model number on the recall page."}</p>` +
       recalls.map(r => `<div class="recall${r.park_it ? " park" : ""}">
-        <div><b>${esc(r.component)}</b> <span class="meta">${esc(r.campaign)} · ${esc(r.date)}</span>${r.park_it ? ` <span class="title-flag">Don't drive it</span>` : ""}</div>
+        <div><b>${esc(r.component)}</b> <span class="meta">${esc(r.campaign)} · ${esc(r.date)}</span>${
+          r.match === "model" ? ` <span class="title-flag">Your model</span>` : r.match === "type" ? ` <span class="meta">· check your model</span>` : ""}${
+          r.park_it ? ` <span class="title-flag">${car ? "Don't drive it" : "Stop using it"}</span>` : ""}</div>
         <div>${esc(r.summary)}</div>
         <div class="meta">${esc(r.consequence)}</div>
         <div class="meta">Fix: ${esc(r.remedy)}</div>
         <a href="${esc(safeUrl(r.url))}" target="_blank" rel="noopener">Details</a></div>`).join("")
-      : `<p class="muted">No recalls listed for ${esc(vehicle)}.</p>`;
+      : `<p class="muted">No recalls listed for ${esc(vehicle)}${source === "cpsc" ? " (searched by brand and kind of product)" : ""}.</p>`;
     box.hidden = false;
   });
 }

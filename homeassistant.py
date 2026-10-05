@@ -42,8 +42,9 @@ KIND_RULES = [
     (r"ubiquiti|unifi|netgear|eero|tp-link deco|asus rt|switch.*poe|poe switch|router|access point", "network", True),
     (r"xbox|playstation|ps5|nintendo|steam deck", "console", True),
     (r"printer|envy|laserjet|officejet|epson|brother|canon pixma", "printer", True),
-    (r"device_(washer|dryer|refrigerator|dish_washer|oven)|washer|dryer|refrigerator|dishwasher|\boven\b|microwave",
-     "appliance", True),
+    (r"microwave|blender|air fryer|coffee|espresso|keurig|instant pot|toaster|kettle|mixer", "kitchen", True),
+    (r"device_(washer|dryer|refrigerator|dish_washer|oven)|washer|dryer|refrigerator|fridge|freezer|dishwasher"
+     r"|\boven\b|\brange\b|stove|cooktop|water heater|vacuum|roomba", "appliance", True),
     (r"tesla|model [sy3x]\b|rivian|ford|toyota", "vehicle", False),
     (r"tp-link|leviton|sonoff|kasa|shelly|bhyve|hobeian|aqara|ratgdo|espressif|zigbee|third reality|ecobee"
      r"|smart plug|switch|dimmer|thermostat", "smart home", False),
@@ -244,5 +245,5 @@ def candidates(url: str, token: str, machines: list[dict], local_ok: bool = True
         seen.add(key)
         out.append(c)
     order = {k: i for i, k in enumerate(["pc", "tv", "phone", "tablet", "audio", "network", "console", "printer",
-                                          "appliance", "vehicle", "smart home", "other"])}
+                                          "appliance", "kitchen", "vehicle", "smart home", "other"])}
     return sorted(out, key=lambda c: (not c["checked"], order.get(c["kind"], 99), c["name"].lower()))

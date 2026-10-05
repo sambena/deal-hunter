@@ -461,7 +461,7 @@ def get_watch(watch_id: int, any_user: bool = False) -> dict | None:
 CATEGORIES = ("tech", "cars", "home")
 KIND_CATEGORY = {"pc": "tech", "server": "tech", "monitor": "tech", "phone": "tech", "tablet": "tech",
                  "network": "tech", "console": "tech", "printer": "tech", "vehicle": "cars", "tv": "home",
-                 "audio": "home", "appliance": "home", "smart home": "home", "other": "home"}
+                 "audio": "home", "appliance": "home", "kitchen": "home", "smart home": "home", "other": "home"}
 
 
 def watch_category(watch: dict) -> str:
@@ -571,7 +571,7 @@ def delete_watch(watch_id: int) -> bool:
 
 # Everything someone owns, not just computers. PCs and servers have a parts list; the rest a make/model.
 DEVICE_KINDS = ["pc", "server", "tv", "monitor", "phone", "tablet", "audio", "network", "console",
-                "printer", "appliance", "smart home", "vehicle", "other"]
+                "printer", "appliance", "kitchen", "smart home", "vehicle", "other"]
 PARTS_KINDS = {"pc", "server"}
 
 

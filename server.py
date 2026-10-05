@@ -24,6 +24,7 @@ import matching
 import homeassistant
 import netguard
 import poller
+import product_recalls
 import specs
 import vehicles
 
@@ -333,11 +334,19 @@ def machine_recalls(body, params, mid):
     machine = db.get_machine(int(mid))
     if not machine:
         raise HTTPError(404, "device not found")
+    kind = machine.get("kind") or "pc"
+    if kind in db.PARTS_KINDS:
+        raise HTTPError(400, "recalls are for cars, appliances and other products, not built computers")
     try:
-        found = vehicles.recalls(machine.get("make", ""), machine.get("model", ""), machine.get("year"))
+        if kind == "vehicle":  # NHTSA
+            found = vehicles.recalls(machine.get("make", ""), machine.get("model", ""), machine.get("year"))
+            what = f"{machine.get('year')} {machine.get('make')} {machine.get('model')}"
+        else:  # CPSC
+            found = product_recalls.recalls(machine)
+            what = " ".join(x for x in (machine.get("make"), machine.get("model") or machine.get("name")) if x)
     except vehicles.LookupFailed as e:
         raise HTTPError(400, str(e)) from e
-    return {"recalls": found, "vehicle": f"{machine.get('year')} {machine.get('make')} {machine.get('model')}"}
+    return {"recalls": found, "vehicle": what, "source": "nhtsa" if kind == "vehicle" else "cpsc"}
 
 
 @route("POST", r"/api/machines/(\d+)/suggest")

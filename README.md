@@ -64,6 +64,11 @@ Vehicles in My Stuff take a VIN and odometer: **Look up** fills in make, model, 
 NHTSA's free VIN decoder, **Recalls** lists NHTSA safety recalls for that model year, and **Find parts** starts a watch linked to the
 vehicle: its eBay searches only show parts eBay lists as fitting that year/make/model.
 
+Household things (kinds Appliance: fridge, stove, washer…; Kitchen: blender, microwave, coffee maker…)
+and most other gear also get **Recalls**, from the Consumer Product Safety Commission's free database: it
+searches the brand's recalls and keeps the ones naming your model ("Your model") or the same kind of
+product ("check your model": compare the model number on the recall page).
+
 ## Focus
 
 The picker at the top (Everything / Tech / Cars & trucks / Home & gear) is saved to each person's account.
