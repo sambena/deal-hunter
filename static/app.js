@@ -351,7 +351,10 @@ function renderWatchSelects() {
 // ---- finds ----------------------------------------------------------------------
 
 async function loadListings() {
+  fillSourceFilter();
   const q = new URLSearchParams({ watch: $("#f-watch").value, status: $("#f-status").value, sort: $("#f-sort").value });
+  const src = $("#f-source").value;
+  if (src) q.set("source", src === "ebay" ? "ebay,ebay_local" : src);  // eBay includes its local pickup search
   const shown = new Set(focusWatches().map(w => w.id));
   const listings = (await api("GET", "/api/listings?" + q)).listings.filter(l => shown.has(l.watch_id));
   const box = $("#listings");
@@ -528,6 +531,15 @@ $("#listings").addEventListener("click", async e => {
 });
 
 ["#f-watch", "#f-status", "#f-sort"].forEach(s => $(s).addEventListener("change", loadListings));
+// Source picker: the sites switched on (eBay's local pickup search counts as eBay), remembered per browser.
+function fillSourceFilter() {
+  const sel = $("#f-source");
+  const cur = sel.value || stored("findsSource", "");
+  const on = Object.keys(SOURCES).filter(s => s !== "ebay_local" && (state.settings.sources_enabled || {})[s] !== false);
+  sel.innerHTML = `<option value="">All sources</option>` + on.map(s => `<option value="${s}">${esc(sourceName(s))}</option>`).join("");
+  sel.value = on.includes(cur) ? cur : "";
+}
+$("#f-source").addEventListener("change", e => { store("findsSource", e.target.value); loadListings(); });
 
 $("#mark-seen").addEventListener("click", async () => {
   await api("POST", "/api/listings/mark-seen", { watch: $("#f-watch").value || null });
