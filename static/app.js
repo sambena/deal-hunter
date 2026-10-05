@@ -358,6 +358,8 @@ async function loadListings() {
   if (src) q.set("source", src === "ebay" ? "ebay,ebay_local" : src);  // eBay includes its local pickup search
   const shown = new Set(focusWatches().map(w => w.id));
   const listings = (await api("GET", "/api/listings?" + q)).listings.filter(l => shown.has(l.watch_id));
+  shownFinds = listings;
+  $("#ai-review").hidden = !aiOn() || !listings.some(l => ["new", "seen", "starred"].includes(l.status));
   const box = $("#listings");
   $("#f-group").checked = stored("groupFinds", true);
   if (!listings.length) {
@@ -549,6 +551,97 @@ function fillSortOptions() {
   sel.innerHTML = opts.map(([v, label]) => `<option value="${v}">${label}</option>`).join("");
   sel.value = opts.some(([v]) => v === cur) ? cur : "newest";
 }
+
+// AI review: one request judging the finds on screen (up to the server's limit). A dialog first asks
+// for anything specific and which AI to use; bad deals can be hidden (to Dismissed, with Undo).
+let shownFinds = [];
+
+$("#ai-review").addEventListener("click", async () => {
+  const dlg = $("#review-dialog"), f = $("#review-form");
+  const { choices, max_review } = await api("GET", "/api/ai/choices");
+  if (!choices.length) return toast("Set up an AI in Settings > AI first", true);
+  const ids = shownFinds.filter(l => ["new", "seen", "starred"].includes(l.status)).slice(0, max_review).map(l => l.id);
+  $("#review-scope").textContent = `Looks at the ${ids.length} find${ids.length === 1 ? "" : "s"} shown` +
+    (shownFinds.length > ids.length ? ` (the first ${max_review}; narrow the view to review the rest)` : "") +
+    ", gives each a verdict, and points out the bad deals. Starred finds are never hidden.";
+  f.choice.innerHTML = choices.map((c, i) => `<option value="${i}"${c.current ? " selected" : ""}>${esc(c.label)}</option>`).join("");
+  const showCost = async () => {
+    const c = choices[f.choice.value];
+    $("#review-cost").textContent = "Working out the cost…";
+    try {
+      const e = await api("POST", "/api/ai/estimate", { action: "review", listing_ids: ids, instructions: f.instructions.value,
+        provider: c.provider, model: c.model });
+      $("#review-cost").textContent = !e.allowed ? e.reason : e.free ? "Free with this AI."
+        : `About ${usd(e.typical)} (at most ${usd(e.max)}). This month: ${usd(e.spent)} of ${usd(e.limit)} used.`;
+      $("#review-go").disabled = !e.allowed;
+    } catch (err) { $("#review-cost").textContent = err.message; $("#review-go").disabled = true; }
+  };
+  f.choice.onchange = showCost;
+  await showCost();
+  dlg.showModal();
+  dlg.onclose = async () => {
+    if (dlg.returnValue !== "go") return;
+    const c = choices[f.choice.value];
+    const btn = $("#ai-review");
+    await busy(btn, async () => {
+      const r = await api("POST", "/api/ai/review", { listing_ids: ids, instructions: f.instructions.value.trim(),
+        provider: c.provider, model: c.model, hide: f.hide.checked });
+      lastHidden = r.hidden_ids;
+      toast(`AI review: ${r.good} good, ${r.ok} ok, ${r.skip} bad deal${r.skip === 1 ? "" : "s"}` +
+        (r.hidden ? `, ${r.hidden} hidden (Undo brings them back)` : "") +
+        (r.unanswered ? ` (${r.unanswered} not answered)` : ""));
+      $("#ai-undo").hidden = !r.hidden;
+      await Promise.all([loadListings(), refresh()]);
+      showWatchTweaks(r.watch_changes || []);
+    }).catch(err => toast(err.message, true));
+  };
+});
+
+// The review's suggested watch changes, each applied with one click (the watch then drops finds that no
+// longer fit, as an edit does).
+const TWEAK_WORDS = { exclude: "exclude", max_price: "max price", min_price: "min price", year_min: "from year",
+  max_miles: "max miles" };
+
+function showWatchTweaks(changes) {
+  const box = $("#review-tweaks");
+  if (!changes.length) { box.hidden = true; box.innerHTML = ""; return; }
+  box.innerHTML = `<h3>Suggested watch changes</h3>` + changes.map((c, i) => {
+    const w = state.watches.find(x => x.id === c.watch_id) || {};
+    const parts = Object.entries(c.changes).map(([k, v]) => k === "exclude"
+      ? `exclude <b>${esc(v.filter(x => !(w.exclude || []).includes(x)).join(", "))}</b>`
+      : `${TWEAK_WORDS[k]} <b>${k.endsWith("price") ? money(v) : k === "year_min" ? v : Number(v).toLocaleString()}</b>`);
+    return `<div class="tweak" data-i="${i}"><div><b>${esc(c.watch_name)}</b>: ${parts.join(" · ")}</div>
+      <div class="meta">${esc(c.reason)}</div>
+      <div class="row"><button class="small primary" data-act="apply-tweak">Apply</button>
+        <button class="small" data-act="skip-tweak">No thanks</button></div></div>`;
+  }).join("");
+  box.hidden = false;
+  box.onclick = async e => {
+    const btn = e.target.closest("button[data-act]");
+    if (!btn) return;
+    const row = btn.closest(".tweak"), c = changes[row.dataset.i];
+    if (btn.dataset.act === "apply-tweak") {
+      const r = await api("PUT", `/api/watches/${c.watch_id}`, c.changes);
+      toast(`Updated "${c.watch_name}"` + (r.removed ? ` · ${r.removed} find${r.removed === 1 ? "" : "s"} removed` : ""));
+      await Promise.all([loadListings(), refresh()]);
+    }
+    row.remove();
+    if (!box.querySelector(".tweak")) box.hidden = true;
+  };
+}
+
+let lastHidden = [];
+$("#ai-review").insertAdjacentHTML("afterend", `<button id="ai-undo" hidden title="Bring back the finds the last AI review hid">Undo</button>`);
+$("#ai-undo").addEventListener("click", e => busy(e.target, async () => {
+  let back = 0;
+  for (const id of lastHidden) {  // a find a watch change has since removed is gone for good
+    try { await api("POST", `/api/listings/${id}`, { status: "seen" }); back++; } catch {}
+  }
+  toast(back ? `Brought back ${back} find${back === 1 ? "" : "s"}` : "Those finds no longer fit the watch, so they're gone");
+  lastHidden = [];
+  e.target.hidden = true;
+  await Promise.all([loadListings(), refresh()]);
+}));
 
 // Source picker: the sites switched on (eBay's local pickup search counts as eBay), remembered per browser.
 function fillSourceFilter() {

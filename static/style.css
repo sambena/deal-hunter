@@ -142,3 +142,11 @@ input[type=color] { width: 44px; height: 30px; padding: 2px; }
 .prices .pc-min { fill: var(--good); }
 .prices .pc-typ { stroke: var(--muted); stroke-dasharray: 5 4; }
 .prices .pc-lab { fill: var(--muted); font-size: 11px; }
+dialog#review-dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 12px;
+  width: min(560px, calc(100vw - 32px)); padding: 18px; }
+dialog#review-dialog::backdrop { background: rgba(0, 0, 0, .55); }
+#review-form { display: flex; flex-direction: column; gap: 12px; }
+#review-form h2 { margin: 0; }
+#review-tweaks { margin-bottom: 12px; }
+#review-tweaks h3 { margin: 0 0 8px; }
+#review-tweaks .tweak { border-top: 1px solid var(--line); padding: 8px 0; display: flex; flex-direction: column; gap: 4px; }

@@ -264,6 +264,17 @@ def _ai_prompt(action: str, body: dict, ref: str | None = None) -> tuple[str, di
         if not str(body.get("description", "")).strip():
             raise HTTPError(400, "Describe what you're looking for")
         return (*ai.draft_prompt(body["description"], db.list_machines()), {})
+    if action == "review":
+        ids = [int(i) for i in (body.get("listing_ids") or [])][:ai.REVIEW_MAX]
+        if not ids:
+            raise HTTPError(400, "No finds to review")
+        rows = db.query(f"""SELECT l.* FROM listings l JOIN watches w ON w.id = l.watch_id WHERE w.user_id = ?
+                            AND l.id IN ({','.join('?' * len(ids))}) AND l.status IN ('new', 'seen', 'starred')""",
+                        (me()["id"], *ids))
+        if not rows:
+            raise HTTPError(400, "No finds to review")
+        watches = {w["id"]: w for w in db.list_watches()}
+        return (*ai.review_prompt(rows, watches, str(body.get("instructions") or "")[:1500]), {"rows": rows})
     if action == "radar":
         gear = radar_gear()
         if not gear:
@@ -318,10 +329,87 @@ def deal_radar(body, params):
     return {"items": items, "skipped": skipped, "gear_count": len(gear)}
 
 
+def _ai_settings(body: dict) -> dict:
+    """The person's AI settings, switched to the AI they picked for this request (if they did)."""
+    try:
+        return ai.with_choice(ai.settings_for(), body.get("provider"), body.get("model"))
+    except ai.AIError as e:
+        raise HTTPError(400, str(e)) from e
+
+
 @route("POST", "/api/ai/estimate")
 def ai_estimate(body, params):
     prompt, schema, _ = _ai_prompt(body.get("action"), body)
-    return ai.estimate(ai.settings_for(), body["action"], prompt, schema)
+    return ai.estimate(_ai_settings(body), body["action"], prompt, schema)
+
+
+@route("GET", "/api/ai/choices")
+def ai_choices(body, params):
+    return {"choices": ai.choices(ai.settings_for()), "max_review": ai.REVIEW_MAX}
+
+
+@route("POST", "/api/ai/review")
+def ai_review(body, params):
+    """Judge the finds shown: a verdict and reason on each; with hide, the obvious bad deals are dismissed
+    (they can be restored from Dismissed). Starred finds are never hidden."""
+    settings = _ai_settings(body)
+    prompt, schema, extra = _ai_prompt("review", body)
+    rows = {r["id"]: r for r in extra["rows"]}
+    try:
+        answer = ai.run(settings, "review", prompt, schema)
+        reviews = answer.get("reviews") or []
+    except ai.AIError as e:
+        raise HTTPError(400, str(e)) from e
+    counts = {"good": 0, "ok": 0, "skip": 0}
+    hidden = []
+    for r in reviews:
+        lid, verdict = r.get("id"), r.get("verdict")
+        if lid not in rows or verdict not in counts:
+            continue  # an id the AI made up, or a second answer for one already done
+        counts[verdict] += 1
+        note = f"{verdict.upper()}: {str(r.get('reason') or '').strip()[:300]}"
+        if verdict == "skip" and body.get("hide") and rows[lid]["status"] != "starred":
+            db.execute("UPDATE listings SET ai_note = ?, status = 'dismissed' WHERE id = ?", (note, lid))
+            hidden.append(lid)
+        else:
+            db.execute("UPDATE listings SET ai_note = ? WHERE id = ?", (note, lid))
+        rows.pop(lid)
+    return {"reviewed": sum(counts.values()), **counts, "hidden": len(hidden), "hidden_ids": hidden,
+            "unanswered": len(rows), "watch_changes": _review_changes(answer.get("watch_changes") or [])}
+
+
+def _review_changes(raw: list) -> list[dict]:
+    """The AI's suggested watch tweaks, kept only for the person's own watches and only where they tighten
+    something: new exclude words, a lower max price, a higher min price/year, a lower mileage cap."""
+    out = []
+    for c in raw:
+        w = db.get_watch(c.get("watch_id")) if isinstance(c.get("watch_id"), int) else None
+        if not w:
+            continue
+        change = {}
+        have = {x.lower() for x in w["exclude"]}
+        words = [str(x).strip()[:40] for x in c.get("add_excludes") or [] if str(x).strip()]
+        fresh = []
+        for x in words:  # first spelling wins; skip words the watch already excludes
+            if x.lower() not in have:
+                have.add(x.lower())
+                fresh.append(x)
+        words = fresh[:8]
+        if words:
+            change["exclude"] = w["exclude"] + words
+        for key, tighter in (("max_price", lambda new, old: old is None or new < old),
+                             ("min_price", lambda new, old: old is None or new > old),
+                             ("year_min", lambda new, old: old is None or new > old),
+                             ("max_miles", lambda new, old: old is None or new < old)):
+            new = c.get(key)
+            if isinstance(new, (int, float)) and new > 0 and tighter(new, w.get(key)):
+                if key in ("year_min", "max_miles") and w.get("kind") != "vehicle":
+                    continue
+                change[key] = int(new) if key in ("year_min", "max_miles") else round(float(new), 2)
+        if change:
+            out.append({"watch_id": w["id"], "watch_name": w["name"], "changes": change,
+                        "reason": str(c.get("reason") or "")[:300]})
+    return out
 
 
 @route("GET", "/api/ai/usage")
