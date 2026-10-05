@@ -66,6 +66,9 @@ def _ebay_access_token(settings: dict) -> str:
     return tok["access_token"]
 
 
+EBAY_CARS_TRUCKS = "6001"  # eBay Motors > Cars & Trucks
+
+
 def ebay(watch: dict, settings: dict) -> list[dict]:
     return _ebay_search(watch, settings, local=False)
 
@@ -91,14 +94,18 @@ def _ebay_search(watch: dict, settings: dict, local: bool) -> list[dict]:
     cond = {"used": "USED", "new": "NEW"}.get(watch.get("condition", "any"))
     if cond:
         filters.append(f"conditions:{{{cond}}}")
+    vehicle = watch.get("kind") == "vehicle"
     if not watch.get("include_auctions"):
-        filters.append("buyingOptions:{FIXED_PRICE|BEST_OFFER}")
+        # eBay Motors sells many vehicles as classified ads (contact the seller) rather than Buy It Now.
+        filters.append("buyingOptions:{FIXED_PRICE|BEST_OFFER" + ("|CLASSIFIED_AD}" if vehicle else "}"))
     if local:
         # eBay requires all five pickup filters together.
         radius = max(1, int(float(settings.get("local_radius_miles") or 50)))
         filters += ["deliveryOptions:{SELLER_ARRANGED_LOCAL_PICKUP}", "pickupCountry:US",
                     f"pickupPostalCode:{zip_code}", f"pickupRadius:{radius}", "pickupRadiusUnit:mi"]
     params = {"q": q, "limit": "50", "sort": "newlyListed"}
+    if vehicle:
+        params["category_ids"] = EBAY_CARS_TRUCKS  # vehicles only, not parts that mention the model
     if filters:
         params["filter"] = ",".join(filters)
     headers = {
@@ -484,6 +491,71 @@ def ksl(watch: dict, settings: dict) -> list[dict]:
     return out
 
 
+# ---- KSL Cars (Utah; dealers and private sellers) ---------------------------
+# Same site family and page format as KSL Classifieds: results in the Next.js payload. Filters go in the
+# path as key/value pairs; a keyword like "toyota tacoma" is read by KSL as make + model. Page 1 is the
+# newest listings (plus a featured one or two, which matching drops if they don't fit).
+
+def ksl_cars(watch: dict, settings: dict) -> list[dict]:
+    zip_code = str(settings.get("zip_code") or "").strip()
+    if not zip_code:
+        raise SourceError("set your ZIP code in Settings > Local area")
+    terms = search_terms(watch["query"])
+    if not terms:
+        return []
+    radius = max(1, int(float(settings.get("local_radius_miles") or 50)))
+    parts = [("keyword", terms)]
+    for key, field in (("yearFrom", "year_min"), ("yearTo", "year_max"), ("mileageTo", "max_miles"),
+                       ("priceFrom", "min_price"), ("priceTo", "max_price")):
+        if watch.get(field):
+            parts.append((key, str(int(math.ceil(watch[field])))))
+    parts += [("zip", zip_code), ("miles", str(radius))]
+    url = "https://cars.ksl.com/search/" + "/".join(f"{k}/{urllib.parse.quote(v, safe='')}" for k, v in parts)
+    wait = KSL_GAP_SECONDS - (time.time() - _ksl_last["at"])
+    if wait > 0:
+        time.sleep(wait)
+    req = urllib.request.Request(url, headers=KSL_HEADERS)
+    try:
+        with urllib.request.urlopen(req, timeout=25) as resp:
+            page = resp.read().decode("utf-8", "replace")
+    except urllib.error.HTTPError as e:
+        if e.code in (403, 429):
+            raise SourceError(f"KSL's bot protection blocked the request (HTTP {e.code}); "
+                              "it usually clears on a later check") from e
+        raise SourceError(f"HTTP {e.code} from KSL Cars") from e
+    except urllib.error.URLError as e:
+        raise SourceError(f"Network error reaching KSL Cars: {e.reason}") from e
+    finally:
+        _ksl_last["at"] = time.time()  # shares the gap with KSL Classifieds (same site family)
+    out, seen = [], set()
+    for r in _ksl_results(page):
+        if not r.get("id") or r["id"] in seen or r.get("listingType", "CAR") != "CAR":
+            continue
+        seen.add(r["id"])
+        loc = r.get("location") or {}
+        dealer = (r.get("dealer") or {}).get("name")
+        seller = "dealer" if (r.get("sellerType") or "").lower().startswith("dealer") else "private seller"
+        title = r.get("title") or " ".join(str(x) for x in (r.get("makeYear"), r.get("make"), r.get("model"),
+                                                          r.get("trim")) if x)
+        out.append({
+            "source": "ksl_cars",
+            "source_id": str(r["id"]),
+            "title": title,
+            "price": float(r["price"]) if r.get("price") else None,
+            "shipping": 0.0,
+            "currency": "USD",
+            "url": f"https://cars.ksl.com/listing/{r['id']}",
+            "image": (r.get("primaryImage") or {}).get("url"),
+            "location": ", ".join(x for x in (loc.get("city"), loc.get("state")) if x),
+            "condition": (r.get("newUsed") or "used").lower(),
+            "buying": f"KSL Cars · {dealer}" if dealer else f"KSL Cars · {seller}",
+            "text": "",
+            "year": r.get("makeYear"),
+            "miles": r.get("mileage") or None,  # private sellers sometimes leave 0
+        })
+    return out
+
+
 # ---- Craigslist (local; the search page's own JSON API) ---------------------
 # sapi.craigslist.org answers the search page with packed rows: offsets from a base id/date, the price,
 # "area:place~lat~lon", then tagged lists ([4, images...], [6, slug], [13, uuid]) and the title last.
@@ -501,9 +573,12 @@ def _miles(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return 3958.8 * 2 * math.asin(math.sqrt(a))
 
 
-def _craigslist_search(zip_code: str, radius: int, query: str, lo=None, hi=None) -> dict:
-    params = {"batch": "1-0-360-0-0", "cc": "US", "lang": "en", "searchPath": "sss",
+def _craigslist_search(zip_code: str, radius: int, query: str, lo=None, hi=None, vehicle: dict | None = None) -> dict:
+    params = {"batch": "1-0-360-0-0", "cc": "US", "lang": "en", "searchPath": "cta" if vehicle else "sss",
               "postal": zip_code, "search_distance": str(radius), "query": query}
+    for key, field in (("min_auto_year", "year_min"), ("max_auto_year", "year_max"), ("max_auto_miles", "max_miles")):
+        if vehicle and vehicle.get(field):
+            params[key] = str(vehicle[field])
     if lo:
         params["min_price"] = str(int(lo))
     if hi:
@@ -542,6 +617,7 @@ def _craigslist_row(row: list, decode: dict) -> dict | None:
                 "price": row[3] if row[3] >= 0 else None, "lat": float(lat), "lon": float(lon),
                 "place": places[int(place)] if int(place) < len(places) and places[int(place)] else "",
                 "images": tags.get(4, []), "slug": (tags.get(6) or [""])[0], "uuid": (tags.get(13) or [""])[0],
+                "odometer": (tags.get(9) or [None])[0],  # cars and trucks only
                 "title": row[-1] if isinstance(row[-1], str) else ""}
     except (AttributeError, IndexError, KeyError, TypeError, ValueError):
         return None  # a row in a shape we don't know; skip it rather than fail the whole search
@@ -555,7 +631,8 @@ def craigslist(watch: dict, settings: dict) -> list[dict]:
     if not terms:
         return []
     radius = max(1, int(float(settings.get("local_radius_miles") or 50)))
-    data = _craigslist_search(zip_code, radius, terms, watch.get("min_price"), watch.get("max_price"))
+    vehicle = watch if watch.get("kind") == "vehicle" else None  # cars+trucks section, year/miles filters
+    data = _craigslist_search(zip_code, radius, terms, watch.get("min_price"), watch.get("max_price"), vehicle)
     decode, home = data.get("decode") or {}, data.get("location") or {}
     if data and "minPostingId" not in decode and data.get("items"):
         raise SourceError("couldn't read Craigslist's results (did the site change?)")
@@ -579,8 +656,9 @@ def craigslist(watch: dict, settings: dict) -> list[dict]:
             "image": f"https://images.craigslist.org/{img}_300x300.jpg" if img else None,
             "location": r["place"] if len(r["place"]) <= 40 else "",  # some sellers put ads in this field
             "condition": "used",
-            "buying": "Craigslist",
+            "buying": "Craigslist" + ({145: " · owner", 146: " · dealer"}.get(raw[2], "") if vehicle else ""),
             "text": "",
+            "miles": r["odometer"] if isinstance(r["odometer"], int) else None,
         })
     return out
 
@@ -590,6 +668,8 @@ def craigslist(watch: dict, settings: dict) -> list[dict]:
 # ou.location cookie (otherwise OfferUp guesses from the IP), and radius only takes 5/10/20/30/50 miles.
 
 OFFERUP_RADII = (5, 10, 20, 30, 50)
+OFFERUP_VEHICLE_RADII = (25, 80, 100, 200)  # vehicle searches offer different distances (else nationwide)
+OFFERUP_MILEAGE = (25000, 50000, 75000, 100000, 125000, 150000, 175000, 200000)
 OFFERUP_GAP_SECONDS = 4
 _offerup_last = {"at": 0.0}
 
@@ -625,8 +705,18 @@ def offerup(watch: dict, settings: dict) -> list[dict]:
         return []
     place = zip_place(zip_code)
     radius = int(float(settings.get("local_radius_miles") or 50))
-    radius = next((r for r in OFFERUP_RADII if r >= radius), OFFERUP_RADII[-1])
+    vehicle = watch.get("kind") == "vehicle"
+    radii = OFFERUP_VEHICLE_RADII if vehicle else OFFERUP_RADII
+    radius = next((r for r in radii if r >= radius), radii[-1])
     params = {"q": terms, "radius": str(radius), "sort": "-posted"}
+    if vehicle:
+        if watch.get("year_min"):
+            params["veh_year_min"] = str(watch["year_min"])
+        if watch.get("year_max"):
+            params["veh_year_max"] = str(watch["year_max"])
+        bucket = next((m for m in OFFERUP_MILEAGE if watch.get("max_miles") and m >= watch["max_miles"]), None)
+        if bucket:
+            params["veh_mileage"] = str(bucket)
     if watch.get("min_price"):
         params["price_min"] = str(int(watch["min_price"]))
     if watch.get("max_price"):
@@ -673,13 +763,14 @@ def offerup(watch: dict, settings: dict) -> list[dict]:
             "condition": (r.get("conditionText") or "used").lower(),
             "buying": "OfferUp" + (" · ships" if "SHIPPING" in flags else ""),
             "text": "",
+            "miles": r.get("vehicleMiles"),
         })
     return out
 
 
 SOURCES = {"ebay": ebay, "ebay_local": ebay_local, "reddit": reddit, "bestbuy": bestbuy,
            "slickdeals": slickdeals, "buildapcsales": buildapcsales, "ksl": ksl, "craigslist": craigslist,
-           "offerup": offerup}
+           "offerup": offerup, "ksl_cars": ksl_cars}
 
 # Sources that see the same items under the same ids; a listing is stored once per family.
 SOURCE_FAMILY = {"ebay_local": "ebay"}

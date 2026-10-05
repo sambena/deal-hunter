@@ -59,12 +59,18 @@
         <form id="watch-form">
           <input type="hidden" name="id">
           <div class="grid">
+            <label>Looking for
+              <select name="kind"><option value="item">Things (hardware, gear…)</option><option value="vehicle">A car or truck</option></select>
+            </label>
             <label>Name <input name="name" required placeholder="i9-10980XE for X299 box"></label>
             <label>Query <input name="query" required placeholder='10980xe   or   n100|n150 "mini pc"'></label>
             <label>Exclude (comma separated) <input name="exclude" placeholder="xeon, laptop, rdimm"></label>
             <label>Linked machine <select name="machine_id"><option value="">None</option></select></label>
             <label>Min price (incl. shipping) <input name="min_price" type="number" step="1" min="0"></label>
             <label>Max price (incl. shipping) <input name="max_price" type="number" step="1" min="0"></label>
+            <label data-vehicle hidden>Model year from <input name="year_min" type="number" min="1900" max="2100" placeholder="2015"></label>
+            <label data-vehicle hidden>Model year to <input name="year_max" type="number" min="1900" max="2100" placeholder="2020"></label>
+            <label data-vehicle hidden>Max miles <input name="max_miles" type="number" min="0" step="1000" placeholder="120000"></label>
             <label title="Only the cheapest finds stay; the rest are hidden and never alert. Starred finds always stay.">Keep only the cheapest
               <select name="keep_cheapest"><option value="">All finds</option><option value="3">3</option><option value="5">5</option><option value="10">10</option><option value="20">20</option></select>
             </label>
@@ -82,6 +88,7 @@
               <label><input type="checkbox" name="src-ksl" checked> KSL Classifieds</label>
               <label><input type="checkbox" name="src-craigslist" checked> Craigslist</label>
               <label><input type="checkbox" name="src-offerup" checked> OfferUp</label>
+              <label><input type="checkbox" name="src-ksl_cars"> KSL Cars</label>
               <label><input type="checkbox" name="src-reddit" checked> Reddit</label>
               <label><input type="checkbox" name="src-slickdeals" checked> Slickdeals</label>
               <label><input type="checkbox" name="src-buildapcsales" checked> r/buildapcsales</label>
@@ -177,6 +184,7 @@
           <label class="toggle" data-admin><input type="checkbox" name="src_ksl"> KSL Classifieds (Utah). Free, no key. Private sellers near you, pickup only</label>
           <label class="toggle" data-admin><input type="checkbox" name="src_craigslist"> Craigslist. Free, no key. Anywhere in the US, pickup only</label>
           <label class="toggle" data-admin><input type="checkbox" name="src_offerup"> OfferUp. Free, no key. Anywhere in the US, up to 50 miles</label>
+          <label class="toggle" data-admin><input type="checkbox" name="src_ksl_cars"> KSL Cars (Utah). Free, no key. Dealers and private sellers, for car and truck watches</label>
           <div class="grid">
             <label>Your ZIP code <input name="zip_code" inputmode="numeric" placeholder="84057"></label>
             <label>Radius (miles) <input name="local_radius_miles" type="number" min="1" max="500"></label>

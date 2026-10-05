@@ -57,8 +57,16 @@ WATCH_FILTERS["ebay_local"] = WATCH_FILTERS["ebay"]
 WATCH_FILTERS["craigslist"] = WATCH_FILTERS["offerup"] = ("min_price", "max_price")
 
 
+# Vehicle watches search sources' car and truck sections, with the year range and mileage.
+VEHICLE_FILTERS = ("kind", "year_min", "year_max", "max_miles")
+# The sources that can search for cars and trucks; vehicle watches skip the rest (Reddit, Best Buy...).
+VEHICLE_SOURCES = {"ebay", "ebay_local", "craigslist", "offerup", "ksl_cars"}
+VEHICLE_ONLY = {"ksl_cars"}  # and these only search for vehicles
+
+
 def fetch_key(name: str, watch: dict, settings: dict) -> str:
-    return json.dumps([name, watch.get("query"), [watch.get(k) for k in WATCH_FILTERS.get(name, ())],
+    vehicle = [watch.get(k) for k in VEHICLE_FILTERS] if watch.get("kind") == "vehicle" else None
+    return json.dumps([name, watch.get("query"), [watch.get(k) for k in WATCH_FILTERS.get(name, ())], vehicle,
                        [str(settings.get(k)) for k in FETCH_SETTINGS]])
 
 
@@ -84,8 +92,10 @@ def fetch(name: str, watch: dict, settings: dict, shared: dict | None = None) ->
 
 def run_watch(watch: dict, settings: dict, shared: dict | None = None) -> dict:
     """Poll one watch. Returns {new: int, errors: [..]}. `shared` holds this pass's requests (see fetch)."""
-    history = [r["total"] for r in db.query(
-        "SELECT total FROM listings WHERE watch_id = ? AND total IS NOT NULL", (watch["id"],))]
+    vehicle = watch.get("kind") == "vehicle"
+    # (price, model year) of everything found so far; vehicles compare with similar model years.
+    history = [(r["total"], r["year"]) for r in db.query(
+        "SELECT total, year FROM listings WHERE watch_id = ? AND total IS NOT NULL", (watch["id"],))]
     polled = set(watch["polled_sources"])
     enabled = settings["sources_enabled"]
     new_rows, errors = [], []
@@ -94,7 +104,8 @@ def run_watch(watch: dict, settings: dict, shared: dict | None = None) -> dict:
     limited = bool(watch.get("keep_cheapest"))
     # Local searches go first so an item that is both local and national is stored as local.
     for name in sorted(watch["sources"], key=lambda n: n != "ebay_local"):
-        if not enabled.get(name) or name not in SOURCES:
+        if (not enabled.get(name) or name not in SOURCES or (vehicle and name not in VEHICLE_SOURCES)
+                or (not vehicle and name in VEHICLE_ONLY)):
             continue
         try:
             items = fetch(name, watch, settings, shared)
@@ -115,6 +126,14 @@ def run_watch(watch: dict, settings: dict, shared: dict | None = None) -> dict:
                                    total, it.get("text", ""))
             if not ok:
                 continue
+            year = miles = status = None
+            if vehicle:
+                text = f"{it['title']} {it.get('text', '')}"
+                year = it.get("year") or matching.vehicle_year(it["title"])
+                miles = it.get("miles") if it.get("miles") is not None else matching.vehicle_miles(text)
+                status = it.get("title_status") or matching.title_status(text)
+                if not matching.check_vehicle(year, miles, watch)[0]:
+                    continue
             fam = family(it["source"])  # e.g. an eBay item found by both the national and local search
             exists = db.query(f"""SELECT id FROM listings WHERE watch_id = ? AND source_id = ?
                                   AND source IN ({','.join('?' * len(fam))})""",
@@ -122,15 +141,17 @@ def run_watch(watch: dict, settings: dict, shared: dict | None = None) -> dict:
             if exists:
                 db.execute("UPDATE listings SET seen_at = ? WHERE id = ?", (time.time(), exists[0]["id"]))
                 continue
-            pct = matching.deal_pct(total, history)
+            compare = matching.vehicle_history(year, history) if vehicle else [t for t, _ in history]
+            pct = matching.deal_pct(total, compare)
             lid = db.execute("""INSERT INTO listings (watch_id, source, source_id, title, price, shipping, total,
-                currency, url, image, location, condition, buying, first_seen, status, deal_pct)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                currency, url, image, location, condition, buying, first_seen, status, deal_pct,
+                year, miles, title_status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (watch["id"], it["source"], it["source_id"], it["title"], it["price"], it["shipping"], total,
                  it["currency"], it["url"], it["image"], it["location"], it["condition"], it["buying"],
-                 time.time(), "pruned" if limited else "new", pct))
+                 time.time(), "pruned" if limited else "new", pct, year, miles, status or None))
             if total is not None:
-                history.append(total)
+                history.append((total, year))
             new_rows.append({**it, "id": lid, "total": total, "deal_pct": pct, "backlog": first_from_source})
     db.execute("UPDATE watches SET last_polled = ?, last_error = ?, polled_sources = ? WHERE id = ?",
                (time.time(), "; ".join(errors) or None, json.dumps(sorted(polled)), watch["id"]))
