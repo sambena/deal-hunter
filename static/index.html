@@ -46,9 +46,11 @@
         </select>
         <label class="toggle" title="One section per watch, each in its colour; click a heading to fold it"><input type="checkbox" id="f-group" checked> Group by watch</label>
         <span class="spacer"></span>
+        <button id="ai-review" hidden title="Have AI weed out the obvious bad deals among these finds">🤖 AI review</button>
         <button id="mark-seen">Mark all seen</button>
         <button id="poll-now" class="primary">Check now</button>
       </div>
+      <div id="review-tweaks" class="panel" hidden></div>
       <div id="listings" class="cards"></div>
     </section>
 
@@ -459,6 +461,24 @@
       </form>
     </section>
   </main>
+
+  <dialog id="review-dialog">
+    <form method="dialog" id="review-form">
+      <h2>AI review</h2>
+      <p class="muted" id="review-scope"></p>
+      <label>Anything specific? (optional)
+        <textarea name="instructions" rows="4" placeholder="e.g. 4x4 only, no Dodge, under 180,000 miles, I'm fine driving 2 hours.
+Leave blank and the AI does its best."></textarea></label>
+      <label>Which AI <select name="choice"></select></label>
+      <label class="toggle"><input type="checkbox" name="hide" checked> Hide the bad deals (they go to Dismissed, where you can restore them)</label>
+      <p class="muted" id="review-cost"></p>
+      <div class="row">
+        <span class="spacer"></span>
+        <button value="cancel" formnovalidate>Cancel</button>
+        <button value="go" class="primary" id="review-go">Review</button>
+      </div>
+    </form>
+  </dialog>
 
   <div id="toast" hidden></div>
   <script src="app.js"></script>

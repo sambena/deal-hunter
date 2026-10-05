@@ -66,7 +66,10 @@ ACTIONS = {
     "upgrades": {"label": "Find upgrades with AI", "typical_out": 3000, "max_out": 8000},
     "specs": {"label": "Read specs with AI", "typical_out": 300, "max_out": 2000},
     "radar": {"label": "Deal radar", "typical_out": 2500, "max_out": 8000},
+    # Up to REVIEW_MAX finds in one request, about 60 tokens of answer each.
+    "review": {"label": "AI review of finds", "typical_out": 2500, "max_out": 9000},
 }
+REVIEW_MAX = 40
 
 
 # ---- whose AI ---------------------------------------------------------------------
@@ -97,6 +100,45 @@ def settings_for(user_id: int | None = None) -> dict:
     elif s["ai_provider"] not in PROVIDERS:
         s["_ai"]["blocked"] = f"{owner}'s AI is off. Use your own key in Settings > AI."
     return s
+
+
+def choices(settings: dict) -> list[dict]:
+    """The AIs a person can pick for one request: every model of each provider they have a key for. On the
+    admin's shared AI, only the model the admin chose (the admin decides what friends spend on)."""
+    sc = _scope(settings)
+    if sc["source"] == "shared":
+        try:
+            info = model_info(settings)
+        except AIError:
+            return []
+        return [{"provider": info["provider"], "model": info["id"], "label": f"{info['label']} ({sc['owner']}'s)",
+                 "free": info["free"], "current": True}]
+    out = []
+    current = (settings.get("ai_provider"), settings.get(PROVIDERS.get(settings.get("ai_provider"), {}).get("model", "")))
+    for provider, p in PROVIDERS.items():
+        if provider == "ollama":
+            if settings.get("ollama_url") and settings.get("ollama_model"):
+                out.append({"provider": "ollama", "model": settings["ollama_model"], "free": True,
+                            "label": f"Ollama {settings['ollama_model']} (free)",
+                            "current": current == ("ollama", settings["ollama_model"])})
+            continue
+        if not (settings.get(p["key"]) or (provider == "claude" and os.environ.get("ANTHROPIC_API_KEY"))):
+            continue
+        for m in MODELS:
+            if m["provider"] == provider:
+                free = provider == "gemini" and bool(settings.get("gemini_free_tier"))
+                out.append({"provider": provider, "model": m["id"], "free": free,
+                            "label": m["label"] + (", free tier" if free else ""), "current": current == (provider, m["id"])})
+    return out
+
+
+def with_choice(settings: dict, provider: str | None, model: str | None) -> dict:
+    """These settings, set to use the AI picked for one request (it must be one of choices())."""
+    if not provider:
+        return settings
+    if not any(c["provider"] == provider and c["model"] == model for c in choices(settings)):
+        raise AIError("That AI isn't available to you; pick one from the list")
+    return {**settings, "ai_provider": provider, PROVIDERS[provider]["model"]: model}
 
 
 def _scope(settings: dict) -> dict:
@@ -642,3 +684,75 @@ Searched for: {watch['name']} (query "{watch['query']}", years {years}, max mile
 Answer with verdict good / ok / skip and a short note (2 sentences max): is the price fair for that
 year and mileage in the US used market, and any red flags (salvage/rebuilt title, mileage too high
 for the year, a price far below market that looks like a scam, "needs work" wording).""", VERDICT_SCHEMA
+
+
+REVIEW_SCHEMA = {
+    "type": "object",
+    "properties": {"reviews": {"type": "array", "items": {
+        "type": "object",
+        "properties": {"id": {"type": "integer"}, "verdict": {"type": "string", "enum": ["good", "ok", "skip"]},
+                       "reason": {"type": "string"}},
+        "required": ["id", "verdict", "reason"], "additionalProperties": False}},
+        # Changes to a watch that would stop the bad finds coming back; null/[] = leave as is.
+        "watch_changes": {"type": "array", "items": {
+            "type": "object",
+            "properties": {"watch_id": {"type": "integer"}, "add_excludes": {"type": "array", "items": {"type": "string"}},
+                           "max_price": {"type": ["number", "null"]}, "min_price": {"type": ["number", "null"]},
+                           "year_min": {"type": ["integer", "null"]}, "max_miles": {"type": ["integer", "null"]},
+                           "reason": {"type": "string"}},
+            "required": ["watch_id", "add_excludes", "max_price", "min_price", "year_min", "max_miles", "reason"],
+            "additionalProperties": False}}},
+    "required": ["reviews", "watch_changes"],
+    "additionalProperties": False,
+}
+
+
+def _review_line(l: dict) -> str:
+    price = f"${l['total']:.0f}" if l.get("total") is not None else "no price"
+    facts = [f"year {l['year']}" if l.get("year") else "", f"{l['miles']:,} miles" if l.get("miles") is not None else "",
+             f"{l['title_status']} title" if l.get("title_status") else "", f"size {l['size']}" if l.get("size") else "",
+             l.get("condition") or "", l.get("location") or "", l.get("buying") or l.get("source") or ""]
+    return f"- id {l['id']}: {l['title']} | {price} | " + " | ".join(f for f in facts if f)
+
+
+def review_prompt(listings: list[dict], watches: dict, instructions: str) -> tuple[str, dict]:
+    """One request judging many finds: which are worth a look and which are obvious bad deals."""
+    groups = {}
+    for l in listings:
+        groups.setdefault(l["watch_id"], []).append(l)
+    parts = []
+    for wid, ls in groups.items():
+        w = watches.get(wid) or {}
+        want = [f'query "{w.get("query", "")}"']
+        if w.get("max_price"):
+            want.append(f"max ${w['max_price']:.0f}")
+        if w.get("year_min") or w.get("year_max"):
+            want.append(f"years {w.get('year_min') or 'any'}-{w.get('year_max') or 'any'}")
+        if w.get("max_miles"):
+            want.append(f"max {w['max_miles']:,} miles")
+        if w.get("size"):
+            want.append(f"size {w['size']}")
+        parts.append(f"Watch id {wid} \"{w.get('name', '?')}\" ({', '.join(want)}):\n"
+                     + "\n".join(_review_line(l) for l in ls))
+    asked = instructions.strip() or "(nothing extra: use your best judgement)"
+    return f"""You're helping someone weed out bad deals from listings their watches found on used and retail
+marketplaces (eBay, KSL, Craigslist, OfferUp, Poshmark, Slickdeals...). Prices are in US dollars.
+
+Their own requirements, which outrank your defaults:
+{asked}
+
+For EVERY listing below give a verdict:
+- "good": a fair or better price for what it is, worth a look
+- "ok": nothing wrong, but not a deal
+- "skip": an obvious bad deal or not what they want: overpriced for the used market, wrong item or a part/accessory
+  instead of the thing, scam signs (price far too low, vague title), salvage/rebuilt title or very high miles for a
+  car without a matching low price, wrong size, or it breaks one of their requirements above.
+Be decisive but don't skip something only because details are missing. The reason is one short sentence
+(under 20 words) a person can act on. Use each listing's id exactly.
+
+Then, in watch_changes, suggest changes to a watch only where they'd stop the same kind of bad find coming
+back: words to exclude (short, specific: "floor mats", "salvage", "parts"; never a word the good finds use), a
+price limit, a minimum model year or a mileage cap. Use null (or []) for anything to leave as it is, and leave
+watch_changes empty when the watch is fine. Never loosen a limit the person set.
+
+{chr(10).join(parts)}""", REVIEW_SCHEMA

@@ -115,6 +115,12 @@ Spending is capped:
 Prices live in `ai.py` (`MODELS`), checked 2026-10-04. A model with no known price can't be used.
 A Claude Pro/Max or ChatGPT subscription can't be used here; these need API keys.
 
+**AI review** (Finds, when AI is on) looks at the finds shown (up to 40) in one request: say anything
+specific in the dialog (or leave it blank), pick which AI, and choose whether to hide the bad deals (to
+Dismissed; Undo brings them back; starred finds are never hidden). Each find gets a verdict and reason, and
+the AI can suggest tightening a watch (exclude words, a price limit, a minimum year, a mileage cap) that you
+apply with one click.
+
 ## Discord
 
 Settings > Discord: paste a channel webhook URL and tick the toggle. By default it
