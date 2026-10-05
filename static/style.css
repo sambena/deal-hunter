@@ -1,6 +1,6 @@
 :root {
   --bg: #111418; --panel: #1a1f26; --panel2: #222932; --line: #2e3742;
-  --text: #e6e9ee; --muted: #8b95a3; --accent: #4ea1ff; --good: #3ecf8e; --great: #ffb547; --bad: #ff6b6b;
+  --text: #e6e9ee; --muted: #8b95a3; --accent: #4ea1ff; --good: #3ecf8e; --great: #22e07a; --warn: #ffb547; --bad: #ff6b6b;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -62,7 +62,8 @@ button:disabled { opacity: .5; cursor: wait; }
 .card .actions { display: flex; gap: 6px; padding: 8px 12px; border-top: 1px solid var(--line); }
 .deal { font-size: 11px; font-weight: 700; border-radius: 4px; padding: 2px 6px; margin-left: 6px; vertical-align: middle; }
 .deal.good { background: color-mix(in srgb, var(--good) 20%, transparent); color: var(--good); }
-.deal.great { background: color-mix(in srgb, var(--great) 20%, transparent); color: var(--great); }
+/* The bigger the discount, the stronger the badge: "great" is solid green, "good" a light tint. */
+.deal.great { background: var(--great); color: #06210f; }
 .ai-note { background: var(--panel2); border-radius: 6px; padding: 6px 8px; font-size: 12px; }
 .empty { color: var(--muted); padding: 40px; text-align: center; grid-column: 1 / -1; }
 
@@ -94,7 +95,7 @@ table.people input.ai-cap, table.people input.ai-allowance { width: 4.5em; }
 .machine:not([data-kind="pc"]):not([data-kind="server"]) .parts-only { display: none; }
 .machine[data-kind="pc"] .gear-only, .machine[data-kind="server"] .gear-only { display: none; }
 table.import input[data-f=name] { min-width: 12em; }
-.specs-needed { color: var(--great); margin: 4px 0 8px; }
+.specs-needed { color: var(--warn); margin: 4px 0 8px; }
 .specs-box { border-top: 1px solid var(--line); margin-top: 10px; padding-top: 10px; }
 .specs-box pre.cmd { white-space: pre-wrap; word-break: break-all; background: var(--panel2); padding: 8px; border-radius: 6px; font-size: 12px; max-height: 9em; overflow: auto; }
 .os-pick label { margin-right: 14px; }
@@ -128,7 +129,7 @@ input[type=color] { width: 44px; height: 30px; padding: 2px; }
   line-height: 16px; box-shadow: 0 1px 2px rgba(0, 0, 0, .35); pointer-events: none; }
 .machine:not([data-kind="vehicle"]) .vehicle-only { display: none; }
 .recalls-box { margin-top: 10px; display: flex; flex-direction: column; gap: 10px; }
-.recall { border-left: 3px solid var(--great); padding: 4px 10px; display: flex; flex-direction: column; gap: 3px; }
+.recall { border-left: 3px solid var(--warn); padding: 4px 10px; display: flex; flex-direction: column; gap: 3px; }
 .recall.park { border-left-color: var(--bad); }
 .title-flag { color: #fff; background: var(--bad); border-radius: 4px; padding: 0 6px; font-weight: 600; font-size: 12px; }
 .vehicle-facts { display: flex; gap: 10px; flex-wrap: wrap; font-size: 13px; }
