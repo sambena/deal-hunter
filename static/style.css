@@ -131,3 +131,5 @@ input[type=color] { width: 44px; height: 30px; padding: 2px; }
 .recall { border-left: 3px solid var(--great); padding: 4px 10px; display: flex; flex-direction: column; gap: 3px; }
 .recall.park { border-left-color: var(--bad); }
 .title-flag { color: #fff; background: var(--bad); border-radius: 4px; padding: 0 6px; font-weight: 600; font-size: 12px; }
+.vehicle-facts { display: flex; gap: 10px; flex-wrap: wrap; font-size: 13px; }
+.vehicle-facts .title-flag { color: #fff; background: var(--bad); border-radius: 4px; padding: 0 6px; font-weight: 600; }

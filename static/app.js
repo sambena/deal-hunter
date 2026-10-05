@@ -5,15 +5,17 @@ const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 let state = { watches: [], machines: [], settings: {}, poller: {} };
 
 // Source keys, in form order, and how they're shown.
-const SOURCES = { ebay: "eBay", ebay_local: "eBay local pickup", ksl: "KSL Classifieds", craigslist: "Craigslist", offerup: "OfferUp", reddit: "Reddit", slickdeals: "Slickdeals",
+const SOURCES = { ebay: "eBay", ebay_local: "eBay local pickup", ksl: "KSL Classifieds", craigslist: "Craigslist", offerup: "OfferUp", ksl_cars: "KSL Cars", reddit: "Reddit", slickdeals: "Slickdeals",
   buildapcsales: "r/buildapcsales", bestbuy: "Best Buy open-box" };
+// Where car and truck watches can search (the others are for hardware and gear).
+const VEHICLE_SOURCES = ["ebay", "ebay_local", "ksl_cars", "craigslist", "offerup"];
 const NEW_WATCH_SOURCES = ["ebay", "ebay_local", "ksl", "craigslist", "offerup", "reddit", "slickdeals", "buildapcsales"];
 const sourceName = s => SOURCES[s] || s;
 // Small brand-coloured tag in the corner of each find's photo (same text and colours as the Android app).
 const SOURCE_TAGS = {
   ebay: ["eBay", "#E53238"], ebay_local: ["eBay local", "#86B817", "#1A2E05"], ksl: ["KSL", "#0D5EA6"],
   reddit: ["Reddit", "#FF4500"], buildapcsales: ["r/bapcs", "#FF4500"], slickdeals: ["Slick", "#2B6CB0"],
-  bestbuy: ["Best Buy", "#0046BE", "#FFE000"], craigslist: ["CL", "#5A1A8C"], offerup: ["OfferUp", "#00AB80"],
+  bestbuy: ["Best Buy", "#0046BE", "#FFE000"], craigslist: ["CL", "#5A1A8C"], ksl_cars: ["KSL Cars", "#0D5EA6"], offerup: ["OfferUp", "#00AB80"],
 };
 function sourceTag(s) {
   const [text, bg, fg] = SOURCE_TAGS[s] || [sourceName(s), "#4B5563"];
@@ -341,6 +343,9 @@ function findCard(l) {
       <div><span class="price">${l.source === "reddit" && l.total != null ? "≈" : ""}${money(l.total)}</span>${ship}${deal}
         ${l.source === "reddit" ? `<span class="meta">${l.total == null ? "see post" : "guessed from post"}</span>` : ""}</div>
       <div class="meta">${esc(sourceName(l.source))} · ${esc(l.condition || "")} ${l.location ? "· " + esc(l.location) : ""}</div>
+      ${l.year != null || l.miles != null || l.title_status ? `<div class="vehicle-facts">${l.year != null ? `<span>${l.year}</span>` : ""}${
+        l.miles != null ? `<span>${Number(l.miles).toLocaleString()} mi</span>` : `<span class="meta">miles not listed</span>`}${
+        l.title_status ? `<span class="title-flag" title="Not a clean title">${esc(l.title_status)} title</span>` : ""}</div>` : ""}
       ${l.source === "bestbuy" ? BESTBUY_CREDIT : ""}
       <div class="meta"><a href="#" class="watch-link" data-edit-watch="${l.watch_id}" title="Edit this watch">${esc(l.watch_name)} ✎</a> · found ${ago(l.first_seen)}</div>
       ${l.ai_note ? `<div class="ai-note">${esc(l.ai_note)}</div>` : ""}
@@ -368,6 +373,20 @@ $("#listings").addEventListener("click", e => {
   cards.hidden ? folded.add(wid) : folded.delete(wid);
   store("foldedWatches", [...folded]);
 });
+// Car or truck: show the year and mileage fields, and only the sources that list vehicles.
+function showWatchKind(setDefaults) {
+  const f = $("#watch-form");
+  const vehicle = f.kind.value === "vehicle";
+  $$("#watch-form [data-vehicle]").forEach(el => (el.hidden = !vehicle));
+  Object.keys(SOURCES).forEach(s => {
+    const box = f["src-" + s];
+    box.closest("label").hidden = vehicle ? !VEHICLE_SOURCES.includes(s) : s === "ksl_cars";
+    if (setDefaults) box.checked = vehicle ? VEHICLE_SOURCES.includes(s) : NEW_WATCH_SOURCES.includes(s);
+  });
+  f.name.placeholder = vehicle ? "Tacoma for hauling" : "i9-10980XE for X299 box";
+  f.query.placeholder = vehicle ? "toyota tacoma   or   f150|f-150" : '10980xe   or   n100|n150 "mini pc"';
+}
+$("#watch-form [name=kind]").addEventListener("change", () => showWatchKind(!$("#watch-form").id.value));
 $("#watch-form [name=color]").addEventListener("input", () => { $("#watch-form [name=color_auto]").checked = false; });
 $("#f-group").addEventListener("change", e => { store("groupFinds", e.target.checked); loadListings(); });
 
@@ -467,6 +486,7 @@ function renderWatches() {
         ${w.notes ? `<br><span class="muted">${esc(w.notes)}</span>` : ""}
         ${w.last_error ? `<div class="error">${esc(w.last_error)}</div>` : ""}</td>
       <td>${w.min_price != null ? money(w.min_price) : "$0"} – ${w.max_price != null ? money(w.max_price) : "any"}${w.keep_cheapest ? ` · cheapest ${w.keep_cheapest}` : ""}<br>
+        ${w.kind === "vehicle" ? `<span class="muted">🚗 ${w.year_min || "any"}–${w.year_max || "any"}${w.max_miles ? ` · ≤${Number(w.max_miles).toLocaleString()} mi` : ""}</span><br>` : ""}
         <span class="muted">${esc(w.condition)} · ${esc(w.sources.map(sourceName).join(", "))}</span></td>
       <td>${w.new_count ? `<b>${w.new_count} new</b> / ` : ""}${w.total_count}</td>
       <td>${w.best_price != null ? money(w.best_price) : "–"}</td>
@@ -523,6 +543,10 @@ function editWatch(w, returnTo = null) {
   f.reset();
   f.id.value = w?.id || "";
   if (w) {
+    f.kind.value = w.kind || "item";
+    f.year_min.value = w.year_min ?? "";
+    f.year_max.value = w.year_max ?? "";
+    f.max_miles.value = w.max_miles ?? "";
     f.name.value = w.name;
     f.query.value = w.query;
     f.exclude.value = w.exclude.join(", ");
@@ -538,6 +562,7 @@ function editWatch(w, returnTo = null) {
     f.include_auctions.checked = w.include_auctions;
     Object.keys(SOURCES).forEach(s => (f["src-" + s].checked = w.sources.includes(s)));
   }
+  showWatchKind(false);
   $("#watch-form-title").textContent = w ? `Edit "${w.name}"` : "New watch";
   $("#watch-cancel").hidden = !w;
   showTab("watches");
@@ -557,6 +582,10 @@ function formToWatch(f) {
     exclude: f.exclude.value.split(",").map(s => s.trim()).filter(Boolean),
     min_price: f.min_price.value,
     max_price: f.max_price.value,
+    kind: f.kind.value,
+    year_min: f.kind.value === "vehicle" ? f.year_min.value : null,
+    year_max: f.kind.value === "vehicle" ? f.year_max.value : null,
+    max_miles: f.kind.value === "vehicle" ? f.max_miles.value : null,
     keep_cheapest: f.keep_cheapest.value ? Number(f.keep_cheapest.value) : null,
     color: f.color_auto.checked ? null : f.color.value,
     condition: f.condition.value,

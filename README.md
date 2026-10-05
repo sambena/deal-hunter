@@ -22,6 +22,7 @@ set `"host": "0.0.0.0"`. There's no login, so only do that on your home network.
 | KSL Classifieds | None | Utah classifieds near your ZIP (Settings > Local area) |
 | Craigslist | None | Classifieds near your ZIP, anywhere in the US; listings outside your radius are dropped |
 | OfferUp | None | Listings near your ZIP, anywhere in the US; OfferUp's radius tops out at 50 miles |
+| KSL Cars | None | Utah used cars and trucks, dealers and private sellers (car and truck watches only) |
 | Reddit | None | r/hardwareswap and r/homelabsales by default, via RSS. Prices are guessed from the post text |
 | Best Buy open-box | Free: developer.bestbuy.com | Experimental |
 
@@ -31,6 +32,14 @@ blocks scrapers, and Amazon's API needs an affiliate account.
 When several watches (yours or friends') run the same search, each check sends it
 once and every watch gets the answer, so more people doesn't mean more eBay calls
 (5000 a day) or more KSL requests. Hover "Last check" to see how many were shared.
+
+## Cars and trucks
+
+Pick "A car or truck" in the watch form: query = make and model (`toyota tacoma`), plus model years and
+max miles. Vehicle watches search eBay Motors (Cars & Trucks), Craigslist cars+trucks, OfferUp vehicles
+and KSL Cars (Utah). Finds show the year, miles and any salvage/rebuilt title; "% under typical" compares with
+the watch's finds within two model years. Ask AI gives a second opinion on price, miles and red flags.
+Cars.com, Autotrader, CarGurus, Carvana, CarMax, TrueCar and Facebook block programs, so they aren't searched.
 
 ## How matching works
 
