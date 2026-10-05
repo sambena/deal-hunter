@@ -102,13 +102,17 @@ def _tidy_finds(watch_id: int) -> int:
     """After an edit: drop finds the watch's excludes or prices now rule out (starred ones stay), and
     re-work "under typical" from what's left, so the removed listings stop skewing it."""
     watch = db.get_watch(watch_id)
-    rows = db.query("SELECT id, title, total, status FROM listings WHERE watch_id = ?", (watch_id,))
-    gone = [r["id"] for r in rows if r["status"] != "starred" and not matching.still_wanted(r["title"], r["total"], watch)]
+    rows = db.query("SELECT id, title, total, status, year, miles FROM listings WHERE watch_id = ?", (watch_id,))
+    vehicle = watch.get("kind") == "vehicle"
+    gone = [r["id"] for r in rows if r["status"] != "starred" and (
+        not matching.still_wanted(r["title"], r["total"], watch)
+        or vehicle and not matching.check_vehicle(r["year"], r["miles"], watch)[0])]
     for lid in gone:
         db.execute("DELETE FROM listings WHERE id = ?", (lid,))
     kept = [r for r in rows if r["id"] not in set(gone)]
     for r in kept:
-        others = [k["total"] for k in kept if k["id"] != r["id"] and k["total"] is not None]
+        others = [(k["total"], k["year"]) for k in kept if k["id"] != r["id"] and k["total"] is not None]
+        others = matching.vehicle_history(r["year"], others) if vehicle else [t for t, _ in others]
         db.execute("UPDATE listings SET deal_pct = ? WHERE id = ?", (matching.deal_pct(r["total"], others), r["id"]))
     return len(gone)
 

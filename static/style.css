@@ -126,3 +126,5 @@ input[type=color] { width: 44px; height: 30px; padding: 2px; }
 .row input[type=color], .row input[type=checkbox] { flex: none; min-width: 0; }
 .src-tag { position: absolute; top: 6px; left: 6px; padding: 1px 6px; border-radius: 4px; font-size: 11px; font-weight: 700;
   line-height: 16px; box-shadow: 0 1px 2px rgba(0, 0, 0, .35); pointer-events: none; }
+.vehicle-facts { display: flex; gap: 10px; flex-wrap: wrap; font-size: 13px; }
+.vehicle-facts .title-flag { color: #fff; background: var(--bad); border-radius: 4px; padding: 0 6px; font-weight: 600; }
