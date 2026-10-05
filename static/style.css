@@ -126,5 +126,10 @@ input[type=color] { width: 44px; height: 30px; padding: 2px; }
 .row input[type=color], .row input[type=checkbox] { flex: none; min-width: 0; }
 .src-tag { position: absolute; top: 6px; left: 6px; padding: 1px 6px; border-radius: 4px; font-size: 11px; font-weight: 700;
   line-height: 16px; box-shadow: 0 1px 2px rgba(0, 0, 0, .35); pointer-events: none; }
+.machine:not([data-kind="vehicle"]) .vehicle-only { display: none; }
+.recalls-box { margin-top: 10px; display: flex; flex-direction: column; gap: 10px; }
+.recall { border-left: 3px solid var(--great); padding: 4px 10px; display: flex; flex-direction: column; gap: 3px; }
+.recall.park { border-left-color: var(--bad); }
+.title-flag { color: #fff; background: var(--bad); border-radius: 4px; padding: 0 6px; font-weight: 600; font-size: 12px; }
 .vehicle-facts { display: flex; gap: 10px; flex-wrap: wrap; font-size: 13px; }
 .vehicle-facts .title-flag { color: #fff; background: var(--bad); border-radius: 4px; padding: 0 6px; font-weight: 600; }

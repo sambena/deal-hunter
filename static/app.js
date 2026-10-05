@@ -789,6 +789,9 @@ function machineCard(m) {
       <label>Purchased <input data-f="purchased" type="date" value="${esc(m.purchased || "")}"></label>
       <label>Price paid ($) <input data-f="price_paid" type="number" min="0" step="0.01" value="${m.price_paid ?? ""}"></label>
       <label>Notes <input data-f="notes" value="${esc(m.notes)}" placeholder="use, size, PSU wattage, limits…"></label>
+      <label class="vehicle-only">VIN <span class="row"><input data-f="vin" value="${esc(m.vin || "")}" maxlength="17"
+        placeholder="17 characters, on the dash or door"><button type="button" class="small" data-act="vin">Look up</button></span></label>
+      <label class="vehicle-only">Odometer (miles) <input data-f="odometer" type="number" min="0" step="1" value="${m.odometer ?? ""}"></label>
     </div>
     <div class="custom">${(m.custom || []).map(customRow).join("")}</div>
     ${needed ? `<p class="specs-needed parts-only">Specs needed: press <b>Get specs</b> to fill in this computer's parts.</p>` : ""}
@@ -801,10 +804,12 @@ function machineCard(m) {
       <button class="parts-only ${needed ? "primary" : ""}" data-act="get-specs">Get specs</button>
       <button class="primary parts-only" data-act="suggest">Find upgrades</button>
       <button class="primary gear-only" data-act="watch-model">Watch this model</button>
+      <button class="vehicle-only" data-act="recalls">Recalls</button>
       ${aiOn() ? `<button data-act="suggest-ai">Find upgrades with AI</button>` : ""}
       ${m.id ? `<button class="danger" data-act="delete">Delete</button>` : ""}
     </div>
     <div class="specs-box" hidden></div>
+    <div class="recalls-box" hidden></div>
     <div class="results"></div>
   </div>`;
 }
@@ -855,6 +860,41 @@ async function fillSpecs(card, btn) {
   });
 }
 
+// Vehicles: a VIN fills in make, model, year and trim (NHTSA's free decoder); Recalls lists NHTSA campaigns.
+async function lookUpVin(card, btn) {
+  await busy(btn, async () => {
+    const v = await api("POST", "/api/vin", { vin: $("[data-f=vin]", card).value });
+    $("[data-f=vin]", card).value = v.vin;
+    $("[data-f=make]", card).value = v.make;
+    $("[data-f=model]", card).value = v.model;  // just the model: recalls and parts searches need it plain
+    if (v.year) $("[data-f=year]", card).value = v.year;
+    const name = $("[data-f=name]", card);
+    if (!name.value.trim()) name.value = `${v.year || ""} ${v.make} ${v.model} ${v.trim}`.trim();
+    const spec = [v.body, v.drive, v.engine].filter(Boolean).join(" · ");
+    toast(`${v.year || ""} ${v.make} ${v.model} ${v.trim}${spec ? " · " + spec : ""}` + (v.warning ? ` (note: ${v.warning})` : "") +
+      " · press Save to keep it");
+  });
+}
+
+async function showRecalls(card, btn) {
+  const box = $(".recalls-box", card);
+  if (!box.hidden) { box.hidden = true; return; }
+  await busy(btn, async () => {
+    const id = await saveMachine(card);
+    const { recalls, vehicle } = await api("GET", `/api/machines/${id}/recalls`);
+    box.innerHTML = recalls.length ? `<p><b>${recalls.length} recall${recalls.length === 1 ? "" : "s"}</b> NHTSA lists for ${esc(vehicle)}.
+        A dealer fixes recalls free; check yours by VIN at <a href="https://www.nhtsa.gov/recalls" target="_blank" rel="noopener">nhtsa.gov/recalls</a>.</p>` +
+      recalls.map(r => `<div class="recall${r.park_it ? " park" : ""}">
+        <div><b>${esc(r.component)}</b> <span class="meta">${esc(r.campaign)} · ${esc(r.date)}</span>${r.park_it ? ` <span class="title-flag">Don't drive it</span>` : ""}</div>
+        <div>${esc(r.summary)}</div>
+        <div class="meta">${esc(r.consequence)}</div>
+        <div class="meta">Fix: ${esc(r.remedy)}</div>
+        <a href="${esc(safeUrl(r.url))}" target="_blank" rel="noopener">Details</a></div>`).join("")
+      : `<p class="muted">No recalls listed for ${esc(vehicle)}.</p>`;
+    box.hidden = false;
+  });
+}
+
 function machineFromCard(card) {
   return {
     name: $("[data-f=name]", card).value.trim() || "Untitled",
@@ -865,6 +905,8 @@ function machineFromCard(card) {
     msrp: $("[data-f=msrp]", card).value,
     purchased: $("[data-f=purchased]", card).value,
     price_paid: $("[data-f=price_paid]", card).value,
+    vin: $("[data-f=vin]", card).value.trim(),
+    odometer: $("[data-f=odometer]", card).value,
     custom: $$(".custom-row", card).map(r => ({ label: $("[data-f=label]", r).value.trim(), value: $("[data-f=value]", r).value.trim() }))
       .filter(f => f.label),
     notes: $("[data-f=notes]", card).value.trim(),
@@ -896,6 +938,8 @@ $("#machines").addEventListener("click", async e => {
     return;
   }
   if (act === "fill-specs") return fillSpecs(card, btn);
+  if (act === "vin") return lookUpVin(card, btn).catch(err => toast(err.message, true));
+  if (act === "recalls") return showRecalls(card, btn).catch(err => toast(err.message, true));
   if (act === "watch-model") {
     const data = machineFromCard(card);
     if (!data.model) return toast("Add the model first", true);

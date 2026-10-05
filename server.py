@@ -25,6 +25,7 @@ import homeassistant
 import netguard
 import poller
 import specs
+import vehicles
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 ROUTES: list[tuple[str, re.Pattern, callable]] = []
@@ -311,6 +312,27 @@ def delete_machine(body, params, mid):
     if not db.delete_machine(int(mid)):
         raise HTTPError(404, "device not found")
     return {"ok": True}
+
+
+@route("POST", "/api/vin")
+def vin_lookup(body, params):
+    """Decode a VIN (NHTSA vPIC): make, model, year, trim, body, drive, engine."""
+    try:
+        return vehicles.decode_vin(body.get("vin", ""))
+    except vehicles.LookupFailed as e:
+        raise HTTPError(400, str(e)) from e
+
+
+@route("GET", r"/api/machines/(\d+)/recalls")
+def machine_recalls(body, params, mid):
+    machine = db.get_machine(int(mid))
+    if not machine:
+        raise HTTPError(404, "device not found")
+    try:
+        found = vehicles.recalls(machine.get("make", ""), machine.get("model", ""), machine.get("year"))
+    except vehicles.LookupFailed as e:
+        raise HTTPError(400, str(e)) from e
+    return {"recalls": found, "vehicle": f"{machine.get('year')} {machine.get('make')} {machine.get('model')}"}
 
 
 @route("POST", r"/api/machines/(\d+)/suggest")

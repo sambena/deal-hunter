@@ -73,11 +73,13 @@ curl -X POST -H "Authorization: Bearer YOUR_KEY" -H "Content-Type: application/j
         <tr><td><code>POST /api/machines</code></td><td>Add a device: <code>name</code>, <code>kind</code> (pc, server, tv, monitor, phone, tablet, audio, network, console, printer, appliance, smart home, vehicle, other),
           <code>make</code>, <code>model</code>, <code>year</code>, <code>msrp</code>, <code>purchased</code> (YYYY-MM-DD), <code>price_paid</code>,
           <code>custom</code> (your own fields: list of <code>{"label", "value"}</code>), <code>parts</code> (PCs: list of <code>{"category", "model"}</code>), <code>notes</code>.
-          All but <code>name</code> are optional; new fields may be added over time, so ignore ones you don't know.</td></tr>
+          Vehicles also take <code>vin</code> and <code>odometer</code> (changed only when sent). All but <code>name</code> are optional; new fields may be added over time, so ignore ones you don't know.</td></tr>
         <tr><td><code>PUT /api/machines/ID</code> / <code>DELETE</code></td><td>Change (send the whole device) or delete.</td></tr>
         <tr><td><code>POST /api/machines/ID/specs</code></td><td>Fill in a PC's parts from <code>{"text": ...}</code>: the Get specs command's output, or other text with <code>"use_ai": true</code>.</td></tr>
         <tr><td><code>POST /api/machines/ID/suggest</code></td><td>Upgrade ideas; <code>{"use_ai": true}</code> for AI.</td></tr>
         <tr><td><code>POST /api/radar</code></td><td>Deal radar proposals for every device; <code>{"use_ai": true}</code> includes non-PCs.</td></tr>
+              <tr><td><code>POST /api/vin</code></td><td>Decode a VIN (NHTSA): <code>{vin}</code> → <code>{vin, make, model, year, trim, body, drive, engine, warning}</code>.</td></tr>
+        <tr><td><code>GET /api/machines/ID/recalls</code></td><td>Safety recalls NHTSA lists for the device's make/model/year: <code>{vehicle, recalls: [{campaign, date, component, summary, consequence, remedy, park_it, url}]}</code>.</td></tr>
       </table></div>
 
       <h2>AI</h2>
