@@ -62,6 +62,10 @@ VEHICLE_FILTERS = ("kind", "year_min", "year_max", "max_miles")
 # The sources that can search for cars and trucks; vehicle watches skip the rest (Reddit, Best Buy...).
 VEHICLE_SOURCES = {"ebay", "ebay_local", "craigslist", "offerup", "ksl_cars"}
 VEHICLE_ONLY = {"ksl_cars"}  # and these only search for vehicles
+# Clothes and shoes: where they're sold (no Reddit, Best Buy or car sites); Poshmark only sells clothes.
+CLOTHING_SOURCES = {"ebay", "ebay_local", "poshmark", "craigslist", "offerup", "ksl", "slickdeals"}
+CLOTHING_ONLY = {"poshmark"}
+WATCH_FILTERS["poshmark"] = ("size", "department")
 
 
 def fetch_key(name: str, watch: dict, settings: dict) -> str:
@@ -117,8 +121,10 @@ def run_watch(watch: dict, settings: dict, shared: dict | None = None) -> dict:
     limited = bool(watch.get("keep_cheapest"))
     # Local searches go first so an item that is both local and national is stored as local.
     for name in sorted(watch["sources"], key=lambda n: n != "ebay_local"):
+        clothing = watch.get("kind") == "clothing"
         if (not enabled.get(name) or name not in SOURCES or (vehicle and name not in VEHICLE_SOURCES)
-                or (not vehicle and name in VEHICLE_ONLY)):
+                or (not vehicle and name in VEHICLE_ONLY)
+                or (clothing and name not in CLOTHING_SOURCES) or (not clothing and name in CLOTHING_ONLY)):
             continue
         try:
             items = fetch(name, watch, settings, shared)
@@ -139,7 +145,11 @@ def run_watch(watch: dict, settings: dict, shared: dict | None = None) -> dict:
                                    total, it.get("text", ""))
             if not ok:
                 continue
-            year = miles = status = None
+            year = miles = status = size = None
+            if watch.get("kind") == "clothing":
+                size = it.get("size") or matching.title_size(it["title"])
+                if not matching.check_size(size, watch)[0]:
+                    continue
             if vehicle:
                 text = f"{it['title']} {it.get('text', '')}"
                 year = it.get("year") or matching.vehicle_year(it["title"])
@@ -158,11 +168,11 @@ def run_watch(watch: dict, settings: dict, shared: dict | None = None) -> dict:
             pct = matching.deal_pct(total, compare)
             lid = db.execute("""INSERT INTO listings (watch_id, source, source_id, title, price, shipping, total,
                 currency, url, image, location, condition, buying, first_seen, status, deal_pct,
-                year, miles, title_status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                year, miles, title_status, size)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (watch["id"], it["source"], it["source_id"], it["title"], it["price"], it["shipping"], total,
                  it["currency"], it["url"], it["image"], it["location"], it["condition"], it["buying"],
-                 time.time(), "pruned" if limited else "new", pct, year, miles, status or None))
+                 time.time(), "pruned" if limited else "new", pct, year, miles, status or None, size or None))
             if total is not None:
                 history.append((total, year))
             new_rows.append({**it, "id": lid, "total": total, "deal_pct": pct, "backlog": first_from_source})

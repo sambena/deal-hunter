@@ -120,6 +120,55 @@ def check_vehicle(year: int | None, miles: int | None, watch: dict) -> tuple[boo
     return True, ""
 
 
+# ---- clothes and shoes ------------------------------------------------------------
+
+LETTER_SIZES = {"xxs": "XXS", "xs": "XS", "extra small": "XS", "s": "S", "small": "S", "m": "M", "medium": "M",
+                "l": "L", "large": "L", "xl": "XL", "x-large": "XL", "extra large": "XL", "xxl": "XXL", "2xl": "XXL",
+                "xx-large": "XXL", "xxxl": "XXXL", "3xl": "XXXL"}
+# "Size 10.5", "sz 10 1/2", "US 10.5", "10.5M", "W32 L30", "32x30", "size M"
+_SIZE_RE = re.compile(
+    r"\b(?:size|sz|us|uk|eu)\s*[:#]?\s*(\d{1,2}(?:\.5| 1/2|½)?|xxs|xs|s|m|l|xl|xxl|xxxl|[23]xl)\b"
+    r"|\b(\d{1,2}(?:\.5)?)\s*(?:m|w|men'?s|women'?s)\b"
+    r"|\bw\s?(\d{2})\s*l\s?(\d{2})\b|\b(\d{2})\s*x\s*(\d{2})\b", re.I)
+
+
+def norm_size(size: str | None) -> str:
+    """One spelling per size: "10 1/2" -> "10.5", "medium" -> "M", "W32 L30" -> "32x30"."""
+    s = " ".join(str(size or "").lower().replace("½", ".5").split())
+    if not s:
+        return ""
+    s = re.sub(r"(\d+) 1/2", r"\1.5", s)
+    m = re.fullmatch(r"w?\s?(\d{2})\s*(?:x|l|/)\s*l?\s?(\d{2})", s)
+    if m:
+        return f"{m.group(1)}x{m.group(2)}"
+    if s in LETTER_SIZES:
+        return LETTER_SIZES[s]
+    m = re.fullmatch(r"(\d{1,2}(?:\.5)?)(?:\.0)?\s*(?:m|w|us)?", s)
+    return m.group(1) if m else s.upper()
+
+
+def title_size(text: str) -> str:
+    """The size a listing title states, if any ("" when it doesn't say)."""
+    m = _SIZE_RE.search(text or "")
+    if not m:
+        return ""
+    if m.group(1):
+        return norm_size(m.group(1))
+    if m.group(2):
+        return norm_size(m.group(2))
+    a, b = (m.group(3), m.group(4)) if m.group(3) else (m.group(5), m.group(6))
+    return f"{a}x{b}"
+
+
+def check_size(listing_size: str | None, watch: dict) -> tuple[bool, str]:
+    """A clothing watch's size: a listing in another size is out; one that doesn't say stays."""
+    want = norm_size(watch.get("size"))
+    have = norm_size(listing_size)
+    if want and have and want != have:
+        return False, f"size {have}, not {want}"
+    return True, ""
+
+
 def check(title: str, watch: dict, junk_terms: list[str], total: float | None,
           extra_text: str = "") -> tuple[bool, str]:
     """Decide whether a listing belongs to a watch. Returns (ok, reason if rejected)."""
