@@ -19,6 +19,10 @@ Follow `docs/integration/adopt-central-login.md` in cougar-auth (https://github.
 - Admission group `cougar-admission-cougar-deals` has **0 members**: nobody can sign in until the first person is added on the login service (ask first; that is a
   login-service change).
 
+## Scope decision (owner, 2026-10-24)
+
+No other item owns the base central sign-in, so #323 includes it, and it lands first, off by default behind one flag. It covers the begin and callback routes, token validation, sessions, and the owner-run link by exact subject, copied from Relay. Self-service linking follows in a later PR. The owner approved adding Relay's pinned packages (PyJWT, cryptography, Authlib, requests) with a `requirements.txt`. Until now the app had no packages to install.
+
 ## What is different from Relay
 
 Relay only built an owner-run link by exact subject. Self-service linking with a one-use link state bound to both accounts and the browser (runbook section 1) is **new work** the reference does not cover.
@@ -27,8 +31,8 @@ Relay only built an owner-run link by exact subject. Self-service linking with a
 - Proof is a fresh email-and-password sign-in to that account, inside the same link flow. An existing cookie or device token is not proof, and neither is a reset or invite link. A reset link is a password change someone else can start (the admin makes it), not proof by the person.
 - **Accounts without a password.** `password_hash` is NULL only for the first admin before first-admin setup (`/api/auth/setup`). Invites set a password when they are used, and an unused invite has no account yet. A NULL-password account cannot be linked by self-service. It is linked only by the owner-run link by exact subject (as in Relay), or after setup gives it a password.
 - **Disabled accounts** (`users.disabled = 1`) cannot be linked. Disabling an account after it is linked keeps the mapping and refuses sign-in.
-- **There are no soft-deleted accounts.** Deleting a user cascades and removes the row, so "deleted" means "no such account": the link state names an account id that no longer exists.
-- **Email is not stable.** A person can change it with `POST /api/me`, so it must never be the join key, either at link time or afterwards. The mapping is the central subject to `users.id`.
+- **The app cannot delete accounts.** It has no delete route and no `DELETE FROM users`, and there is no soft delete. A row removed by hand cascades only `tokens`, `user_settings` and `invites`. `watches`, `machines` and `ai_usage` carry a plain `user_id` with no foreign key, so they would be left orphaned. `users.id` is AUTOINCREMENT, so an id is never reused. "Deleted" therefore means "no such account": the link state names an account id that no longer exists. The test sets this up by deleting the row directly.
+- **Email is neither stable nor unique.** A person can change it with `POST /api/me`, and `users.email` has no `UNIQUE` constraint. Neither `POST /api/me` nor setup checks for duplicates, and password sign-in takes the first match. So email is never the join key, either at link time or afterwards. The proof binds to the `users.id` that the fresh password sign-in returned, not to the email typed in. The mapping is the central subject to `users.id`.
 
 ## Plan adjustments from what we learned
 
@@ -58,7 +62,7 @@ Self-service account linking with proof of both accounts is NEW work the referen
 Valid: the proven owner links the intended account. Rejected: matching email alone taking over an account, a collision (rolls back, both unchanged), a banned or deleted account, a link state from another browser.
 
 Specific to Deal Hunter (valid control beside each rejection):
-- **Valid control:** a fresh password sign-in plus a central sign-in links the account. Afterwards its `watches`, finds (`listings`), `machines`, `user_settings`, role and AI allowance are unchanged, compared row by row with a snapshot taken before the link.
+- **Valid control:** a fresh password sign-in plus a central sign-in links the account. Afterwards its `watches`, finds (`listings`), `machines`, `user_settings`, `ai_usage` (`user_id`, `paid_by`), `invites.created_by`, and its `users` columns (role, `watch_limit`, `ai_shared`, `ai_allowance`, `ai_daily_cap`) are unchanged, compared row by row with a snapshot taken before the link.
 - **Rejected:**
   - an existing cookie or device token without a fresh password sign-in
   - a reset or invite link offered as proof
@@ -66,6 +70,7 @@ Specific to Deal Hunter (valid control beside each rejection):
   - a disabled account (`disabled = 1`)
   - a link state naming an account id that no longer exists
   - a central account whose email matches but which has no password proof
+  - two local accounts sharing one email: the link goes to the account the password proved, never to the other one
 - **Email change after linking:** the account still signs in through its central subject, and a different central account with the old email cannot take it over.
 
 
