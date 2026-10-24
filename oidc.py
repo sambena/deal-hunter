@@ -11,12 +11,14 @@ path) finishes it, GET /auth/logout is where the login service sends people afte
 from __future__ import annotations
 
 import html
+import os
 import secrets
+import stat
 import urllib.parse
-from http.cookies import SimpleCookie
 from pathlib import Path
 from urllib.parse import urlsplit
 
+import auth
 import central
 
 TX_SECONDS = 300
@@ -53,15 +55,19 @@ class CentralLogin:
         self.transactions, self.cache, self.exchange = transactions, cache, exchange
 
     @classmethod
-    def from_config(cls, config: dict | None, data_dir: Path) -> "CentralLogin | None":
-        """None when central login is off. Missing settings stop the server now, not at the first sign-in."""
+    def from_config(cls, config: dict | None, data_dir: Path, app_dir: Path | None = None) -> "CentralLogin | None":
+        """None when central login is off. Missing settings stop the server now, not at the first sign-in.
+        Relative paths in the config are relative to the app's folder (app_dir), not wherever it was started."""
         if not config or config.get("enabled") is not True:
             return None
         missing = [k for k in REQUIRED if not config.get(k)]
         if missing:
             raise SystemExit('config.json "oidc" is enabled but needs: ' + ", ".join(missing))
-        secret_file = Path(config["client_secret_file"])
+        app_dir = app_dir or Path(__file__).resolve().parent
+        secret_file = app_dir / Path(config["client_secret_file"])  # an absolute path stays as it is
         try:
+            if os.name == "posix" and stat.S_IMODE(secret_file.stat().st_mode) & 0o077:
+                raise SystemExit('config.json "oidc": client_secret_file must be readable by its owner only (chmod 600)')
             secret = secret_file.read_text(encoding="utf-8").strip()
         except OSError:
             secret = ""
@@ -72,11 +78,19 @@ class CentralLogin:
             from cougar_login.login_validation import OAuthBackchannel, Provider, Transactions
         except ImportError as e:
             raise SystemExit(f"Central login needs its packages: pip install -r requirements.txt ({e.name})") from None
-        tx_db = Path(config.get("tx_db") or data_dir / "oidc" / "login-tx.db")
-        tx_db.parent.mkdir(mode=0o700, parents=True, exist_ok=True)  # the library refuses a directory others can read
-        provider = Provider(config["issuer"], config["client_id"], config["callback"])
-        return cls(provider, config["authorize_url"], Transactions(tx_db), JWKSCache(provider, config["jwks_url"]),
-                   OAuthBackchannel(provider, config["token_url"], secret))
+        tx_db = app_dir / Path(config["tx_db"]) if config.get("tx_db") else data_dir / "oidc" / "login-tx.db"
+        try:
+            tx_db.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+            transactions = Transactions(tx_db)  # refuses a directory or file anyone else can read
+        except ValueError as e:
+            raise SystemExit(f'config.json "oidc": the login transaction store needs a private folder owned by '
+                             f'this user ({tx_db.parent}, chmod 700): {e}') from None
+        try:
+            provider = Provider(config["issuer"], config["client_id"], config["callback"])
+            return cls(provider, config["authorize_url"], transactions, JWKSCache(provider, config["jwks_url"]),
+                       OAuthBackchannel(provider, config["token_url"], secret))
+        except ValueError as e:  # an http:// issuer or callback, or an endpoint off the issuer's origin
+            raise SystemExit(f'config.json "oidc": {e}') from None
 
     @staticmethod
     def _cookie_name(secure: bool) -> str:
@@ -108,12 +122,7 @@ class CentralLogin:
         from cougar_login.jwks_cache import complete_cached_callback
         from cougar_login.login_validation import LoginRejected
         name = self._cookie_name(secure)
-        jar = SimpleCookie()
-        try:
-            jar.load(cookie_header or "")
-        except Exception:  # noqa: BLE001 - a malformed cookie header is just no transaction
-            pass
-        browser = jar[name].value if name in jar else ""
+        browser = auth.cookie_value(cookie_header, name) or ""
         clear = self._tx_cookie(name, "", 0, secure)
         session = None
         try:
@@ -123,6 +132,9 @@ class CentralLogin:
             status, headers, body = page("Sign-in could not be completed. Start again.", 400)
         except central.CentralError as e:
             status, headers, body = page(str(e), e.status)
+        except Exception as e:  # noqa: BLE001 - anything unexpected still gets an answer and a cleared cookie
+            print(f"central sign-in failed: {type(e).__name__}")  # the type only: messages can carry claims
+            status, headers, body = page("Sign-in could not be completed. Start again.", 500)
         else:
             status, headers, body = 200, [], GO.encode()
             session = (user["id"], token)
@@ -136,7 +148,8 @@ class CentralLogin:
 
 def redact(path: str) -> str:
     """The callback URL carries a one-time code and the state: keep them out of every log line."""
-    if path.startswith("/auth/") and "?" in path:
+    # By the parsed path, so a request line with a full URL ("GET http://host/auth/callback?...") is caught too.
+    if urlsplit(path).path.startswith("/auth/") and "?" in path:
         return path.split("?", 1)[0] + "?[redacted]"
     return path
 
