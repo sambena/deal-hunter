@@ -404,19 +404,27 @@ def query(sql: str, args: tuple = ()) -> list[dict]:
         return [dict(r) for r in conn().execute(sql, args).fetchall()]
 
 
-def execute(sql: str, args: tuple = ()) -> int:
+def _write(sql: str, args: tuple) -> sqlite3.Cursor:
+    # A failed statement leaves the shared connection inside the transaction it opened; undo it, or every later
+    # write (and central sign-in's BEGIN IMMEDIATE) runs into it.
     with _lock:
-        cur = conn().execute(sql, args)
-        conn().commit()
-        return cur.lastrowid
+        c = conn()
+        try:
+            cur = c.execute(sql, args)
+            c.commit()
+        except BaseException:
+            c.rollback()
+            raise
+        return cur
+
+
+def execute(sql: str, args: tuple = ()) -> int:
+    return _write(sql, args).lastrowid
 
 
 def execute_count(sql: str, args: tuple = ()) -> int:
     """Like execute, but returns how many rows changed."""
-    with _lock:
-        cur = conn().execute(sql, args)
-        conn().commit()
-        return cur.rowcount
+    return _write(sql, args).rowcount
 
 
 # ---- settings -------------------------------------------------------------

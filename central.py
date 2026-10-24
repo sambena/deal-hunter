@@ -32,13 +32,15 @@ def _write():
     that depends on it can't be split by a disable or a switch-off, from this server or from central_admin.py."""
     with db._lock:
         c = db.conn()
+        if c.in_transaction:  # left open by an earlier failure: never let it carry this change, or hide in it
+            c.rollback()
         c.execute("BEGIN IMMEDIATE")
         try:
             yield c
+            c.commit()  # inside the try: a commit that fails (database busy) rolls back instead of staying open
         except BaseException:
             c.rollback()
             raise
-        c.commit()
 
 
 def audit(action: str, detail: str, conn=None) -> None:

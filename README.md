@@ -163,7 +163,9 @@ every command.
 
 To roll back, run `python central_admin.py central off`. It ends every central session at once and refuses
 new ones, keeps the links, and `central on` restores sign-in without reviving anyone who was disabled.
-Setting `"enabled": false` and restarting also refuses every central session. Before going back to a Deal
+Setting `"enabled": false` and restarting also refuses every central session, but only while it stays off:
+the sessions are not deleted, so turning it back on lets them in again. To end them for good, use `central
+off`. Before going back to a Deal
 Hunter version without central login, run `central off` first: older versions don't know which sessions came
 from central sign-in.
 
