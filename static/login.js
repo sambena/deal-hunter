@@ -40,6 +40,8 @@ async function offerApp(code) {
   } catch {}
 }
 
+$("#central").addEventListener("click", () => { location.href = "/auth/central"; });
+
 form.addEventListener("submit", async e => {
   e.preventDefault();
   if (mode !== "login" && form.password.value !== form.password2.value) return ($("#auth-error").textContent = "The passwords don't match");
@@ -74,4 +76,6 @@ form.addEventListener("submit", async e => {
   const status = await call("GET", "/api/auth/status").catch(() => ({}));
   show(status.setup_needed ? "setup" : "login", status.setup_needed
     ? "Welcome. You'll be the admin: pick your name, the email you'll sign in with, and a password." : "");
+  // Central sign-in, when the server has it on: the button goes to Cougar Cave and comes back signed in.
+  $("#central-row").hidden = !(status.central && mode === "login");
 })();

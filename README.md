@@ -8,7 +8,7 @@ check back later. Everything runs on your PC and stores data in `data/`.
 
 Double-click `start.bat`, or run `python server.py`, then open
 http://localhost:8780. It checks every watch every 15 minutes (configurable)
-while it's running. No packages to install.
+while it's running. No packages to install, unless you turn on central login (below).
 
 To reach it from your phone, copy `config.example.json` to `config.json` and
 set `"host": "0.0.0.0"`. There's no login, so only do that on your home network.
@@ -131,9 +131,36 @@ fills the form, and nothing changes until you save.
 Settings > Discord: paste a channel webhook URL and tick the toggle. By default it
 only posts deals, and never posts the first batch a new watch finds.
 
+## Central login (optional)
+
+Deal Hunter can also sign people in through a Cougar Cave login service (OpenID Connect with PKCE). It is
+off unless `config.json` turns it on, and the app's own email-and-password sign-in keeps working beside it.
+It needs the pinned packages: `pip install -r requirements.txt`.
+
+```json
+"oidc": {
+  "enabled": true,
+  "issuer": "https://login.example.test/application/o/your-app/",
+  "client_id": "your-client-id",
+  "callback": "https://deals.example.test/auth/callback",
+  "authorize_url": "https://login.example.test/application/o/authorize/",
+  "token_url": "https://login.example.test/application/o/token/",
+  "jwks_url": "https://login.example.test/application/o/your-app/jwks/",
+  "client_secret_file": "/path/to/a/private/file"
+}
+```
+
+The callback must be exactly `/auth/callback` on this site, and the client secret lives only in that file.
+Missing settings stop the server at start-up. Login transactions are kept in `data/oidc/` (or `"tx_db"`).
+
+Nobody gets in just by having a central account: the owner links each one to an existing account here by
+its exact central user id, never by email, with `python central_admin.py link ACCOUNT SUBJECT`. Admins also
+need a sign-in that used both their password and their authenticator code. `python central_admin.py central
+off` ends every central session at once and keeps the links. Run `python central_admin.py` for every command.
+
 ## Tests
 
-`python -m unittest discover tests`
+`python -m unittest discover tests` (the central-login tests need `pip install -r requirements.txt`)
 
 ## License
 

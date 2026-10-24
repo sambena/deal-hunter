@@ -53,20 +53,32 @@ def _hash(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
-def create_token(user_id: int, kind: str, name: str) -> str:
+def create_token(user_id: int, kind: str, name: str, via: str | None = None, auth_time: float | None = None,
+                 identity_id: int | None = None) -> str:
     token = "dht_" + secrets.token_urlsafe(32)
-    db.execute("INSERT INTO tokens (user_id, token_hash, kind, name, created_at) VALUES (?, ?, ?, ?, ?)",
-               (user_id, _hash(token), kind, (name or kind)[:60], time.time()))
+    db.execute("""INSERT INTO tokens (user_id, token_hash, kind, name, created_at, via, auth_time, identity_id)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+               (user_id, _hash(token), kind, (name or kind)[:60], time.time(), via, auth_time, identity_id))
     return token
+
+
+def central_on() -> bool:
+    """The central sign-in switch (rollback): off ends every central session and refuses new ones."""
+    rows = db.query("SELECT value FROM central_state WHERE key = 'central'")
+    return not rows or rows[0]["value"] == "on"
 
 
 def user_for_token(token: str | None) -> dict | None:
     if not token or not token.startswith("dht_"):
         return None
-    rows = db.query("""SELECT u.*, t.id AS token_id FROM tokens t JOIN users u ON u.id = t.user_id
+    rows = db.query("""SELECT u.*, t.id AS token_id, t.via, t.auth_time, c.status AS identity_status
+                       FROM tokens t JOIN users u ON u.id = t.user_id
+                       LEFT JOIN central_identities c ON c.id = t.identity_id AND c.user_id = t.user_id
                        WHERE t.token_hash = ?""", (_hash(token),))
     if not rows or rows[0]["disabled"]:
         return None
+    if rows[0]["via"] == "central" and (rows[0]["identity_status"] != "active" or not central_on()):
+        return None  # the live deny state: an unlinked or disabled central person, or central sign-in switched off
     db.execute("UPDATE tokens SET last_used = ? WHERE id = ?", (time.time(), rows[0]["token_id"]))
     return rows[0]
 

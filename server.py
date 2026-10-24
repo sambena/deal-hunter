@@ -24,6 +24,7 @@ import hardware
 import matching
 import homeassistant
 import netguard
+import oidc
 import poller
 import product_recalls
 import specs
@@ -727,7 +728,8 @@ def _signed_in(user: dict, kind: str, name: str) -> dict:
 def auth_status(body, params):
     req = _request.get() or {}
     return {"setup_needed": _setup_needed(),
-            "user": auth.public_user(req["user"]) if req.get("user") else None}
+            "user": auth.public_user(req["user"]) if req.get("user") else None,
+            "central": oidc.enabled() and auth.central_on()}  # show "Sign in with Cougar Cave"
 
 
 @route("POST", "/api/auth/setup")
@@ -1073,7 +1075,10 @@ class Handler(BaseHTTPRequestHandler):
 
     def log_message(self, format, *args):  # noqa: A002 - stdlib signature
         if not self.path.startswith("/api/state"):
-            print(f"{self.address_string()} - {format % args}")
+            line = format % args
+            if self.path.startswith("/auth/"):  # the callback's one-time code and state never reach the log
+                line = line.replace(self.path, oidc.redact(self.path))
+            print(f"{self.address_string()} - {line}")
 
     def _send(self, status: int, body: bytes, ctype: str, headers: list[tuple[str, str]] = ()) -> None:
         self.send_response(status)
@@ -1107,6 +1112,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(404, {"error": "API only on this port; see /api.html on the web address"})
             if url.path.startswith(API_PORT_BLOCKED):
                 return self._json(403, {"error": "not available through the API port"})
+        elif url.path in oidc.ROUTES and oidc.enabled():
+            return self._central(method, url)
         user, token = self._identify()
         if method == "GET" and url.path == "/download/android" and not self.api_only:
             return self._download(user, parse_qs(url.query).get("code", [""])[0])
@@ -1161,6 +1168,25 @@ class Handler(BaseHTTPRequestHandler):
             _request.reset(req_token)
             db._current_user.reset(user_token)
 
+    def _central(self, method: str, url) -> None:
+        """Central login's own routes. They run before anyone is identified and never call me(), which would
+        fall back to the first admin."""
+        login = oidc.LOGIN["central"]
+        if method != "GET":
+            return self._send(405, b"Method not allowed", "text/plain")
+        headers: list[tuple[str, str]] = []
+        if url.path == "/auth/central":
+            status, headers, body = login.begin(self._address(), self._https())
+        elif url.path == oidc.CALLBACK_PATH:
+            (status, headers, body), session = login.callback(url.query, self.headers.get("Cookie") or "", self._https())
+            if session:
+                user_id, token = session
+                headers += [self._cookie(token, COOKIE_DAYS * 86400),
+                            self._cookie(auth.device_mark(user_id), COOKIE_DAYS * 86400, DEVICE_COOKIE)]
+        else:
+            status, headers, body = login.logout()
+        self._send(status, body, "text/html; charset=utf-8", headers)
+
     def _download(self, user: dict | None, code: str) -> None:
         if not user:
             try:
@@ -1206,6 +1232,9 @@ def main() -> None:
     host = config.get("host", "127.0.0.1")
     port = int(config.get("port", 8780))
     db.conn()
+    oidc.LOGIN["central"] = oidc.CentralLogin.from_config(config.get("oidc"), db.DB_PATH.parent)
+    if oidc.enabled():
+        print("Cougar Cave sign-in is on (config \"oidc\")")
     DOWNLOADS["dir"] = config.get("downloads_dir")
     if "--no-poll" not in sys.argv:
         poller.start()

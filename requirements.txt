@@ -1,0 +1,6 @@
+# Only needed when central login is switched on (config "oidc"); Deal Hunter runs without them otherwise.
+# Pinned to the versions the cougar-auth adoption playbook and Agent Relay use.
+PyJWT[crypto]==2.15.1
+cryptography==50.0.2
+Authlib==1.9.1
+requests==2.34.2
