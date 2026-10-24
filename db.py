@@ -390,7 +390,8 @@ def conn() -> sqlite3.Connection:
             tcols = {r["name"] for r in _conn.execute("PRAGMA table_info(tokens)")}
             for col, ddl in (("via", "TEXT"),  # 'central' for a Cougar Cave sign-in; NULL for the app's own
                              ("auth_time", "REAL"),  # when the person last proved who they are centrally
-                             ("identity_id", "INTEGER")):
+                             ("identity_id", "INTEGER"),
+                             ("amr", "TEXT")):  # the signed sign-in methods, as JSON: ["pwd", "mfa"]
                 if col not in tcols:
                     _conn.execute(f"ALTER TABLE tokens ADD COLUMN {col} {ddl}")
             _conn.execute("CREATE INDEX IF NOT EXISTS idx_watches_user ON watches(user_id)")

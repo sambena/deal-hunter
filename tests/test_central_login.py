@@ -63,10 +63,11 @@ def fake_exchange(code, verifier):
     return Provided.tokens
 
 
-def id_token(nonce, sub="owner-uuid", key=KEY, iss=ISSUER, aud=CLIENT, amr=("pwd", "mfa"), exp_in=300, extra=None):
+def id_token(nonce, sub="owner-uuid", key=KEY, iss=ISSUER, aud=CLIENT, amr=("pwd", "mfa"), exp_in=300, extra=None,
+             auth_age=1):
     now = int(time.time())
     claims = {"iss": iss, "sub": sub, "aud": aud, "iat": now, "exp": now + exp_in, "nonce": nonce,
-              "auth_time": now - 1, "amr": list(amr), **(extra or {})}
+              "auth_time": now - auth_age, "amr": list(amr), **(extra or {})}
     return jwt.encode(claims, key, algorithm="RS256", headers={"kid": "good"})
 
 
@@ -120,6 +121,9 @@ class CentralLoginTest(unittest.TestCase):
                                 (auth.hash_password("sister pass 1"), time.time()))
         cls.owner_ident = central.link(cls.admin, ISSUER, "owner-uuid")
         cls.member_ident = central.link(cls.member, ISSUER, "member-uuid")
+        cls.unlinked = db.execute("INSERT INTO users (email, name, password_hash, role, created_at) "
+                                  "VALUES ('pal@example.com', 'Pal', ?, 'member', ?)",
+                                  (auth.hash_password("pal pass 1"), time.time()))
 
     @classmethod
     def tearDownClass(cls):
@@ -515,10 +519,10 @@ class CentralLoginTest(unittest.TestCase):
             central.set_status(self.member_ident, "disabled")
             done.set()
 
-        def slow_mint(conn, user, auth_time):
+        def slow_mint(*args):
             threading.Thread(target=disable, daemon=True).start()
             done.wait(0.5)  # with the transaction the disable is blocked here; without it, it lands now
-            return real(conn, user, auth_time)
+            return real(*args)
 
         central._mint = slow_mint
         try:
@@ -664,7 +668,7 @@ class CentralLoginTest(unittest.TestCase):
         child = {}
         real = central._mint
 
-        def slow_mint(conn, user, auth_time):
+        def slow_mint(*args):
             child["p"] = subprocess.Popen([sys.executable, "-c", code, str(Path(__file__).resolve().parent.parent),
                                            str(db.DB_PATH), str(self.member_ident)])
             try:
@@ -672,7 +676,7 @@ class CentralLoginTest(unittest.TestCase):
                 child["waited"] = False
             except subprocess.TimeoutExpired:
                 child["waited"] = True
-            return real(conn, user, auth_time)
+            return real(*args)
 
         central._mint = slow_mint
         try:
@@ -694,10 +698,10 @@ class CentralLoginTest(unittest.TestCase):
             central.set_switch("off")
             done.set()
 
-        def slow_mint(conn, user, auth_time):
+        def slow_mint(*args):
             threading.Thread(target=switch_off, daemon=True).start()
             done.wait(0.5)
-            return real(conn, user, auth_time)
+            return real(*args)
 
         central._mint = slow_mint
         try:
@@ -785,6 +789,96 @@ class CentralLoginTest(unittest.TestCase):
         self.assertEqual(status, 500)
         self.assertTrue(any(c.startswith("dh_login=;") and "Max-Age=0" in c for c in cookies))
         self.assertNotIn("dh_session", b.jar)
+
+
+    # ---- privileged actions (#412): admin and account routes need a central pwd+mfa sign-in, a change a recent one
+
+    def password_session(self, email, password, port=None, device=None):
+        b = self.browser(port)
+        body = {"email": email, "password": password, **({"device_name": device} if device else {})}
+        status, _, data, _ = b.get("/api/auth/login", "POST", body)
+        self.assertEqual(status, 200)
+        return b, json.loads(data)
+
+    def invite(self, b):
+        return b.get("/api/admin/invites", "POST", {"note": "for a test"})
+
+    def test_admin_with_a_fresh_central_sign_in_reaches_admin_reads_and_changes(self):
+        status, _, b, _ = self.sign_in()
+        self.assertEqual(status, 200)
+        self.assertEqual(b.get("/api/admin/users")[0], 200)
+        self.assertEqual(self.invite(b)[0], 200)
+        self.assertEqual(b.get("/api/tokens")[0], 200)
+
+    def test_admin_password_session_is_refused_on_admin_routes_with_the_reason(self):
+        b, _ = self.password_session("sam@example.com", "admin pass 1")
+        self.assertEqual(self.state_of(b), 200)  # ordinary use is unchanged
+        for method, path, body in (("GET", "/api/admin/users", None), ("POST", "/api/admin/invites", {"note": "x"}),
+                                   ("GET", "/api/import/ha", None), ("POST", "/api/api-key", {}),
+                                   ("PUT", "/api/settings", {"zip_code": "84057"}), ("GET", "/api/tokens", None),
+                                   ("POST", "/api/me", {"new_password": "another pass 1", "current_password": "admin pass 1"})):
+            with self.subTest(path=path, method=method):
+                status, _, data, _ = b.get(path, method, body)
+                self.assertEqual(status, 403)
+                self.assertIn("both your password and your authenticator code", json.loads(data)["error"])
+        self.assertEqual(b.get("/api/me", "POST", {"name": "Sam"})[0], 200)  # a name change is ordinary
+
+    def test_code_only_or_password_only_central_sessions_are_refused_for_a_linked_member(self):
+        for amr in (("mfa",), ("pwd",)):
+            with self.subTest(amr=amr):
+                _, _, b, _ = self.sign_in(sub="member-uuid", amr=amr)
+                self.assertEqual(self.state_of(b), 200)
+                status, _, data, _ = b.get("/api/tokens")
+                self.assertEqual(status, 403)
+                self.assertIn("both your password", json.loads(data)["error"])
+        _, _, b, _ = self.sign_in(sub="member-uuid", amr=("pwd", "mfa"))
+        self.assertEqual(b.get("/api/tokens")[0], 200)
+        self.assertEqual(b.get("/api/admin/users")[0], 403)  # still not the admin
+
+    def test_a_stale_sign_in_reads_but_cannot_change_with_a_clear_message(self):
+        _, _, b, _ = self.sign_in(auth_age=600)
+        self.assertEqual(b.get("/api/admin/users")[0], 200)
+        status, _, data, _ = self.invite(b)
+        self.assertEqual(status, 403)
+        self.assertIn("sign in again: your last Cougar Cave sign-in was 10 minutes ago", json.loads(data)["error"])
+        _, _, fresh, _ = self.sign_in(auth_age=200)
+        self.assertEqual(self.invite(fresh)[0], 200)
+
+    def test_device_tokens_and_the_old_api_key_are_refused_for_the_linked_admin(self):
+        _, data = self.password_session("sam@example.com", "admin pass 1", device="Pixel")
+        app = Browser(self.ui.server_port)
+        status, _, body, _ = app.get("/api/admin/users", headers={"Authorization": "Bearer " + data["token"]})
+        self.assertEqual(status, 403)
+        self.assertEqual(app.get("/api/state", headers={"Authorization": "Bearer " + data["token"]})[0], 200)
+        db.update_settings({"api_key": "dh_old-shared-key"}, user_id=self.admin)
+        api = Browser(self.api.server_port)
+        key = {"Authorization": "Bearer dh_old-shared-key"}
+        self.assertEqual(api.get("/api/state", headers=key)[0], 200)  # ordinary use during the window
+        for method, path, body in (("GET", "/api/import/ha", None),
+                                   ("POST", "/api/me", {"email": "new@example.com", "current_password": "x"})):
+            with self.subTest(path=path):
+                status, _, data, _ = api.get(path, method, body, headers=key)
+                self.assertEqual(status, 403)
+                self.assertIn("both your password", json.loads(data)["error"])
+
+    def test_unlinked_accounts_keep_the_app_sign_in_for_everything(self):
+        b, _ = self.password_session("pal@example.com", "pal pass 1")
+        self.assertEqual(b.get("/api/tokens")[0], 200)
+        self.assertEqual(b.get("/api/me", "POST", {"new_password": "pal pass 2", "current_password": "pal pass 1"})[0], 200)
+        db.execute("UPDATE users SET password_hash = ? WHERE id = ?", (auth.hash_password("pal pass 1"), self.unlinked))
+
+    def test_with_central_off_the_guard_steps_aside(self):
+        b, _ = self.password_session("sam@example.com", "admin pass 1")
+        central.set_switch("off")
+        self.assertEqual(b.get("/api/admin/users")[0], 200)  # a rollback must never lock the owner out
+        central.set_switch("on")
+        self.assertEqual(b.get("/api/admin/users")[0], 403)
+        oidc.LOGIN["central"] = None
+        self.assertEqual(b.get("/api/admin/users")[0], 200)  # nor turning it off in config.json
+
+    def test_a_member_still_changes_their_own_ordinary_settings(self):
+        _, _, b, _ = self.sign_in(sub="member-uuid", amr=("mfa",))
+        self.assertEqual(b.get("/api/settings", "PUT", {"zip_code": "84057"})[0], 200)
 
 
 class LinkingTest(unittest.TestCase):

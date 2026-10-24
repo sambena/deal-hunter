@@ -22,6 +22,7 @@ import db
 import hardware
 import matching
 import homeassistant
+import central
 import netguard
 import oidc
 import poller
@@ -977,6 +978,37 @@ def admin_reset_link(body, params, uid):
     return _make_link("reset", f"password reset for {rows[0]['name']}", user_id=int(uid))
 
 
+# ---- privileged actions (#412) -------------------------------------------------
+# Admin routes and the account routes that change how someone signs in. For an account linked to Cougar Cave
+# (while central sign-in is on) they need a central sign-in with both password and code, and a change needs one
+# made in the last five minutes. The old API key, device tokens and app-password sessions carry neither.
+
+ADMIN_PREFIXES = ("/api/admin/", "/api/import/ha")
+
+
+def _is_privileged(method: str, path: str, body, user: dict | None) -> bool:
+    if not user:
+        return False
+    if path.startswith(ADMIN_PREFIXES) or (method, path) == ("POST", "/api/api-key"):
+        return True
+    if (method, path) == ("PUT", "/api/settings") and user.get("role") == "admin":
+        return True  # all of an admin's settings: shared keys, the Home Assistant link, LAN addresses
+    if path == "/api/tokens" or path.startswith("/api/tokens/"):
+        return True
+    if (method, path) == ("POST", "/api/me") and isinstance(body, dict) and (body.get("email") or body.get("new_password")):
+        return True
+    return False
+
+
+def _check_privileged(method: str, path: str, body, user: dict | None) -> None:
+    if not _is_privileged(method, path, body, user):
+        return
+    try:
+        central.check_privileged(user, write=method != "GET")
+    except central.CentralError as e:
+        raise HTTPError(e.status, str(e)) from e
+
+
 # ---- HTTP plumbing ----------------------------------------------------------
 
 SIGNED_OUT_FILES = {"login.html", "login.js", "style.css"}
@@ -1142,6 +1174,7 @@ class Handler(BaseHTTPRequestHandler):
                 raise HTTPError(413, "request too large")
             body = json.loads(self.rfile.read(length) or b"{}") if length else {}
             params = {k: v[0] for k, v in parse_qs(url.query).items()}
+            _check_privileged(method, url.path, body, user)
             result = fn(body, params, *match.groups())
             headers = []
             if isinstance(result, dict) and "__set_cookie__" in result:

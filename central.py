@@ -8,6 +8,7 @@ the account are active. Standard library only; the protocol side is in oidc.py.
 from __future__ import annotations
 
 import contextlib
+import json
 import threading
 import time
 
@@ -129,14 +130,54 @@ def sign_in(issuer: str, subject: str, auth_time: float, amr) -> tuple[dict, str
         both = isinstance(amr, list) and "pwd" in amr and "mfa" in amr
         if user["role"] == "admin" and not both:
             raise CentralError(OWNER_FACTORS)
-        token = _mint(c, user, float(auth_time))
+        token = _mint(c, user, float(auth_time), amr)
         audit("sign_in", f"account {user['id']} ({user['role']}) via identity {user['identity_id']}", c)
     return user, token
 
 
-def _mint(conn, user: dict, auth_time: float) -> str:
+def _mint(conn, user: dict, auth_time: float, amr=None) -> str:
+    methods = json.dumps([m for m in amr if isinstance(m, str)]) if isinstance(amr, list) else "[]"
     return auth.create_token(user["id"], "web", "Cougar Cave sign-in", via="central", auth_time=auth_time,
-                             identity_id=user["identity_id"], conn=conn)
+                             identity_id=user["identity_id"], conn=conn, amr=methods)
+
+
+# ---- privileged actions (#412) -----------------------------------------------------------
+
+FRESH_SECONDS = 300  # a privileged change needs a sign-in this recent
+SKEW_SECONDS = 30
+
+NEEDS_BOTH = ("This needs a Cougar Cave sign-in that used both your password and your authenticator code. "
+              "Sign out, then use Sign in with Cougar Cave.")
+
+
+def stale_message(age: float) -> str:
+    return (f"For this change, sign in again: your last Cougar Cave sign-in was {int(age // 60)} minutes ago. "
+            "Sign out, then use Sign in with Cougar Cave from a private window so it asks for your password and code.")
+
+
+def enforced_for(user_id: int) -> bool:
+    """The guard applies to accounts linked to a central identity while central sign-in is on. Accounts not
+    linked yet keep the app's own sign-in for everything until they link (#323), so nobody is locked out."""
+    return auth.central_configured() and auth.central_on() and bool(
+        db.query("SELECT 1 FROM central_identities WHERE user_id = ?", (int(user_id),)))
+
+
+def check_privileged(user: dict, write: bool, now: float | None = None) -> None:
+    """Refuse a privileged request unless this session came from a central sign-in with both pwd and mfa, and,
+    for a change, one made in the last five minutes. There is no forced re-authentication yet (the provider
+    ignores max_age=0 and shows "Not Found" for prompt=login), so a stale sign-in gets a message, not a loop."""
+    if not enforced_for(user["id"]):
+        return
+    try:
+        methods = json.loads(user.get("amr") or "[]") if user.get("via") == "central" else []
+    except ValueError:
+        methods = []
+    if not (isinstance(methods, list) and "pwd" in methods and "mfa" in methods):
+        raise CentralError(NEEDS_BOTH)
+    if write:
+        age = (now if now is not None else time.time()) - float(user.get("auth_time") or 0)
+        if not -SKEW_SECONDS <= age <= FRESH_SECONDS:
+            raise CentralError(stale_message(age))
 
 
 # ---- throttling the unauthenticated begin route ---------------------------------------
