@@ -8,6 +8,7 @@ import contextlib
 import http.client
 import io
 import json
+import os
 import sys
 import tempfile
 import threading
@@ -404,10 +405,205 @@ class CentralLoginTest(unittest.TestCase):
         cfg = {**base, "client_secret_file": str(secret), "tx_db": str(Path(self.tmp.name) / "oidc2" / "tx.db")}
         login = oidc.CentralLogin.from_config(cfg, Path(self.tmp.name))
         self.assertEqual(login.provider.callback, base["callback"])
-        with self.assertRaises(ValueError):  # Relay's first mistake: a callback path the provider doesn't allow
-            oidc.CentralLogin.from_config({**cfg, "callback": "https://deals.example.test/login/callback"}, Path(self.tmp.name))
-        with self.assertRaises(ValueError):  # an authorization endpoint off the issuer's origin
-            oidc.CentralLogin.from_config({**cfg, "authorize_url": "https://evil.example.test/authorize/"}, Path(self.tmp.name))
+        for label, change, expect in (
+                ("Relay's first mistake: a callback path the provider doesn't allow",
+                 {"callback": "https://deals.example.test/login/callback"}, "/auth/callback"),
+                ("an authorization endpoint off the issuer's origin",
+                 {"authorize_url": "https://evil.example.test/authorize/"}, "origin"),
+                ("a plain-HTTP issuer", {"issuer": "http://auth.example.test/application/o/deals/"}, "HTTPS")):
+            with self.subTest(label):
+                with self.assertRaises(SystemExit) as e:
+                    oidc.CentralLogin.from_config({**cfg, **change}, Path(self.tmp.name))
+                self.assertIn(expect, str(e.exception))
+                self.assertNotIn("not-a-real-secret", str(e.exception))
+
+    def config(self, **change):
+        return {"enabled": True, "issuer": "https://auth.example.test/application/o/deals/", "client_id": CLIENT,
+                "callback": "https://deals.example.test/auth/callback",
+                "authorize_url": "https://auth.example.test/application/o/authorize/",
+                "token_url": "https://auth.example.test/application/o/token/",
+                "jwks_url": "https://auth.example.test/application/o/deals/jwks/", **change}
+
+    def test_relative_config_paths_are_relative_to_the_app_folder(self):
+        app = Path(self.tmp.name) / "app"
+        (app / "secrets").mkdir(parents=True)
+        (app / "secrets" / "client.secret").write_text("not-a-real-secret")
+        cfg = self.config(client_secret_file="secrets/client.secret", tx_db="private/tx.db")
+        self.assertIsNotNone(oidc.CentralLogin.from_config(cfg, Path(self.tmp.name), app))
+        self.assertTrue((app / "private" / "tx.db").is_file())
+        with self.assertRaises(SystemExit):  # the same relative path from another folder is not found
+            oidc.CentralLogin.from_config(cfg, Path(self.tmp.name), Path(self.tmp.name) / "elsewhere")
+
+    @unittest.skipUnless(os.name == "posix", "file modes are enforced on POSIX only (production runs on Linux)")
+    def test_readable_secret_or_transaction_folder_stops_start_up(self):
+        base = Path(self.tmp.name) / "perm"
+        base.mkdir()
+        secret = base / "client.secret"
+        secret.write_text("not-a-real-secret")
+        secret.chmod(0o644)
+        cfg = self.config(client_secret_file=str(secret))
+        with self.assertRaises(SystemExit) as e:
+            oidc.CentralLogin.from_config(cfg, base)
+        self.assertIn("chmod 600", str(e.exception))
+        secret.chmod(0o600)
+        (base / "oidc").mkdir()
+        (base / "oidc").chmod(0o755)
+        with self.assertRaises(SystemExit) as e:
+            oidc.CentralLogin.from_config(cfg, base)
+        self.assertIn("chmod 700", str(e.exception))
+        (base / "oidc").chmod(0o700)
+        self.assertIsNotNone(oidc.CentralLogin.from_config(cfg, base))
+
+    # ---- hardening after the PR 60 review -----------------------------------------------------
+
+    def test_https_uses_a_host_prefixed_secure_transaction_cookie_and_clears_it(self):
+        https = {"X-Forwarded-Proto": "https"}
+        b = self.browser()
+        status, headers, _, cookies = b.get("/auth/central", headers=https)
+        self.assertEqual(status, 302)
+        tx = [c for c in cookies if c.startswith("__Host-dh_login=")]
+        self.assertEqual(len(tx), 1)
+        for attr in ("Path=/", "HttpOnly", "SameSite=Lax", "Secure"):
+            self.assertIn(attr, tx[0])
+        self.assertNotIn("Domain=", tx[0])
+        q = urllib.parse.parse_qs(urllib.parse.urlsplit(headers["Location"]).query)
+        Provided.tokens = {"token_type": "Bearer", "access_token": "x", "id_token": id_token(q["nonce"][0])}
+        status, _, _, cookies = b.get("/auth/callback?" + urllib.parse.urlencode(
+            {"code": "abc", "state": q["state"][0]}), headers=https)
+        self.assertEqual(status, 200)
+        cleared = [c for c in cookies if c.startswith("__Host-dh_login=;")]
+        self.assertEqual(len(cleared), 1)
+        self.assertIn("Max-Age=0", cleared[0])
+        self.assertIn("Secure", cleared[0])
+        self.assertIn("Secure", [c for c in cookies if c.startswith("dh_session=")][0])
+        # Over HTTPS a plain-named cookie is not the transaction: one planted without the __Host- prefix is ignored.
+        b2 = self.browser()
+        _, headers, _, _ = b2.get("/auth/central", headers=https)
+        q = urllib.parse.parse_qs(urllib.parse.urlsplit(headers["Location"]).query)
+        b2.jar["dh_login"] = b2.jar.pop("__Host-dh_login")
+        Provided.tokens = {"token_type": "Bearer", "access_token": "x", "id_token": id_token(q["nonce"][0])}
+        self.assertEqual(b2.get("/auth/callback?" + urllib.parse.urlencode(
+            {"code": "abc", "state": q["state"][0]}), headers=https)[0], 400)
+
+    def test_the_transaction_cookie_is_cleared_on_a_rejection_too(self):
+        b = self.browser()
+        q, _, _ = self.begin(b)
+        self.assertIn("dh_login", b.jar)
+        Provided.tokens = {"token_type": "Bearer", "access_token": "x", "id_token": id_token(q["nonce"][0], key=OTHER_KEY)}
+        status, _, _, cookies = b.get("/auth/callback?" + urllib.parse.urlencode({"code": "abc", "state": q["state"][0]}))
+        self.assertEqual(status, 400)
+        self.assertTrue(any(c.startswith("dh_login=;") and "Max-Age=0" in c for c in cookies))
+        self.assertNotIn("dh_login", b.jar)
+
+    def test_re_enabling_a_link_does_not_revive_its_old_session(self):
+        _, _, b, _ = self.sign_in(sub="member-uuid")
+        central.set_status(self.member_ident, "disabled")
+        central.set_status(self.member_ident, "active")
+        self.assertEqual(self.state_of(b), 401)
+        self.assertEqual(self.sign_in(sub="member-uuid")[0], 200)  # a new sign-in works
+
+    def test_a_disable_during_sign_in_cannot_leave_a_live_session(self):
+        # Hold the sign-in between its checks and its insert, and disable the link from another thread then.
+        # The disable must wait for the sign-in and then end its session; re-enabling must not bring it back.
+        done = threading.Event()
+        real = central._mint
+
+        def disable():
+            central.set_status(self.member_ident, "disabled")
+            done.set()
+
+        def slow_mint(conn, user, auth_time):
+            threading.Thread(target=disable, daemon=True).start()
+            done.wait(0.5)  # with the transaction the disable is blocked here; without it, it lands now
+            return real(conn, user, auth_time)
+
+        central._mint = slow_mint
+        try:
+            status, _, b, _ = self.sign_in(sub="member-uuid")
+        finally:
+            central._mint = real
+        self.assertTrue(done.wait(5))
+        self.assertEqual(status, 200)
+        central.set_status(self.member_ident, "active")
+        self.assertEqual(self.state_of(b), 401)
+
+    def test_turning_central_login_off_in_config_ends_its_sessions(self):
+        _, _, b, _ = self.sign_in()
+        pw = self.browser()
+        pw.get("/api/auth/login", "POST", {"email": "sis@example.com", "password": "sister pass 1"})
+        oidc.LOGIN["central"] = None  # as after "enabled": false and a restart
+        self.assertEqual(self.state_of(b), 401)
+        self.assertEqual(self.state_of(pw), 200)  # the app's own sessions are not affected
+        oidc.LOGIN["central"] = self.login
+        self.assertEqual(self.state_of(b), 200)   # once it is back on, the switch and the link decide again
+
+    def test_an_unexpected_error_gets_the_generic_page_a_cleared_cookie_and_a_quiet_log(self):
+        b = self.browser()
+        q, _, _ = self.begin(b)
+        Provided.tokens = {"token_type": "Bearer", "access_token": "x", "id_token": id_token(q["nonce"][0])}
+        real = central.sign_in
+
+        def broken(*args):
+            raise RuntimeError("detail that must not be logged: SECRET-CLAIM")
+
+        central.sign_in = broken
+        out = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(out):
+                status, _, body, cookies = b.get("/auth/callback?" + urllib.parse.urlencode(
+                    {"code": "abc", "state": q["state"][0]}))
+        finally:
+            central.sign_in = real
+        self.assertEqual(status, 500)
+        self.assertIn(b"could not be completed", body)
+        self.assertTrue(any(c.startswith("dh_login=;") for c in cookies))
+        self.assertNotIn("dh_session", b.jar)
+        self.assertIn("RuntimeError", out.getvalue())
+        self.assertNotIn("SECRET-CLAIM", out.getvalue())
+
+    def test_an_unexpected_error_in_begin_still_answers(self):
+        real = self.login.transactions.begin
+
+        def broken(*args):
+            raise RuntimeError("store unavailable")
+
+        self.login.transactions.begin = broken
+        out = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(out):
+                status, _, body, _ = self.browser().get("/auth/central")
+        finally:
+            self.login.transactions.begin = real
+        self.assertEqual(status, 500)
+        self.assertIn(b"could not be completed", body)
+        self.assertNotIn("store unavailable", out.getvalue())
+
+    def test_a_full_url_request_line_is_redacted_too(self):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            conn = http.client.HTTPConnection("127.0.0.1", self.ui.server_port, timeout=10)
+            conn.putrequest("GET", "http://deals.example.test/auth/callback?code=FULL-URL-CODE&state=FULL-STATE",
+                            skip_host=True)
+            conn.putheader("Host", "deals.example.test")
+            conn.endheaders()
+            conn.getresponse().read()
+            conn.close()
+        self.assertNotIn("FULL-URL-CODE", out.getvalue())
+        self.assertNotIn("FULL-STATE", out.getvalue())
+        self.assertIn("?[redacted]", out.getvalue())
+
+    def test_a_malformed_cookie_from_another_site_does_not_break_sign_in(self):
+        b = self.browser()
+        q, _, _ = self.begin(b)
+        b.jar = {"theme; cf": '{"a":1}', "dh_login": b.jar["dh_login"], "a": '"b"c'}
+        Provided.tokens = {"token_type": "Bearer", "access_token": "x", "id_token": id_token(q["nonce"][0])}
+        status, _, _, _ = b.get("/auth/callback?" + urllib.parse.urlencode({"code": "abc", "state": q["state"][0]}))
+        self.assertEqual(status, 200)
+        b.jar = {"x": '"unterminated', "dh_session": b.jar["dh_session"]}
+        self.assertEqual(self.state_of(b), 200)  # the session cookie still reads beside a broken one
+
+    def test_favicon_answers_signed_out_without_a_401(self):
+        self.assertEqual(self.browser().get("/favicon.ico")[0], 204)
 
 
 class LinkingTest(unittest.TestCase):

@@ -150,13 +150,22 @@ It needs the pinned packages: `pip install -r requirements.txt`.
 }
 ```
 
-The callback must be exactly `/auth/callback` on this site, and the client secret lives only in that file.
-Missing settings stop the server at start-up. Login transactions are kept in `data/oidc/` (or `"tx_db"`).
+The issuer, its endpoints and the callback must be HTTPS, with the callback exactly `/auth/callback` on this
+site. The client secret lives only in that file, readable by its owner only (`chmod 600` on Linux). Relative
+paths are relative to Deal Hunter's folder. Login transactions are kept in `data/oidc/` (or `"tx_db"`). On
+Linux that folder must be owned by the user running Deal Hunter, with mode 700. Missing or unsafe settings stop
+the server at start-up.
 
 Nobody gets in just by having a central account: the owner links each one to an existing account here by
 its exact central user id, never by email, with `python central_admin.py link ACCOUNT SUBJECT`. Admins also
-need a sign-in that used both their password and their authenticator code. `python central_admin.py central
-off` ends every central session at once and keeps the links. Run `python central_admin.py` for every command.
+need a sign-in that used both their password and their authenticator code. Run `python central_admin.py` for
+every command.
+
+To roll back, run `python central_admin.py central off`. It ends every central session at once and refuses
+new ones, keeps the links, and `central on` restores sign-in without reviving anyone who was disabled.
+Setting `"enabled": false` and restarting also refuses every central session. Before going back to a Deal
+Hunter version without central login, run `central off` first: older versions don't know which sessions came
+from central sign-in.
 
 ## Tests
 

@@ -7,6 +7,7 @@ the account are active. Standard library only; the protocol side is in oidc.py.
 
 from __future__ import annotations
 
+import contextlib
 import threading
 import time
 
@@ -25,9 +26,25 @@ OWNER_FACTORS = ("Admin sign-in needs your password and your authenticator code 
                  "or clear this browser's cookies for the sign-in service, then try again.")
 
 
-def audit(action: str, detail: str) -> None:
+@contextlib.contextmanager
+def _write():
+    """One SQLite write transaction. BEGIN IMMEDIATE takes the database's write lock, so a check and the change
+    that depends on it can't be split by a disable or a switch-off, from this server or from central_admin.py."""
+    with db._lock:
+        c = db.conn()
+        c.execute("BEGIN IMMEDIATE")
+        try:
+            yield c
+        except BaseException:
+            c.rollback()
+            raise
+        c.commit()
+
+
+def audit(action: str, detail: str, conn=None) -> None:
     # Ids, names and roles only: never codes, tokens, secrets or email addresses.
-    db.execute("INSERT INTO central_audit (at, action, detail) VALUES (?, ?, ?)", (time.time(), action, detail[:300]))
+    (conn or db).execute("INSERT INTO central_audit (at, action, detail) VALUES (?, ?, ?)",
+                         (time.time(), action, detail[:300]))
 
 
 def audit_log(limit: int = 50) -> list[dict]:
@@ -65,11 +82,12 @@ def set_status(ident: int, status: str) -> None:
     """Disable or re-enable a link. Disabling ends that person's central sessions at once."""
     if status not in ("active", "disabled"):
         raise CentralError("Status must be active or disabled.", 400)
-    if not db.execute_count("UPDATE central_identities SET status = ? WHERE id = ?", (status, int(ident))):
-        raise CentralError("No such identity.", 404)
-    if status == "disabled":
-        db.execute("DELETE FROM tokens WHERE identity_id = ?", (int(ident),))
-    audit("identity_" + status, f"identity {int(ident)}")
+    with _write() as c:
+        if not c.execute("UPDATE central_identities SET status = ? WHERE id = ?", (status, int(ident))).rowcount:
+            raise CentralError("No such identity.", 404)
+        if status == "disabled":
+            c.execute("DELETE FROM tokens WHERE identity_id = ?", (int(ident),))
+        audit("identity_" + status, f"identity {int(ident)}", c)
 
 
 # ---- the switch (rollback) -----------------------------------------------------------
@@ -83,31 +101,40 @@ def set_switch(state: str) -> None:
     sign-in are untouched, so turning it back on revives nobody who was disabled."""
     if state not in ("on", "off"):
         raise CentralError("State must be on or off.", 400)
-    db.execute("INSERT OR REPLACE INTO central_state (key, value) VALUES ('central', ?)", (state,))
-    if state == "off":
-        db.execute("DELETE FROM tokens WHERE via = 'central'")
-    audit("central_" + state, "central sign-in " + state)
+    with _write() as c:
+        c.execute("INSERT OR REPLACE INTO central_state (key, value) VALUES ('central', ?)", (state,))
+        if state == "off":
+            c.execute("DELETE FROM tokens WHERE via = 'central'")
+        audit("central_" + state, "central sign-in " + state, c)
 
 
 # ---- turning a validated login into a session --------------------------------------
 
 def sign_in(issuer: str, subject: str, auth_time: float, amr) -> tuple[dict, str]:
-    """Mint a browser session for a validated central login. Refuses anyone not linked and active."""
-    if not switch_on():
-        raise CentralError("Cougar Cave sign-in is turned off for Deal Hunter.")
-    rows = db.query("""SELECT c.id AS identity_id, c.status, u.* FROM central_identities c
-                       JOIN users u ON u.id = c.user_id WHERE c.issuer = ? AND c.subject = ?""", (issuer, subject))
-    if not rows or rows[0]["status"] != "active" or rows[0]["disabled"]:
-        raise CentralError("This account has no access to Deal Hunter.")
-    user = rows[0]
-    # A code-only sign-in carries amr ["mfa"] with no "pwd"; admin access needs both in the same sign-in.
-    both = isinstance(amr, list) and "pwd" in amr and "mfa" in amr
-    if user["role"] == "admin" and not both:
-        raise CentralError(OWNER_FACTORS)
-    token = auth.create_token(user["id"], "web", "Cougar Cave sign-in", via="central",
-                              auth_time=float(auth_time), identity_id=user["identity_id"])
-    audit("sign_in", f"account {user['id']} ({user['role']}) via identity {user['identity_id']}")
+    """Mint a browser session for a validated central login. Refuses anyone not linked and active. The checks
+    and the new session are one transaction, so a disable or switch-off can't land between them."""
+    with _write() as c:
+        state = c.execute("SELECT value FROM central_state WHERE key = 'central'").fetchone()
+        if state is not None and state["value"] != "on":
+            raise CentralError("Cougar Cave sign-in is turned off for Deal Hunter.")
+        row = c.execute("""SELECT c.id AS identity_id, c.status, u.* FROM central_identities c
+                           JOIN users u ON u.id = c.user_id WHERE c.issuer = ? AND c.subject = ?""",
+                        (issuer, subject)).fetchone()
+        if row is None or row["status"] != "active" or row["disabled"]:
+            raise CentralError("This account has no access to Deal Hunter.")
+        user = dict(row)
+        # A code-only sign-in carries amr ["mfa"] with no "pwd"; admin access needs both in the same sign-in.
+        both = isinstance(amr, list) and "pwd" in amr and "mfa" in amr
+        if user["role"] == "admin" and not both:
+            raise CentralError(OWNER_FACTORS)
+        token = _mint(c, user, float(auth_time))
+        audit("sign_in", f"account {user['id']} ({user['role']}) via identity {user['identity_id']}", c)
     return user, token
+
+
+def _mint(conn, user: dict, auth_time: float) -> str:
+    return auth.create_token(user["id"], "web", "Cougar Cave sign-in", via="central", auth_time=auth_time,
+                             identity_id=user["identity_id"], conn=conn)
 
 
 # ---- throttling the unauthenticated begin route ---------------------------------------

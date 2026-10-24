@@ -54,11 +54,16 @@ def _hash(token: str) -> str:
 
 
 def create_token(user_id: int, kind: str, name: str, via: str | None = None, auth_time: float | None = None,
-                 identity_id: int | None = None) -> str:
+                 identity_id: int | None = None, conn=None) -> str:
+    """`conn`: insert inside the caller's open transaction instead of committing on its own."""
     token = "dht_" + secrets.token_urlsafe(32)
-    db.execute("""INSERT INTO tokens (user_id, token_hash, kind, name, created_at, via, auth_time, identity_id)
-                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-               (user_id, _hash(token), kind, (name or kind)[:60], time.time(), via, auth_time, identity_id))
+    sql = """INSERT INTO tokens (user_id, token_hash, kind, name, created_at, via, auth_time, identity_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)"""
+    args = (user_id, _hash(token), kind, (name or kind)[:60], time.time(), via, auth_time, identity_id)
+    if conn is not None:
+        conn.execute(sql, args)
+    else:
+        db.execute(sql, args)
     return token
 
 
@@ -66,6 +71,22 @@ def central_on() -> bool:
     """The central sign-in switch (rollback): off ends every central session and refuses new ones."""
     rows = db.query("SELECT value FROM central_state WHERE key = 'central'")
     return not rows or rows[0]["value"] == "on"
+
+
+def central_configured() -> bool:
+    """Whether this server has central login turned on in config.json. Imported late: oidc imports auth."""
+    import oidc
+    return oidc.enabled()
+
+
+def cookie_value(header: str | None, name: str) -> str | None:
+    """One cookie from a Cookie header. Lenient on purpose: http.cookies gives up on the whole header when any
+    other cookie is malformed (a sibling site's, say), which would sign people out for nothing."""
+    for part in (header or "").split(";"):
+        key, sep, value = part.strip().partition("=")
+        if sep and key == name:
+            return value.strip()
+    return None
 
 
 def user_for_token(token: str | None) -> dict | None:
@@ -77,8 +98,11 @@ def user_for_token(token: str | None) -> dict | None:
                        WHERE t.token_hash = ?""", (_hash(token),))
     if not rows or rows[0]["disabled"]:
         return None
-    if rows[0]["via"] == "central" and (rows[0]["identity_status"] != "active" or not central_on()):
-        return None  # the live deny state: an unlinked or disabled central person, or central sign-in switched off
+    if rows[0]["via"] == "central" and (rows[0]["identity_status"] != "active" or not central_on()
+                                        or not central_configured()):
+        # The live deny state: an unlinked or disabled central person, central sign-in switched off, or
+        # central login no longer turned on in config.json.
+        return None
     db.execute("UPDATE tokens SET last_used = ? WHERE id = ?", (time.time(), rows[0]["token_id"]))
     return rows[0]
 

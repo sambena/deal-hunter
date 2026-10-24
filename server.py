@@ -12,7 +12,6 @@ import re
 import statistics
 import sys
 import time
-from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -1056,11 +1055,11 @@ class Handler(BaseHTTPRequestHandler):
                 return db.query("SELECT * FROM users WHERE id = ?", (db.admin_id(),))[0], None
             return None, None
         if not self.api_only:
-            cookie = SimpleCookie(self.headers.get("Cookie") or "")
-            if COOKIE in cookie:
-                user = auth.user_for_token(cookie[COOKIE].value)
+            session = auth.cookie_value(self.headers.get("Cookie"), COOKIE)
+            if session:
+                user = auth.user_for_token(session)
                 if user:
-                    return user, cookie[COOKIE].value
+                    return user, session
         return None, None
 
     def _address(self) -> str:
@@ -1076,8 +1075,9 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):  # noqa: A002 - stdlib signature
         if not self.path.startswith("/api/state"):
             line = format % args
-            if self.path.startswith("/auth/"):  # the callback's one-time code and state never reach the log
-                line = line.replace(self.path, oidc.redact(self.path))
+            path = getattr(self, "path", "")
+            if oidc.redact(path) != path:  # the callback's one-time code and state never reach the log
+                line = line.replace(path, oidc.redact(path))
             print(f"{self.address_string()} - {line}")
 
     def _send(self, status: int, body: bytes, ctype: str, headers: list[tuple[str, str]] = ()) -> None:
@@ -1102,8 +1102,7 @@ class Handler(BaseHTTPRequestHandler):
     def _cookie_value(self, name: str) -> str | None:
         if self.api_only:
             return None
-        cookie = SimpleCookie(self.headers.get("Cookie") or "")
-        return cookie[name].value if name in cookie else None
+        return auth.cookie_value(self.headers.get("Cookie"), name)
 
     def _dispatch(self, method: str) -> None:
         url = urlparse(self.path)
@@ -1174,6 +1173,14 @@ class Handler(BaseHTTPRequestHandler):
         login = oidc.LOGIN["central"]
         if method != "GET":
             return self._send(405, b"Method not allowed", "text/plain")
+        try:
+            status, headers, body = self._central_route(login, url)
+        except Exception as e:  # noqa: BLE001 - the type only: a message could carry claims or a code
+            print(f"central login route failed: {type(e).__name__}")
+            status, headers, body = oidc.page("Sign-in could not be completed. Start again.", 500)
+        self._send(status, body, "text/html; charset=utf-8", headers)
+
+    def _central_route(self, login, url) -> tuple:
         headers: list[tuple[str, str]] = []
         if url.path == "/auth/central":
             status, headers, body = login.begin(self._address(), self._https())
@@ -1185,7 +1192,7 @@ class Handler(BaseHTTPRequestHandler):
                             self._cookie(auth.device_mark(user_id), COOKIE_DAYS * 86400, DEVICE_COOKIE)]
         else:
             status, headers, body = login.logout()
-        self._send(status, body, "text/html; charset=utf-8", headers)
+        return status, headers, body
 
     def _download(self, user: dict | None, code: str) -> None:
         if not user:
@@ -1201,6 +1208,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def _static(self, path: str, user: dict | None) -> None:
         rel = "index.html" if path in ("", "/") else path.lstrip("/")
+        if rel == "favicon.ico" and not (STATIC_DIR / rel).is_file():
+            return self._send(204, b"", "image/x-icon")  # browsers ask for it signed out too; no icon, no 401
         if not user:
             # Signed out, the site is just its sign-in page: the app, its script and the API docs stay hidden.
             if rel == "index.html":
@@ -1232,7 +1241,7 @@ def main() -> None:
     host = config.get("host", "127.0.0.1")
     port = int(config.get("port", 8780))
     db.conn()
-    oidc.LOGIN["central"] = oidc.CentralLogin.from_config(config.get("oidc"), db.DB_PATH.parent)
+    oidc.LOGIN["central"] = oidc.CentralLogin.from_config(config.get("oidc"), db.DB_PATH.parent, config_path.parent)
     if oidc.enabled():
         print("Cougar Cave sign-in is on (config \"oidc\")")
     DOWNLOADS["dir"] = config.get("downloads_dir")
