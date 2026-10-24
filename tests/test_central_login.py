@@ -9,6 +9,9 @@ import http.client
 import io
 import json
 import os
+import socket
+import sqlite3
+import subprocess
 import sys
 import tempfile
 import threading
@@ -603,7 +606,185 @@ class CentralLoginTest(unittest.TestCase):
         self.assertEqual(self.state_of(b), 200)  # the session cookie still reads beside a broken one
 
     def test_favicon_answers_signed_out_without_a_401(self):
-        self.assertEqual(self.browser().get("/favicon.ico")[0], 204)
+        status, headers, body, _ = self.browser().get("/favicon.ico")
+        self.assertEqual((status, body), (204, b""))
+        self.assertIsNone(headers["Content-Length"])  # a 204 carries none (RFC 9110)
+        self.assertIn("max-age", headers["Cache-Control"])
+
+    # ---- robustness after the PR 61 review --------------------------------------------------------
+
+    def test_a_failed_write_elsewhere_does_not_block_central_sign_in(self):
+        with self.assertRaises(sqlite3.IntegrityError):  # e.g. the poller inserting a find for a deleted watch
+            db.execute("INSERT INTO listings (watch_id, source, source_id, title, first_seen) VALUES (?, 'x', 'x', 'x', 0)",
+                       (999999,))
+        self.assertFalse(db.conn().in_transaction)  # the failed write was undone, not left open
+        self.assertEqual(self.sign_in()[0], 200)
+
+    def test_a_stray_open_transaction_is_not_carried_into_a_central_change(self):
+        # Belt and braces: whatever left the shared connection mid-transaction, a central change starts clean.
+        with db._lock:
+            db.conn().execute("INSERT INTO central_audit (at, action, detail) VALUES (0, 'stray', 'never committed')")
+        self.assertTrue(db.conn().in_transaction)
+        self.assertEqual(self.sign_in()[0], 200)
+        self.assertFalse(db.conn().in_transaction)
+        self.assertFalse(db.query("SELECT 1 FROM central_audit WHERE action = 'stray'"))
+
+    def test_a_failed_commit_rolls_back_and_makes_no_session(self):
+        real_conn = db.conn()
+
+        class CommitFails:
+            def __getattr__(self, name):
+                return getattr(real_conn, name)
+
+            def commit(self):
+                raise sqlite3.OperationalError("database is locked")
+
+        before = db.query("SELECT COUNT(*) AS n FROM tokens WHERE via = 'central'")[0]["n"]
+        real = db.conn
+        db.conn = lambda: CommitFails()
+        try:
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                status, _, b, _ = self.sign_in(sub="member-uuid")
+        finally:
+            db.conn = real
+        self.assertEqual(status, 500)
+        self.assertNotIn("dh_session", b.jar)
+        self.assertFalse(real_conn.in_transaction)
+        db.execute("INSERT INTO central_audit (at, action, detail) VALUES (0, 'later', 'an unrelated write')")
+        self.assertEqual(db.query("SELECT COUNT(*) AS n FROM tokens WHERE via = 'central'")[0]["n"], before)
+        self.assertEqual(self.sign_in(sub="member-uuid")[0], 200)
+
+    def test_a_disable_from_another_process_during_sign_in_cannot_leave_a_live_session(self):
+        # central_admin.py runs as its own process, so the thread lock alone can't hold it off: only the database's
+        # write lock (BEGIN IMMEDIATE) does. Start the disable in a child process while the sign-in is between its
+        # checks and its insert; it must wait for the sign-in, then end its session.
+        code = ("import sys; sys.path.insert(0, sys.argv[1]); from pathlib import Path; import db, central_admin; "
+                "db.DB_PATH = Path(sys.argv[2]); sys.exit(central_admin.run(['disable', sys.argv[3]], lambda *a: None))")
+        child = {}
+        real = central._mint
+
+        def slow_mint(conn, user, auth_time):
+            child["p"] = subprocess.Popen([sys.executable, "-c", code, str(Path(__file__).resolve().parent.parent),
+                                           str(db.DB_PATH), str(self.member_ident)])
+            try:
+                child["p"].wait(3)  # with the write lock the child is held here; without it, it finishes now
+                child["waited"] = False
+            except subprocess.TimeoutExpired:
+                child["waited"] = True
+            return real(conn, user, auth_time)
+
+        central._mint = slow_mint
+        try:
+            status, _, b, _ = self.sign_in(sub="member-uuid")
+        finally:
+            central._mint = real
+        self.assertEqual(child["p"].wait(20), 0)
+        self.assertEqual(status, 200)
+        self.assertTrue(child["waited"], "the other process's disable did not wait for the sign-in")
+        self.assertEqual(central.identities()[1]["status"], "disabled")
+        central.set_status(self.member_ident, "active")
+        self.assertEqual(self.state_of(b), 401)
+
+    def test_a_switch_off_during_sign_in_cannot_leave_a_live_session(self):
+        done = threading.Event()
+        real = central._mint
+
+        def switch_off():
+            central.set_switch("off")
+            done.set()
+
+        def slow_mint(conn, user, auth_time):
+            threading.Thread(target=switch_off, daemon=True).start()
+            done.wait(0.5)
+            return real(conn, user, auth_time)
+
+        central._mint = slow_mint
+        try:
+            status, _, b, _ = self.sign_in()
+        finally:
+            central._mint = real
+        self.assertTrue(done.wait(5))
+        self.assertEqual(status, 200)
+        central.set_switch("on")
+        self.assertEqual(self.state_of(b), 401)
+
+    def raw(self, request_line: bytes) -> tuple[bytes, str, str]:
+        """Send one raw request line; returns the response's first line, what was logged, and stderr."""
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            s = socket.create_connection(("127.0.0.1", self.ui.server_port), timeout=10)
+            s.sendall(request_line + b"\r\nHost: x\r\n\r\n")
+            data = b""
+            while chunk := s.recv(65536):
+                data += chunk
+            s.close()
+            time.sleep(0.1)  # let the handler thread finish logging
+        return data.split(b"\r\n", 1)[0], out.getvalue(), err.getvalue()
+
+    def test_malformed_request_lines_get_an_error_and_a_redacted_log(self):
+        for line, code in ((b"GET /auth/callback?code=BAD-CODE&state=BAD-STATE HTTP/1.1 extra", b"400"),
+                           (b"GET /auth/callback?code=BAD-CODE&state=BAD-STATE HTTP/9.9", b"505"),
+                           (b"GET /auth/callback?code=BAD-CODE&state=" + b"S" * 70000 + b" HTTP/1.1", b"414")):
+            with self.subTest(code=code):
+                first, logged, err = self.raw(line)
+                self.assertIn(code, first)
+                self.assertNotIn("Traceback", err + logged)
+                for secret in ("BAD-CODE", "BAD-STATE"):
+                    self.assertNotIn(secret, logged + err)
+                self.assertIn(code.decode(), logged)  # the request was logged
+
+    def test_invite_and_reset_codes_are_redacted_too(self):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            self.browser().get("/api/auth/link?code=INVITE-CODE")
+        self.assertNotIn("INVITE-CODE", out.getvalue())
+        self.assertIn("/api/auth/link?[redacted]", out.getvalue())
+
+    def test_cookie_value_matches_names_exactly_and_the_last_duplicate_wins(self):
+        self.assertEqual(auth.cookie_value("dh_session=; dh_session=GOOD", "dh_session"), "GOOD")
+        self.assertIsNone(auth.cookie_value("\xa0__Host-dh_login=PLANTED", "__Host-dh_login"))
+        self.assertIsNone(auth.cookie_value("xdh_session=NO; dh_session_x=NO", "dh_session"))
+        self.assertEqual(auth.cookie_value(" \tdh_session=OK\t ", "dh_session"), "OK")
+
+    def test_an_unexpected_error_logs_where_it_happened_but_not_what_it_said(self):
+        b = self.browser()
+        q, _, _ = self.begin(b)
+        Provided.tokens = {"token_type": "Bearer", "access_token": "x", "id_token": id_token(q["nonce"][0])}
+        real = central.sign_in
+
+        def broken_sign_in(*args):
+            raise RuntimeError("SECRET-CLAIM")
+
+        central.sign_in = broken_sign_in
+        out = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(out):
+                b.get("/auth/callback?" + urllib.parse.urlencode({"code": "abc", "state": q["state"][0]}))
+        finally:
+            central.sign_in = real
+        self.assertRegex(out.getvalue(), r"RuntimeError at test_central_login\.py:\d+ in broken_sign_in")
+        self.assertNotIn("SECRET-CLAIM", out.getvalue())
+
+    def test_a_failure_after_the_session_is_made_still_clears_the_transaction_cookie(self):
+        b = self.browser()
+        q, _, _ = self.begin(b)
+        Provided.tokens = {"token_type": "Bearer", "access_token": "x", "id_token": id_token(q["nonce"][0])}
+        real = auth.device_mark
+
+        def broken(user_id):
+            raise RuntimeError("device key unreadable")
+
+        auth.device_mark = broken
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                status, _, _, cookies = b.get("/auth/callback?" + urllib.parse.urlencode(
+                    {"code": "abc", "state": q["state"][0]}))
+        finally:
+            auth.device_mark = real
+        self.assertEqual(status, 500)
+        self.assertTrue(any(c.startswith("dh_login=;") and "Max-Age=0" in c for c in cookies))
+        self.assertNotIn("dh_session", b.jar)
 
 
 class LinkingTest(unittest.TestCase):

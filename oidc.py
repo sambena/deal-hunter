@@ -12,8 +12,10 @@ from __future__ import annotations
 
 import html
 import os
+import re
 import secrets
 import stat
+import traceback
 import urllib.parse
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -83,8 +85,9 @@ class CentralLogin:
             tx_db.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
             transactions = Transactions(tx_db)  # refuses a directory or file anyone else can read
         except ValueError as e:
-            raise SystemExit(f'config.json "oidc": the login transaction store needs a private folder owned by '
-                             f'this user ({tx_db.parent}, chmod 700): {e}') from None
+            raise SystemExit(f'config.json "oidc": the login transaction store must be private to this user: its '
+                             f'folder {tx_db.parent} chmod 700 and the file {tx_db.name}, if it exists, a regular '
+                             f'file with chmod 600 ({e})') from None
         try:
             provider = Provider(config["issuer"], config["client_id"], config["callback"])
             return cls(provider, config["authorize_url"], transactions, JWKSCache(provider, config["jwks_url"]),
@@ -132,13 +135,13 @@ class CentralLogin:
             status, headers, body = page("Sign-in could not be completed. Start again.", 400)
         except central.CentralError as e:
             status, headers, body = page(str(e), e.status)
-        except Exception as e:  # noqa: BLE001 - anything unexpected still gets an answer and a cleared cookie
-            print(f"central sign-in failed: {type(e).__name__}")  # the type only: messages can carry claims
-            status, headers, body = page("Sign-in could not be completed. Start again.", 500)
-        else:
+        else:  # anything unexpected is answered by the server's catch-all, which clears this cookie too
             status, headers, body = 200, [], GO.encode()
             session = (user["id"], token)
         return (status, headers + [clear], body), session
+
+    def clear_cookie(self, secure: bool) -> tuple[str, str]:
+        return self._tx_cookie(self._cookie_name(secure), "", 0, secure)
 
     @staticmethod
     def logout() -> Response:
@@ -146,12 +149,23 @@ class CentralLogin:
         return 302, [("Location", "/")], b""
 
 
-def redact(path: str) -> str:
-    """The callback URL carries a one-time code and the state: keep them out of every log line."""
-    # By the parsed path, so a request line with a full URL ("GET http://host/auth/callback?...") is caught too.
-    if urlsplit(path).path.startswith("/auth/") and "?" in path:
-        return path.split("?", 1)[0] + "?[redacted]"
-    return path
+# Any /auth/... URL with a query, wherever it sits in a log line: a request line (even a malformed one, or one
+# with a full URL), or an error message quoting it. The callback's query carries a one-time code and the state;
+# /api/auth/link carries an invite or reset code.
+_AUTH_QUERY = re.compile(r"(/auth/[^\s?\"']*)\?[^\s\"']*")
+
+
+def redact(text: str) -> str:
+    """Keep login codes and state out of every log line."""
+    return _AUTH_QUERY.sub(r"\1?[redacted]", text)
+
+
+def describe(error: BaseException) -> str:
+    """An unexpected error for the log: its type and where it happened, never its message, which could carry a
+    claim, a code or a provider response."""
+    frames = traceback.extract_tb(error.__traceback__)[-4:]
+    return f"{type(error).__name__} at " + " < ".join(
+        f"{Path(f.filename).name}:{f.lineno} in {f.name}" for f in reversed(frames))
 
 
 LOGIN: dict = {"central": None}  # the configured CentralLogin, or None when it is off

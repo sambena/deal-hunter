@@ -1073,12 +1073,11 @@ class Handler(BaseHTTPRequestHandler):
         return "https" in (self.headers.get("X-Forwarded-Proto") or "") or "https" in (self.headers.get("Cf-Visitor") or "")
 
     def log_message(self, format, *args):  # noqa: A002 - stdlib signature
-        if not self.path.startswith("/api/state"):
-            line = format % args
-            path = getattr(self, "path", "")
-            if oidc.redact(path) != path:  # the callback's one-time code and state never reach the log
-                line = line.replace(path, oidc.redact(path))
-            print(f"{self.address_string()} - {line}")
+        # A malformed request line never gets a path, so don't assume one.
+        if not getattr(self, "path", "").startswith("/api/state"):
+            # The whole line is redacted, not just the path: the stdlib's own error messages quote the raw
+            # request line, so the callback's one-time code and state could reach the log that way too.
+            print(f"{self.address_string()} - {oidc.redact(format % args)}")
 
     def _send(self, status: int, body: bytes, ctype: str, headers: list[tuple[str, str]] = ()) -> None:
         self.send_response(status)
@@ -1167,6 +1166,15 @@ class Handler(BaseHTTPRequestHandler):
             _request.reset(req_token)
             db._current_user.reset(user_token)
 
+    def _no_icon(self) -> None:
+        """Browsers ask for /favicon.ico signed out too: no icon, and no 401 in their console. A 204 carries no
+        Content-Length, and a day's caching stops the request on every page."""
+        self.send_response(204)
+        self.send_header("Cache-Control", "max-age=86400")
+        for k, v in SECURITY_HEADERS:
+            self.send_header(k, v)
+        self.end_headers()
+
     def _central(self, method: str, url) -> None:
         """Central login's own routes. They run before anyone is identified and never call me(), which would
         fall back to the first admin."""
@@ -1175,9 +1183,11 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(405, b"Method not allowed", "text/plain")
         try:
             status, headers, body = self._central_route(login, url)
-        except Exception as e:  # noqa: BLE001 - the type only: a message could carry claims or a code
-            print(f"central login route failed: {type(e).__name__}")
+        except Exception as e:  # noqa: BLE001 - type and place only: a message could carry claims or a code
+            print(f"central login route failed: {oidc.describe(e)}")
             status, headers, body = oidc.page("Sign-in could not be completed. Start again.", 500)
+            if url.path == oidc.CALLBACK_PATH:  # a failure after the session was made still ends the transaction
+                headers = headers + [login.clear_cookie(self._https())]
         self._send(status, body, "text/html; charset=utf-8", headers)
 
     def _central_route(self, login, url) -> tuple:
@@ -1209,7 +1219,7 @@ class Handler(BaseHTTPRequestHandler):
     def _static(self, path: str, user: dict | None) -> None:
         rel = "index.html" if path in ("", "/") else path.lstrip("/")
         if rel == "favicon.ico" and not (STATIC_DIR / rel).is_file():
-            return self._send(204, b"", "image/x-icon")  # browsers ask for it signed out too; no icon, no 401
+            return self._no_icon()
         if not user:
             # Signed out, the site is just its sign-in page: the app, its script and the API docs stay hidden.
             if rel == "index.html":

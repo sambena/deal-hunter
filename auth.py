@@ -81,12 +81,15 @@ def central_configured() -> bool:
 
 def cookie_value(header: str | None, name: str) -> str | None:
     """One cookie from a Cookie header. Lenient on purpose: http.cookies gives up on the whole header when any
-    other cookie is malformed (a sibling site's, say), which would sign people out for nothing."""
+    other cookie is malformed (a sibling site's, say), which would sign people out for nothing. Only spaces and
+    tabs are trimmed, so no other character can make a different cookie match the name (a __Host- one, say). With
+    the name twice the last one wins, as it did with http.cookies."""
+    found = None
     for part in (header or "").split(";"):
-        key, sep, value = part.strip().partition("=")
+        key, sep, value = part.strip(" \t").partition("=")
         if sep and key == name:
-            return value.strip()
-    return None
+            found = value.strip(" \t")
+    return found
 
 
 def user_for_token(token: str | None) -> dict | None:
