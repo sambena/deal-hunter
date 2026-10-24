@@ -23,6 +23,19 @@ Follow `docs/integration/adopt-central-login.md` in cougar-auth (https://github.
 
 Use Relay #316's window, audit, rollback and gated-retire mechanisms. The old login must read live ban/deny state or fail closed.
 
+**"Old login" here means every way in that does not go through central login**, not only the password form. Deal Hunter has six of them today (checked against `server.py` and `auth.py` on 2026-10-24):
+
+| Path | Where | What it does today |
+|---|---|---|
+| Email and password | `POST /api/auth/login` | Browser cookie, or a device token when `device_name` is sent |
+| Device token | `Authorization: Bearer` or `X-API-Key` (`_identify`) | Lasts until revoked; issued by any of the sign-ins in this table |
+| Old single API key | API port only (`_identify`) | Acts as the **first admin**; blocked only for `LEGACY_KEY_BLOCKED` (`/api/admin/`, `/api/tokens`) |
+| Invite link | `POST /api/auth/accept` (kind `invite`) | Creates a password account and signs it in |
+| Password-reset link | `POST /api/auth/accept` (kind `reset`) | Sets a new password and signs the person in |
+| First-admin setup | `POST /api/auth/setup` | Sets the first admin's password while it has none |
+
+Each path needs an explicit decision for the window: keep it with a deny check, or switch it off when central login is switched on. Each path also needs a planned end: retired, or replaced (for example, invites become admission-group membership and resets move to the login service). The rollout window, audit, rollback and retirement cover all six. Device tokens issued by an old path stay subject to the live deny state and are revoked when that path retires, unless the person has re-linked through #323.
+
 ## Plan adjustments from what we learned
 
 Use Relay #316's window, audit, rollback and gated-retire mechanisms; the old password login must obey the live deny state.
@@ -49,6 +62,13 @@ Use Relay #316's window, audit, rollback and gated-retire mechanisms; the old pa
 ## Acceptance (in addition to the playbook's section 5 and 6 verification)
 
 A banned account is denied on both logins; rollback keeps bans and mappings; retirement refuses until every runbook check is named.
+
+Per old path (valid control beside each rejection):
+- A disabled person is refused through each of the six paths: password, a device token, the old API key (when the first admin is disabled or the key is retired), an invite, a reset link and first-admin setup. An enabled person gets in through each path that is still open.
+- An invite or reset link made before its path was switched off is refused afterwards, and its use changes nothing.
+- First-admin setup is refused once any admin has a password or a central mapping.
+- Retirement refuses to complete while any of the six paths is still enabled, and names the open path. Re-enable one path once and the retirement check fails.
+- Rollback (`central off`) restores only the paths that were open before, and keeps bans, mappings and the deny state.
 
 
 ## Delivery and boundaries

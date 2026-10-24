@@ -23,6 +23,13 @@ Follow `docs/integration/adopt-central-login.md` in cougar-auth (https://github.
 
 Relay only built an owner-run link by exact subject. Self-service linking with a one-use link state bound to both accounts and the browser (runbook section 1) is **new work** the reference does not cover.
 
+**What "proves control of the Deal Hunter account" means here** (from `db.py`, `auth.py` and `server.py` on 2026-10-24):
+- Proof is a fresh email-and-password sign-in to that account, inside the same link flow. An existing cookie or device token is not proof, and neither is a reset or invite link. A reset link is a password change someone else can start (the admin makes it), not proof by the person.
+- **Accounts without a password.** `password_hash` is NULL only for the first admin before first-admin setup (`/api/auth/setup`). Invites set a password when they are used, and an unused invite has no account yet. A NULL-password account cannot be linked by self-service. It is linked only by the owner-run link by exact subject (as in Relay), or after setup gives it a password.
+- **Disabled accounts** (`users.disabled = 1`) cannot be linked. Disabling an account after it is linked keeps the mapping and refuses sign-in.
+- **There are no soft-deleted accounts.** Deleting a user cascades and removes the row, so "deleted" means "no such account": the link state names an account id that no longer exists.
+- **Email is not stable.** A person can change it with `POST /api/me`, so it must never be the join key, either at link time or afterwards. The mapping is the central subject to `users.id`.
+
 ## Plan adjustments from what we learned
 
 Self-service account linking with proof of both accounts is NEW work the reference does not cover (Relay only has an owner-run link by exact subject). Never link by email.
@@ -49,6 +56,17 @@ Self-service account linking with proof of both accounts is NEW work the referen
 ## Acceptance (in addition to the playbook's section 5 and 6 verification)
 
 Valid: the proven owner links the intended account. Rejected: matching email alone taking over an account, a collision (rolls back, both unchanged), a banned or deleted account, a link state from another browser.
+
+Specific to Deal Hunter (valid control beside each rejection):
+- **Valid control:** a fresh password sign-in plus a central sign-in links the account. Afterwards its `watches`, finds (`listings`), `machines`, `user_settings`, role and AI allowance are unchanged, compared row by row with a snapshot taken before the link.
+- **Rejected:**
+  - an existing cookie or device token without a fresh password sign-in
+  - a reset or invite link offered as proof
+  - a NULL-password account through self-service (the owner-run link by exact subject still works for it)
+  - a disabled account (`disabled = 1`)
+  - a link state naming an account id that no longer exists
+  - a central account whose email matches but which has no password proof
+- **Email change after linking:** the account still signs in through its central subject, and a different central account with the old email cannot take it over.
 
 
 ## Delivery and boundaries
