@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import secrets
 import threading
 import time
 
@@ -20,6 +21,10 @@ class CentralError(Exception):
     def __init__(self, message: str, status: int = 403):
         super().__init__(message)
         self.status = status
+
+
+class NotLinked(CentralError):
+    """A validated central person with no account here yet: they can link one they prove is theirs."""
 
 
 OWNER_FACTORS = ("Admin sign-in needs your password and your authenticator code in the same sign-in. This "
@@ -123,7 +128,9 @@ def sign_in(issuer: str, subject: str, auth_time: float, amr) -> tuple[dict, str
         row = c.execute("""SELECT c.id AS identity_id, c.status, u.* FROM central_identities c
                            JOIN users u ON u.id = c.user_id WHERE c.issuer = ? AND c.subject = ?""",
                         (issuer, subject)).fetchone()
-        if row is None or row["status"] != "active" or row["disabled"]:
+        if row is None:
+            raise NotLinked("This Cougar Cave account isn't linked to a Deal Hunter account yet.")
+        if row["status"] != "active" or row["disabled"]:
             raise CentralError("This account has no access to Deal Hunter.")
         user = dict(row)
         # A code-only sign-in carries amr ["mfa"] with no "pwd"; admin access needs both in the same sign-in.
@@ -139,6 +146,83 @@ def _mint(conn, user: dict, auth_time: float, amr=None) -> str:
     methods = json.dumps([m for m in amr if isinstance(m, str)]) if isinstance(amr, list) else "[]"
     return auth.create_token(user["id"], "web", "Cougar Cave sign-in", via="central", auth_time=auth_time,
                              identity_id=user["identity_id"], conn=conn, amr=methods)
+
+
+# ---- self-service linking (#323) ---------------------------------------------------------
+# A validated central person who isn't linked yet proves which Deal Hunter account is theirs with that account's
+# email and password, in the same browser, within five minutes. The link goes to the account the password proved,
+# never to one that merely shares the email. Existing sessions, device tokens, invites and reset links are not proof.
+
+LINK_SECONDS = 300
+NO_PROOF = "Wrong email or password"
+
+
+def begin_link(issuer: str, subject: str, auth_time: float, amr) -> str:
+    """Remember a validated, unlinked central login for this browser. Returns the token for its cookie."""
+    token = secrets.token_urlsafe(32)
+    methods = json.dumps([m for m in amr if isinstance(m, str)]) if isinstance(amr, list) else "[]"
+    with _write() as c:
+        c.execute("DELETE FROM central_link_states WHERE created_at <= ?", (time.time() - LINK_SECONDS,))
+        c.execute("INSERT INTO central_link_states VALUES (?, ?, ?, ?, ?, ?)",
+                  (auth._hash(token), issuer, subject, methods, float(auth_time), time.time()))
+    return token
+
+
+def _proven_account(email: str, password: str) -> dict | None:
+    """The one account whose email and password both match. Emails aren't unique here, so every account with that
+    email is checked and only an exact single match counts. Accounts without a password can't be proven."""
+    rows = db.query("SELECT * FROM users WHERE lower(email) = lower(?) AND password_hash IS NOT NULL",
+                    (str(email or "").strip(),))
+    matched = [r for r in rows if auth.verify_password(password, r["password_hash"])]
+    if not rows:
+        auth.verify_password(password, auth._DUMMY_HASH)  # a wrong email takes as long as a wrong password
+    return matched[0] if len(matched) == 1 else None
+
+
+def complete_link(token: str, email: str, password: str, address: str) -> tuple[dict, str]:
+    """Link the waiting central login to the account the password proves, then sign in. Refuses, changing nothing,
+    for a missing, expired or other browser's link, a wrong password, a disabled account, or an account or central
+    person that is already linked."""
+    if not token:
+        raise CentralError("Start again with Sign in with Cougar Cave.", 400)
+    email_key = "email:" + str(email or "").strip().lower()
+    try:
+        auth.check_rate(address)
+        auth.check_rate(email_key)
+    except auth.AuthError as e:
+        raise CentralError(str(e), 429) from None
+    user = _proven_account(email, password)  # slow on purpose (scrypt), so outside the write lock
+    if user is None:
+        auth.note_failure(address)
+        auth.note_failure(email_key)
+        raise CentralError(NO_PROOF, 401)
+    with _write() as c:
+        state = c.execute("SELECT * FROM central_link_states WHERE token_hash = ?", (auth._hash(token),)).fetchone()
+        if state is None or time.time() - state["created_at"] > LINK_SECONDS:
+            raise CentralError("This link has expired. Start again with Sign in with Cougar Cave.", 400)
+        switch = c.execute("SELECT value FROM central_state WHERE key = 'central'").fetchone()
+        if switch is not None and switch["value"] != "on":
+            raise CentralError("Cougar Cave sign-in is turned off for Deal Hunter.")
+        row = c.execute("SELECT * FROM users WHERE id = ?", (user["id"],)).fetchone()
+        if row is None or row["disabled"] or row["password_hash"] is None:
+            raise CentralError("This account has no access to Deal Hunter.")
+        if c.execute("SELECT 1 FROM central_identities WHERE issuer = ? AND subject = ?",
+                     (state["issuer"], state["subject"])).fetchone():
+            raise CentralError("That Cougar Cave account is already linked to a Deal Hunter account.", 409)
+        if c.execute("SELECT 1 FROM central_identities WHERE user_id = ?", (row["id"],)).fetchone():
+            raise CentralError("That Deal Hunter account is already linked to a Cougar Cave account.", 409)
+        methods = json.loads(state["amr"])
+        if row["role"] == "admin" and not ("pwd" in methods and "mfa" in methods):
+            raise CentralError(OWNER_FACTORS)
+        ident = c.execute("INSERT INTO central_identities (issuer, subject, user_id, created_at) VALUES (?, ?, ?, ?)",
+                          (state["issuer"], state["subject"], row["id"], time.time())).lastrowid
+        c.execute("DELETE FROM central_link_states WHERE token_hash = ?", (auth._hash(token),))  # one use
+        linked = {**dict(row), "identity_id": ident}
+        session = _mint(c, linked, state["auth_time"], methods)
+        audit("link_self", f"identity {ident} to account {row['id']} ({row['role']}), proven by password", c)
+    auth._fails.pop(address, None)
+    auth._fails.pop(email_key, None)
+    return linked, session
 
 
 # ---- privileged actions (#412) -----------------------------------------------------------

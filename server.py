@@ -1011,7 +1011,7 @@ def _check_privileged(method: str, path: str, body, user: dict | None) -> None:
 
 # ---- HTTP plumbing ----------------------------------------------------------
 
-SIGNED_OUT_FILES = {"login.html", "login.js", "style.css"}
+SIGNED_OUT_FILES = {"login.html", "login.js", "style.css", "link.html", "link.js"}
 OPEN_ROUTES = {("GET", "/api/auth/status"), ("POST", "/api/auth/setup"), ("POST", "/api/auth/login"),
                ("GET", "/api/auth/link"), ("POST", "/api/auth/accept"), ("GET", "/api/app/android")}
 
@@ -1212,8 +1212,10 @@ class Handler(BaseHTTPRequestHandler):
         """Central login's own routes. They run before anyone is identified and never call me(), which would
         fall back to the first admin."""
         login = oidc.LOGIN["central"]
-        if method != "GET":
+        if method != ("POST" if url.path == oidc.LINK_PATH else "GET"):  # the link is POST only; the rest GET only
             return self._send(405, b"Method not allowed", "text/plain")
+        if url.path == oidc.LINK_PATH:
+            return self._central_link(login)
         try:
             status, headers, body = self._central_route(login, url)
         except Exception as e:  # noqa: BLE001 - type and place only: a message could carry claims or a code
@@ -1222,6 +1224,32 @@ class Handler(BaseHTTPRequestHandler):
             if url.path == oidc.CALLBACK_PATH:  # a failure after the session was made still ends the transaction
                 headers = headers + [login.clear_cookie(self._https())]
         self._send(status, body, "text/html; charset=utf-8", headers)
+
+    def _central_link(self, login) -> None:
+        """Link a central login to the Deal Hunter account its owner proves with email and password. JSON only, so a
+        cross-site form can't post it; signed-out on purpose, so an existing session is never taken as proof."""
+        if self.headers.get_content_type() != "application/json":
+            return self._json(415, {"error": "send JSON"})
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+            if not 0 < length <= 4096:
+                return self._json(413 if length else 400, {"error": "bad request"})
+            body = json.loads(self.rfile.read(length))
+            if not isinstance(body, dict):
+                raise ValueError
+        except ValueError:
+            return self._json(400, {"error": "bad request"})
+        try:
+            status, payload, headers, session = login.link(body, self.headers.get("Cookie") or "", self._https(),
+                                                           self._address())
+        except Exception as e:  # noqa: BLE001 - type and place only, as for the other central routes
+            print(f"central link failed: {oidc.describe(e)}")
+            return self._json(500, {"error": "Linking could not be completed. Start again."})
+        if session:
+            user_id, token = session
+            headers += [self._cookie(token, COOKIE_DAYS * 86400),
+                        self._cookie(auth.device_mark(user_id), COOKIE_DAYS * 86400, DEVICE_COOKIE)]
+        self._json(status, payload, headers)
 
     def _central_route(self, login, url) -> tuple:
         headers: list[tuple[str, str]] = []

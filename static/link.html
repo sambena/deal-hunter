@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Link your account · Deal Hunter</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- After a Cougar Cave sign-in that isn't linked yet: prove which Deal Hunter account is yours, once. -->
+  <div id="auth-screen">
+  <form id="link-form" class="panel">
+    <h2>Link your Deal Hunter account</h2>
+    <p class="muted">You signed in with Cougar Cave. To use it for your existing Deal Hunter account, enter that
+      account's email and password once. Your watches, finds and settings stay as they are.</p>
+    <label>Email <input name="email" type="email" autocomplete="username" required></label>
+    <label>Password <input name="password" type="password" autocomplete="current-password" required></label>
+    <div class="row"><button class="primary" type="submit" id="go">Link and sign in</button>
+      <a href="/">Cancel</a></div>
+    <p id="auth-error"></p>
+  </form>
+  </div>
+  <script src="link.js"></script>
+</body>
+</html>
