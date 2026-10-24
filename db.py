@@ -206,6 +206,22 @@ CREATE TABLE IF NOT EXISTS invites (   -- one-time links: a new account, or a pa
     expires_at REAL NOT NULL,
     used_at REAL
 );
+CREATE TABLE IF NOT EXISTS central_identities (  -- a Cougar Cave login linked to one account here; never matched by email
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    issuer TEXT NOT NULL,
+    subject TEXT NOT NULL,              -- the person's central user id
+    user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+    status TEXT NOT NULL DEFAULT 'active',  -- active | disabled
+    created_at REAL NOT NULL,
+    UNIQUE (issuer, subject)
+);
+CREATE TABLE IF NOT EXISTS central_state (key TEXT PRIMARY KEY, value TEXT NOT NULL);  -- the on/off switch
+CREATE TABLE IF NOT EXISTS central_audit (  -- who did what to central sign-in; never codes, tokens or secrets
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    at REAL NOT NULL,
+    action TEXT NOT NULL,
+    detail TEXT NOT NULL
+);
 """
 
 DEFAULT_WATCH_LIMIT = 10  # for invited friends; the admin has none
@@ -371,6 +387,12 @@ def conn() -> sqlite3.Connection:
                     _conn.execute("UPDATE listings SET make = ? WHERE id = ?",
                                   (matching.vehicle_make(r["title"]) or None, r["id"]))
                 _conn.execute("PRAGMA user_version = 9")
+            tcols = {r["name"] for r in _conn.execute("PRAGMA table_info(tokens)")}
+            for col, ddl in (("via", "TEXT"),  # 'central' for a Cougar Cave sign-in; NULL for the app's own
+                             ("auth_time", "REAL"),  # when the person last proved who they are centrally
+                             ("identity_id", "INTEGER")):
+                if col not in tcols:
+                    _conn.execute(f"ALTER TABLE tokens ADD COLUMN {col} {ddl}")
             _conn.execute("CREATE INDEX IF NOT EXISTS idx_watches_user ON watches(user_id)")
             _conn.execute("CREATE INDEX IF NOT EXISTS idx_machines_user ON machines(user_id)")
             _conn.commit()
