@@ -10,6 +10,7 @@ from __future__ import annotations
 import contextlib
 import json
 import secrets
+import sqlite3
 import threading
 import time
 
@@ -57,6 +58,35 @@ def audit(action: str, detail: str, conn=None) -> None:
 
 def audit_log(limit: int = 50) -> list[dict]:
     return db.query("SELECT at, action, detail FROM central_audit ORDER BY id DESC LIMIT ?", (int(limit),))
+
+
+def backchannel_logout(issuer: str, subject: str, jti: str) -> int:
+    """Relay's one-use logout: revoke the sessions attached to this exact linked identity, atomically."""
+    with _write() as c:
+        c.execute("DELETE FROM central_logout_jti WHERE seen < ?", (time.time() - 3600,))
+        row = c.execute("SELECT id FROM central_identities WHERE issuer = ? AND subject = ?",
+                        (issuer, subject)).fetchone()
+        if row is None:
+            raise CentralError("No such person.", 400)
+        try:
+            c.execute("INSERT INTO central_logout_jti VALUES (?, ?)", (jti[:200], time.time()))
+        except sqlite3.IntegrityError:
+            raise CentralError("Logout token already used.", 400) from None
+        n = c.execute("DELETE FROM tokens WHERE identity_id = ?", (row['id'],)).rowcount
+        audit("logout_backchannel", f"identity {row['id']}: {n} sessions ended", c)
+        return n
+
+
+def throttle_backchannel(key: str, maximum: int, window: float = 600) -> None:
+    """Relay's persistent per-address and global counters, separate from sign-in throttling."""
+    with _write() as c:
+        now = time.time()
+        c.execute("DELETE FROM central_logout_attempts WHERE until <= ?", (now,))
+        row = c.execute("SELECT count FROM central_logout_attempts WHERE key = ?", (key,)).fetchone()
+        if row and row['count'] >= maximum:
+            raise CentralError("Too many attempts.", 429)
+        c.execute("INSERT INTO central_logout_attempts VALUES (?, 1, ?) "
+                  "ON CONFLICT(key) DO UPDATE SET count = count + 1", (key, now + window))
 
 
 # ---- linking (owner only, from central_admin.py) ---------------------------------

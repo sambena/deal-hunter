@@ -1232,6 +1232,8 @@ class Handler(BaseHTTPRequestHandler):
         """Central login's own routes. They run before anyone is identified and never call me(), which would
         fall back to the first admin."""
         login = oidc.LOGIN["central"]
+        if url.path == oidc.BACKCHANNEL_PATH:
+            return self._central_backchannel(login, method)
         if method != ("POST" if url.path == oidc.LINK_PATH else "GET"):  # the link is POST only; the rest GET only
             return self._send(405, b"Method not allowed", "text/plain")
         if url.path == oidc.LINK_PATH:
@@ -1244,6 +1246,33 @@ class Handler(BaseHTTPRequestHandler):
             if url.path == oidc.CALLBACK_PATH:  # a failure after the session was made still ends the transaction
                 headers = headers + [login.clear_cookie(self._https())]
         self._send(status, body, "text/html; charset=utf-8", headers)
+
+    def _central_backchannel(self, login, method: str) -> None:
+        """The provider's form POST; every refusal is bare and never echoes a token."""
+        from cougar_login.login_validation import LoginRejected
+        bad = lambda status=400: self._json(status, {"error": "invalid_request"})
+        if method != "POST":
+            return bad(405)
+        try:
+            central.throttle_backchannel('bcl:' + self._address(), oidc.BACKCHANNEL_LIMIT)
+            central.throttle_backchannel('bcl:all', oidc.BACKCHANNEL_LIMIT * 10)
+        except central.CentralError:
+            return bad(429)
+        try:
+            # This stdlib server reads Content-Length bodies, not chunked requests. Reject ambiguous framing.
+            lengths = self.headers.get_all("Content-Length") or []
+            if self.headers.get("Transfer-Encoding") or len(lengths) != 1:
+                return bad()
+            length = int(lengths[0])
+            if not 0 < length <= oidc.BACKCHANNEL_MAX_BODY:
+                return bad(413 if length > oidc.BACKCHANNEL_MAX_BODY else 400)
+            login.backchannel(self.rfile.read(length))
+        except (LoginRejected, central.CentralError, ValueError, UnicodeError):
+            return bad()
+        except Exception as e:
+            print(f"central backchannel failed: {oidc.describe(e)}")
+            return bad(500)
+        self._send(200, b"", "text/plain")
 
     def _central_link(self, login) -> None:
         """Link a central login to the Deal Hunter account its owner proves with email and password. JSON only, so a
