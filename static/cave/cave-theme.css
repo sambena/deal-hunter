@@ -579,3 +579,20 @@ wa-drawer.cave-settings::part(body) { padding: 0; display: grid; grid-template-c
   :root { --cave-hit: 2.75rem; }
   .cave-themes button, .cave-signin wa-button, cave-account wa-button { min-height: var(--cave-hit); }
 }
+
+/* Native checkboxes and radios. Web Awesome draws the checkbox tick as a data: image, which strict CSPs (img-src
+   without data:) block, so the box toggled but never showed a tick; the tick here comes from the app's own origin.
+   ":root" outranks the apps' older blanket input rules (padding, radius, background) that squashed the box. */
+:root input[type="checkbox"], :root input[type="radio"] {
+  box-sizing: border-box; padding: 0; flex: 0 0 auto;
+  width: var(--wa-form-control-toggle-size); min-width: var(--wa-form-control-toggle-size); height: var(--wa-form-control-toggle-size);
+  background-color: var(--wa-form-control-background-color);
+  border: var(--wa-form-control-border-width) var(--wa-border-style) var(--wa-form-control-border-color);
+}
+:root input[type="checkbox"] { border-radius: var(--wa-border-radius-s); }
+:root input[type="radio"] { border-radius: 50%; }
+:root input[type="checkbox"]:checked, :root input[type="checkbox"]:indeterminate {
+  background-color: var(--wa-form-control-activated-color); border-color: var(--wa-form-control-activated-color);
+}
+:root input[type="checkbox"]:checked::after { mask: url("icons/check.svg") center / 1em 1em no-repeat; }
+:root input[type="checkbox"]:indeterminate::after { mask: url("icons/minus.svg") center / 1em 1em no-repeat; }
