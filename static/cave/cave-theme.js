@@ -14,6 +14,9 @@
   ];
   var ORIGINAL = { name: 'original', label: "Each app's original look" };
   var root = document.documentElement;
+  // Web Awesome's cloak: the page stays invisible (at most 2 s) until its components are defined, so nobody sees
+  // bare, unstyled sign-in forms and menus while the scripts load.
+  root.classList.add('wa-cloak');
   var media = window.matchMedia ? window.matchMedia('(prefers-color-scheme: light)') : null;
 
   function cookie(name) {

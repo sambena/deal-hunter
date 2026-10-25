@@ -222,6 +222,12 @@ class CaveSettings extends HTMLElement {
   hide() { if (this._drawer) this._drawer.open = false; }
 }
 
+// Only one menu open at a time: on touch screens a tap on a second menu doesn't count as a click outside the first.
+document.addEventListener('wa-show', (event) => {
+  if (event.target.localName !== 'wa-dropdown') return;
+  document.querySelectorAll('wa-dropdown[open]').forEach((other) => { if (other !== event.target && !other.contains(event.target)) other.open = false; });
+});
+
 customElements.define('cave-account', CaveAccount);
 customElements.define('cave-signin', CaveSignin);
 customElements.define('cave-settings', CaveSettings);

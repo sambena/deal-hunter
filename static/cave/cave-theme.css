@@ -553,7 +553,7 @@ wa-drawer.cave-settings { --size: min(42rem, 100vw); }
 wa-drawer.cave-settings::part(body) { padding: 0; display: grid; grid-template-columns: 12rem 1fr; min-height: 100%; }
 .cave-settings-nav { border-inline-end: 1px solid var(--wa-color-surface-border); padding: var(--wa-space-xs); display: grid; align-content: start; gap: 2px; }
 .cave-settings-nav button { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: var(--wa-space-xs); padding: var(--wa-space-xs) var(--wa-space-s);
-  border-radius: var(--wa-border-radius-m); color: var(--wa-color-text-quiet); cursor: pointer; font: inherit; min-height: 2.5rem; }
+  border-radius: var(--wa-border-radius-m); color: var(--wa-color-text-quiet); cursor: pointer; font: inherit; min-height: var(--cave-hit, 2.5rem); }
 .cave-settings-nav button:hover, .cave-settings-nav button[aria-current="true"] { background: var(--wa-color-surface-raised); color: var(--wa-color-text-normal); }
 .cave-settings-nav button[aria-current="true"] { box-shadow: inset 3px 0 0 var(--wa-color-focus); }
 .cave-settings-nav button:focus-visible { outline: 2px solid var(--wa-color-focus); outline-offset: 1px; }
@@ -573,4 +573,9 @@ wa-drawer.cave-settings::part(body) { padding: 0; display: grid; grid-template-c
   wa-drawer.cave-settings::part(body) { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
   .cave-settings-nav { display: flex; overflow-x: auto; border-inline-end: 0; border-bottom: 1px solid var(--wa-color-surface-border); }
   .cave-settings-nav button { white-space: nowrap; }
+}
+/* Touch screens: every kit control is at least --cave-hit tall (44px by default; the Player sets 52px for the car). */
+@media (pointer: coarse) {
+  :root { --cave-hit: 2.75rem; }
+  .cave-themes button, .cave-signin wa-button, cave-account wa-button { min-height: var(--cave-hit); }
 }
