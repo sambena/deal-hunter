@@ -978,7 +978,7 @@ class CentralLoginTest(unittest.TestCase):
         self.assertEqual(self.state_of(b), 200)  # ordinary use is unchanged
         for method, path, body in (("GET", "/api/admin/users", None), ("POST", "/api/admin/invites", {"note": "x"}),
                                    ("GET", "/api/import/ha", None), ("POST", "/api/api-key", {}),
-                                   ("PUT", "/api/settings", {"zip_code": "84057"}), ("GET", "/api/tokens", None),
+                                   ("PUT", "/api/settings", {"zip_code": "84057"}), ("DELETE", "/api/tokens/999999", {}),
                                    ("POST", "/api/me", {"new_password": "another pass 1", "current_password": "admin pass 1"})):
             with self.subTest(path=path, method=method):
                 status, _, data, _ = b.get(path, method, body)
@@ -991,12 +991,36 @@ class CentralLoginTest(unittest.TestCase):
             with self.subTest(amr=amr):
                 _, _, b, _ = self.sign_in(sub="member-uuid", amr=amr)
                 self.assertEqual(self.state_of(b), 200)
-                status, _, data, _ = b.get("/api/tokens")
+                self.assertEqual(b.get("/api/tokens")[0], 200)  # seeing your own sessions is ordinary
+                status, _, data, _ = b.get("/api/tokens/999999", "DELETE", {})
                 self.assertEqual(status, 403)
                 self.assertIn("both your password", json.loads(data)["error"])
         _, _, b, _ = self.sign_in(sub="member-uuid", amr=("pwd", "mfa"))
-        self.assertEqual(b.get("/api/tokens")[0], 200)
+        self.assertEqual(b.get("/api/tokens/999999", "DELETE", {})[0], 404)  # past the guard: no such session
         self.assertEqual(b.get("/api/admin/users")[0], 403)  # still not the admin
+
+    # ---- signing out (a Cougar Cave session also ends the Cougar Cave sign-in) -----------------------------
+
+    def test_signing_out_a_central_session_sends_the_browser_to_end_session(self):
+        _, _, b, _ = self.sign_in(sub="member-uuid")
+        status, _, data, cookies = b.get("/api/auth/logout", "POST", {})
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(data)["end_session"], ISSUER + "end-session/")
+        self.assertTrue(any(c.startswith("dh_session=;") for c in cookies))
+        self.assertEqual(self.state_of(b), 401)  # and the Deal Hunter session is gone
+
+    def test_signing_out_a_password_session_stays_in_deal_hunter(self):
+        b, _ = self.password_session("pal@example.com", "pal pass 1")
+        status, _, data, _ = b.get("/api/auth/logout", "POST", {})
+        self.assertEqual(status, 200)
+        self.assertNotIn("end_session", json.loads(data))
+        self.assertEqual(self.state_of(b), 401)
+
+    def test_the_end_session_address_must_be_on_the_issuer(self):
+        with self.assertRaises(ValueError):
+            oidc.CentralLogin(self.login.provider, self.login.authorize_url, self.login.transactions, FakeCache(),
+                              fake_exchange, "https://evil.example.test/end-session/")
+        self.assertEqual(self.login.end_session_url, ISSUER + "end-session/")
 
     def test_a_stale_sign_in_reads_but_cannot_change_with_a_clear_message(self):
         _, _, b, _ = self.sign_in(auth_age=600)

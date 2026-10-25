@@ -49,10 +49,16 @@ def page(message: str, status: int = 403) -> Response:
 
 
 class CentralLogin:
-    def __init__(self, provider, authorize_url: str, transactions, cache, exchange):
+    def __init__(self, provider, authorize_url: str, transactions, cache, exchange, end_session_url: str | None = None):
         authorize, issuer = urlsplit(authorize_url), urlsplit(provider.issuer)
         if (authorize.scheme, authorize.netloc) != (issuer.scheme, issuer.netloc) or authorize.query or authorize.fragment:
             raise ValueError("The authorization endpoint must be on the trusted issuer's origin")
+        # Where Sign out sends a central session: the login service's end-session for this client, which ends the
+        # Cougar Cave session too (cougar-auth #388). authentik's is the issuer's own "end-session/".
+        self.end_session_url = end_session_url or provider.issuer.rstrip("/") + "/end-session/"
+        end = urlsplit(self.end_session_url)
+        if (end.scheme, end.netloc) != (issuer.scheme, issuer.netloc) or end.query or end.fragment:
+            raise ValueError("The end-session endpoint must be on the trusted issuer's origin")
         if urlsplit(provider.callback).path != CALLBACK_PATH:
             raise ValueError(f"The callback must be the registered {CALLBACK_PATH}")
         self.provider, self.authorize_url = provider, authorize_url
@@ -93,7 +99,7 @@ class CentralLogin:
         try:
             provider = Provider(config["issuer"], config["client_id"], config["callback"])
             return cls(provider, config["authorize_url"], transactions, JWKSCache(provider, config["jwks_url"]),
-                       OAuthBackchannel(provider, config["token_url"], secret))
+                       OAuthBackchannel(provider, config["token_url"], secret), config.get("end_session_url"))
         except ValueError as e:  # an http:// issuer or callback, or an endpoint off the issuer's origin
             raise SystemExit(f'config.json "oidc": {e}') from None
 
