@@ -12,13 +12,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import ai  # noqa: E402
 import db  # noqa: E402
+import shared_ai_file  # noqa: E402
 
 PROMPT, SCHEMA = ai.judge_prompt({"title": "Ryzen 7 5700X", "total": 120, "source": "ebay"},
                                  {"name": "5700X", "query": "5700x"}, None)
 ANSWER = ('{"verdict": "good", "note": "fine"}', 500, 200, None)
-PAID = {"ai_provider": "claude", "claude_model": "claude-haiku-4-5", "anthropic_api_key": "sam-key"}
-FREE = {"ai_provider": "gemini", "gemini_model": "gemini-3.5-flash-lite", "gemini_api_key": "sam-key",
-        "gemini_free_tier": True}
+# The admin's AI comes from the owner console's settings file (fake keys); a member's own key from their settings.
+PAID = {"provider": "anthropic", "model": "claude-haiku-4-5", "key": "sam-key"}
+GEMINI = {"provider": "gemini", "model": "gemini-3.5-flash-lite", "key": "sam-key"}
+OWN = {"ai_provider": "claude", "claude_model": "claude-haiku-4-5"}
 
 
 class AiModesTest(unittest.TestCase):
@@ -40,7 +42,7 @@ class AiModesTest(unittest.TestCase):
         self.tmp.cleanup()
 
     def admin_ai(self, **kw):
-        db.update_settings({**kw}, user_id=self.admin)
+        shared_ai_file.use(self, **kw)
 
     def ask(self, uid):
         with db.as_user(uid), mock.patch.dict(ai.CALLERS, {"claude": lambda *a: ANSWER, "gemini": lambda *a: ANSWER}):
@@ -50,19 +52,21 @@ class AiModesTest(unittest.TestCase):
         with db.as_user(uid):
             return ai.estimate(ai.settings_for(), "judge", PROMPT, SCHEMA)
 
-    def test_members_use_the_admins_free_ai_without_seeing_the_key(self):
-        self.admin_ai(**FREE)
+    def test_members_use_the_admins_ai_without_seeing_the_key(self):
+        self.admin_ai(**GEMINI)
+        db.execute("UPDATE users SET ai_allowance = 1 WHERE id = ?", (self.sis,))
         with db.as_user(self.sis):
             s = ai.settings_for()
             self.assertEqual((s["ai_provider"], s["_ai"]["source"], s["_ai"]["owner"]), ("gemini", "shared", "Sam"))
             self.assertIs(self.s.get_state({}, {})["settings"]["gemini_api_key"], False)  # their own (empty) key
         self.ask(self.sis)
         row = db.query("SELECT user_id, paid_by, cost FROM ai_usage")[0]
-        self.assertEqual((row["user_id"], row["paid_by"], row["cost"]), (self.sis, self.admin, 0))
+        self.assertEqual((row["user_id"], row["paid_by"]), (self.sis, self.admin))
+        self.assertGreater(row["cost"], 0)  # the console's file has no free tier
 
     def test_daily_cap(self):
-        self.admin_ai(**FREE)
-        db.execute("UPDATE users SET ai_daily_cap = 2 WHERE id = ?", (self.sis,))
+        self.admin_ai(**GEMINI)
+        db.execute("UPDATE users SET ai_daily_cap = 2, ai_allowance = 1 WHERE id = ?", (self.sis,))
         self.ask(self.sis)
         self.ask(self.sis)
         est = self.estimate(self.sis)
@@ -71,7 +75,7 @@ class AiModesTest(unittest.TestCase):
         self.assertTrue(self.estimate(self.admin)["allowed"])  # the admin has no daily cap
 
     def test_paid_models_need_an_allowance(self):
-        self.admin_ai(**PAID, ai_monthly_limit=5.0)
+        self.admin_ai(**PAID, monthly=5.0)
         est = self.estimate(self.sis)  # allowance starts at $0
         self.assertFalse(est["allowed"])
         self.assertIn("Sam gave you $0.00 a month", est["reason"])
@@ -85,7 +89,7 @@ class AiModesTest(unittest.TestCase):
             self.assertEqual(ai.budget(ai.settings_for())["spent"], b["spent"])
 
     def test_the_admins_limit_covers_everyone_on_the_key(self):
-        self.admin_ai(**PAID, ai_monthly_limit=1.0)
+        self.admin_ai(**PAID, monthly=1.0)
         db.execute("UPDATE users SET ai_allowance = 5 WHERE id = ?", (self.sis,))
         db.execute("INSERT INTO ai_usage (at, provider, model, action, input_tokens, output_tokens, cost, user_id, paid_by)"
                    " VALUES (?, 'claude', 'claude-haiku-4-5', 'judge', 0, 0, 0.999, ?, ?)",
@@ -95,21 +99,21 @@ class AiModesTest(unittest.TestCase):
         self.assertIn("Sam's AI budget for this month is used up", est["reason"])
 
     def test_not_shared_or_admin_ai_off(self):
-        self.admin_ai(**FREE)
+        self.admin_ai(**GEMINI)
         db.execute("UPDATE users SET ai_shared = 0 WHERE id = ?", (self.sis,))
         with self.assertRaises(ai.AIError) as cm:
             self.estimate(self.sis)
         self.assertIn("hasn't shared their AI", str(cm.exception))
         db.execute("UPDATE users SET ai_shared = 1 WHERE id = ?", (self.sis,))
-        self.admin_ai(ai_provider="off")
+        self.admin_ai(**GEMINI, ai=False)  # turned off in the owner console
         with self.assertRaises(ai.AIError) as cm:
             self.estimate(self.sis)
         self.assertIn("Sam's AI is off", str(cm.exception))
 
     def test_own_key_is_separate(self):
-        self.admin_ai(**PAID, ai_monthly_limit=5.0)
+        self.admin_ai(**PAID, monthly=5.0)
         with db.as_user(self.sis):
-            self.s.put_settings({"ai_source": "own", **PAID, "anthropic_api_key": "sis-key", "ai_monthly_limit": 2.0}, {})
+            self.s.put_settings({"ai_source": "own", **OWN, "anthropic_api_key": "sis-key", "ai_monthly_limit": 2.0}, {})
             s = ai.settings_for()
             self.assertEqual((s["_ai"]["source"], s["anthropic_api_key"], s["ai_monthly_limit"]), ("own", "sis-key", 2.0))
         self.ask(self.sis)
@@ -118,7 +122,7 @@ class AiModesTest(unittest.TestCase):
             self.assertEqual(ai.budget(ai.settings_for())["spent"], 0)  # not on Sam's key
 
     def test_admin_sets_limits_and_sees_use_of_their_ai(self):
-        self.admin_ai(**FREE)
+        self.admin_ai(**GEMINI)
         self.s.admin_update_user({"ai_daily_cap": 5, "ai_allowance": "2.50", "ai_shared": True}, {}, str(self.sis))
         self.ask(self.sis)
         sis = {u["name"]: u for u in self.s.admin_users({}, {})["users"]}["Sis"]

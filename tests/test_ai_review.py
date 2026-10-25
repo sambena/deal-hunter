@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import ai  # noqa: E402
 import db  # noqa: E402
+import shared_ai_file  # noqa: E402
 
 
 class AIReviewTest(unittest.TestCase):
@@ -19,8 +20,7 @@ class AIReviewTest(unittest.TestCase):
         db._conn, db.DB_PATH = None, Path(self.tmp.name) / "t.db"
         import server
         self.server = server
-        db.update_settings({"ai_provider": "gemini", "gemini_api_key": "k", "gemini_model": "gemini-3.5-flash-lite",
-                            "gemini_free_tier": True})
+        shared_ai_file.use(self, provider="gemini", key="k", model="gemini-3.5-flash-lite")
         self.wid = db.create_watch({"name": "Pickup", "query": "pickup", "kind": "vehicle", "max_price": 5000})
         self.ids = []
         for i, (title, status) in enumerate((("2005 Ford F-150", "new"), ("2003 Ram 1500 salvage", "starred"),
@@ -36,14 +36,15 @@ class AIReviewTest(unittest.TestCase):
         self.tmp.cleanup()
 
     def test_choices(self):
+        # The admin's AI is the owner console's pick: that one model, paid (the file has no free tier).
         cs = ai.choices(ai.settings_for())
-        self.assertEqual({c["provider"] for c in cs}, {"gemini", "ollama"})  # a key (Ollama: an address)
-        self.assertTrue(any(c["current"] and c["model"] == "gemini-3.5-flash-lite" for c in cs))
-        self.assertTrue(all(c["free"] for c in cs))
-        with self.assertRaises(ai.AIError):
-            ai.with_choice(ai.settings_for(), "claude", "claude-opus-5-5")  # no Claude key
-        s = ai.with_choice(ai.settings_for(), "gemini", "gemini-3.8-flash")
-        self.assertEqual((s["ai_provider"], s["gemini_model"]), ("gemini", "gemini-3.8-flash"))
+        self.assertEqual([(c["provider"], c["model"], c["free"], c["current"]) for c in cs],
+                         [("gemini", "gemini-3.5-flash-lite", False, True)])
+        for provider, model in (("claude", "claude-opus-5-5"), ("gemini", "gemini-3.8-flash")):
+            with self.assertRaises(ai.AIError):
+                ai.with_choice(ai.settings_for(), provider, model)
+        s = ai.with_choice(ai.settings_for(), "gemini", "gemini-3.5-flash-lite")
+        self.assertEqual((s["ai_provider"], s["gemini_model"]), ("gemini", "gemini-3.5-flash-lite"))
 
     def test_shared_ai_offers_only_the_admins_pick(self):
         friend = db.execute("INSERT INTO users (email, name, role, created_at) VALUES ('f@x.y', 'F', 'member', ?)",

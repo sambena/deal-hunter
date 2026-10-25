@@ -1458,6 +1458,22 @@ function showAiProvider() {
   $$("[data-member]", f).forEach(el => (el.hidden = admin));
   $("#ai-own").hidden = !admin && f.ai_source.value === "shared";
   $$("[data-provider]", f).forEach(g => (g.hidden = g.dataset.provider !== p));
+  // The admin's AI (mode, model, key, limit) is managed in the owner console: shown here, read-only.
+  const managed = admin && state.settings.ai_managed;
+  $("#ai-managed").hidden = !managed;
+  if (managed) {
+    $("#ai-managed").textContent = managed.on
+      ? `Managed in the owner console: ${f.ai_provider.selectedOptions[0]?.textContent || managed.provider}, ` +
+        `${managed.model}, ${usd(managed.monthly_usd)} a month.`
+      : `Managed in the owner console: ${managed.reason}`;
+  }
+  ["ai_provider", "ai_monthly_limit", "claude_model", "openai_model", "gemini_model", "anthropic_api_key",
+   "openai_api_key", "gemini_api_key", "gemini_free_tier"].forEach(n => {
+    const el = f.elements[n];
+    if (!el) return;
+    el.disabled = !!managed;
+    if (managed && el.type === "password") el.placeholder = "Managed in the owner console";
+  });
   $("#ai-price-note").textContent = p === "off"
     ? "Pick a mode above to see where its API key and model go, with setup steps."
     : p === "ollama" ? "" :
