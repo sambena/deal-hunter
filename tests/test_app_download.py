@@ -140,6 +140,11 @@ class LockdownTest(unittest.TestCase):
         self.assertEqual((status, headers["Content-Type"].split(";")[0]), (200, "text/css"))
         status, _, headers = self.raw_get("/cave/icons/tag.svg")
         self.assertEqual((status, headers["Content-Type"]), (200, "image/svg+xml"))
+        # Web Awesome's own icons (caret, close, check), so the policy needn't allow data: fetches.
+        status, _, headers = self.raw_get("/cave/cave-icons.js")
+        self.assertTrue(status == 200 and headers["Content-Type"].startswith("text/javascript"), (status, headers["Content-Type"]))
+        status, _, headers = self.raw_get("/cave/system-icons.svg")
+        self.assertEqual((status, headers["Content-Type"]), (200, "image/svg+xml"))
         self.assertIn(b"cave/webawesome/webawesome.loader.js", self.raw_get("/")[1])  # the sign-in page uses it
 
     def test_cave_prefix_does_not_open_the_app(self):

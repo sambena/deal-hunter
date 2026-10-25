@@ -38,6 +38,7 @@ HEAD = ('<meta charset="utf-8"><meta name="viewport" content="width=device-width
 DENIED = ('<!doctype html><html lang="en" class="wa-dark cave-accent-teal"><head>' + HEAD +
           '<title>Sign in · Deal Hunter · Cougar Cave</title>'
           '<script type="module" src="/cave/webawesome/webawesome.loader.js" data-webawesome="/cave/webawesome"></script>'
+          '<script type="module" src="/cave/cave-icons.js"></script>'
           '</head><body><wa-page mobile-breakpoint="700px">'
           '<header slot="header" class="cave-bar cave-brand wa-dark wa-cluster wa-gap-s wa-align-items-center">'
           '<a class="cave-home wa-cluster wa-gap-2xs wa-align-items-center" href="https://cougarcave.dev">'

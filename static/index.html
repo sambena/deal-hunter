@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="/cave/cave-theme.css">
   <link rel="stylesheet" href="style.css">
   <script type="module" src="/cave/webawesome/webawesome.loader.js" data-webawesome="/cave/webawesome"></script>
+  <script type="module" src="/cave/cave-icons.js"></script>
 </head>
 <body>
 <wa-page mobile-breakpoint="700px">
@@ -22,7 +23,7 @@
       <wa-icon src="/cave/icons/tag.svg"></wa-icon><span>Deal Hunter</span>
     </a>
     <wa-dropdown>
-      <wa-button slot="trigger" appearance="plain" size="small">
+      <wa-button slot="trigger" appearance="plain" size="s">
         <wa-icon src="/cave/icons/layout-grid.svg" label="Cougar Cave apps"></wa-icon>
       </wa-button>
       <wa-dropdown-item href="https://cougarcave.dev"><wa-icon slot="icon" src="/cave/icons/home.svg"></wa-icon>Hub</wa-dropdown-item>
@@ -36,7 +37,7 @@
     </wa-dropdown>
     <div class="cave-end">
       <wa-dropdown id="account" data-cave-signed-in hidden placement="bottom-end">
-        <wa-button slot="trigger" appearance="plain" size="small" with-caret>
+        <wa-button slot="trigger" appearance="plain" size="s" with-caret>
           <wa-avatar slot="start" initials="" label="Your account"></wa-avatar><span class="cave-name" data-cave-name></span>
         </wa-button>
         <wa-dropdown-item disabled><span data-cave-name></span><span slot="details" data-cave-email></span></wa-dropdown-item>
