@@ -42,7 +42,10 @@ class AIError(Exception):
 MODELS = [
     {"provider": "claude", "id": "claude-opus-5-5", "label": "Claude Opus 5.5 (best)", "in": 4.00, "out": 20.00, "effort": True},
     {"provider": "claude", "id": "claude-sonnet-5-5", "label": "Claude Sonnet 5.5", "in": 2.00, "out": 10.00, "effort": True},
-    {"provider": "claude", "id": "claude-haiku-4-5", "label": "Claude Haiku 4.5 (cheapest)", "in": 1.00, "out": 5.00, "effort": False},
+    # Checked 2026-10-25 on Anthropic's pricing page: a prompt over 100,000 tokens pays the higher row.
+    {"provider": "claude", "id": "claude-haiku-5-5", "label": "Claude Haiku 5.5 (cheapest)", "in": 0.10, "out": 0.50, "effort": True,
+     "long": {"over": 100_000, "in": 0.50, "out": 2.50}},
+    {"provider": "claude", "id": "claude-haiku-4-5", "label": "Claude Haiku 4.5", "in": 1.00, "out": 5.00, "effort": False},
     {"provider": "claude", "id": "claude-opus-5", "label": "Claude Opus 5 (older)", "in": 5.00, "out": 25.00, "effort": True},
     {"provider": "openai", "id": "gpt-6-astra", "label": "GPT-6 Astra (best)", "in": 10.00, "out": 50.00, "effort": True},
     {"provider": "openai", "id": "gpt-6.1-sol", "label": "GPT-6.1 Sol", "in": 2.00, "out": 10.00, "effort": True},
@@ -81,7 +84,7 @@ REVIEW_MAX = 40
 AI_KEYS = ("ai_provider", "ollama_url", "ollama_model", "anthropic_api_key", "claude_model", "openai_api_key",
            "openai_model", "gemini_api_key", "gemini_model", "gemini_free_tier")
 # The admin's model when the owner console doesn't name one: each provider's cheapest.
-MANAGED_DEFAULT_MODELS = {"claude": "claude-haiku-4-5", "openai": "gpt-6-luna", "gemini": "gemini-3.5-flash-lite"}
+MANAGED_DEFAULT_MODELS = {"claude": "claude-haiku-5-5", "openai": "gpt-6-luna", "gemini": "gemini-3.5-flash-lite"}
 MANAGED_OFF = "The admin's AI is off in the owner console."
 
 
@@ -233,6 +236,9 @@ def _price_today(m: dict) -> dict:
 
 
 def cost(info: dict, tokens_in: int, tokens_out: int) -> float:
+    long = info.get("long")
+    if long and tokens_in > long["over"]:  # the whole request pays the long-prompt price
+        info = {**info, "in": long["in"], "out": long["out"]}
     return (tokens_in * info["in"] + tokens_out * info["out"]) / 1_000_000
 
 

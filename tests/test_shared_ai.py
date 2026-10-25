@@ -99,14 +99,20 @@ class AdminAiTest(Base):
             s = ai.settings_for()
             b = ai.budget(s)
         self.assertEqual((s["ai_provider"], s["claude_model"], s["anthropic_api_key"], s["ai_monthly_limit"]),
-                         ("claude", "claude-haiku-4-5", KEY, 1.0))
+                         ("claude", "claude-haiku-5-5", KEY, 1.0))  # the cheapest Claude by default
         self.assertEqual(b["limit"], 1.0)
         self.ask(self.admin)
         self.ask(self.friend)  # a friend on "shared"
-        self.assertEqual(self.calls, [("claude", KEY, "claude-haiku-4-5")] * 2)
+        self.assertEqual(self.calls, [("claude", KEY, "claude-haiku-5-5")] * 2)
         with db.as_user(self.friend):
             self.assertEqual(ai.settings_for()["_ai"]["pool_limit"], 1.0)
         self.assertEqual({r["paid_by"] for r in db.query("SELECT paid_by FROM ai_usage")}, {self.admin})
+
+    def test_haiku_5_5_price_effort_and_long_prompts(self):
+        info = ai.model_info({"ai_provider": "claude", "claude_model": "claude-haiku-5-5"})
+        self.assertEqual((info["in"], info["out"], info["effort"]), (0.10, 0.50, True))  # effort is sent as "low"
+        self.assertAlmostEqual(ai.cost(info, 50_000, 1_000_000), (50_000 * 0.10 + 1_000_000 * 0.50) / 1e6)  # short
+        self.assertAlmostEqual(ai.cost(info, 200_000, 1_000), (200_000 * 0.50 + 1_000 * 2.50) / 1e6)  # over 100K
 
     def test_model_from_the_file(self):
         shared_ai_file.use(self, provider="anthropic", key=KEY, model="claude-sonnet-5-5")
@@ -143,7 +149,7 @@ class AdminAiTest(Base):
         with mock.patch.dict(os.environ, {"ANTHROPIC_API_KEY": STRAY_ENV}):
             shared_ai_file.use(self, provider="anthropic", key=KEY)
             self.ask(self.admin)
-        self.assertEqual(self.calls, [("claude", KEY, "claude-haiku-4-5")])
+        self.assertEqual(self.calls, [("claude", KEY, "claude-haiku-5-5")])
 
     def test_settings_for_holds_only_its_own_providers_key(self):
         shared_ai_file.use(self, provider="gemini", key=KEY,
@@ -173,8 +179,8 @@ class SettingsPageTest(Base):
             page = self.s.get_state({}, {})["settings"]
             self.assertNotIn(KEY, json.dumps(page))
             self.assertEqual((page["ai_provider"], page["anthropic_api_key"], page["openai_api_key"],
-                              page["ai_monthly_limit"], page["claude_model"]), ("claude", True, False, 1.0, "claude-haiku-4-5"))
-            self.assertEqual(page["ai_managed"], {"on": True, "provider": "claude", "model": "claude-haiku-4-5",
+                              page["ai_monthly_limit"], page["claude_model"]), ("claude", True, False, 1.0, "claude-haiku-5-5"))
+            self.assertEqual(page["ai_managed"], {"on": True, "provider": "claude", "model": "claude-haiku-5-5",
                                                   "monthly_usd": 1.0, "reason": ""})
             self.s.put_settings({"anthropic_api_key": STRAY_DB, "ai_monthly_limit": 99, "ai_provider": "openai",
                                  "ai_confirm": False}, {})
