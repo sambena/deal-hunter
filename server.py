@@ -729,7 +729,11 @@ def auth_status(body, params):
     req = _request.get() or {}
     return {"setup_needed": _setup_needed(),
             "user": auth.public_user(req["user"]) if req.get("user") else None,
-            "central": oidc.enabled() and auth.central_on()}  # show "Sign in with Cougar Cave"
+            "central": oidc.enabled() and auth.central_on(),  # show "Sign in with Cougar Cave"
+            # What the sign-in card (cave/cave-ui.js) offers: central only while it is on, and the email and password
+            # form always (accounts from before Cougar Cave). Nothing here is hard-coded in the page.
+            "signin": {"central": "/auth/central" if oidc.enabled() and auth.central_on() else None,
+                       "password": {"label": "Email", "reset": None}}}
 
 
 @route("POST", "/api/auth/setup")
@@ -1025,7 +1029,8 @@ CAVE_DIR = STATIC_DIR / "cave"
 # module script (the Web Awesome loader) that isn't served as JavaScript.
 STATIC_TYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
                 ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".json": "application/json",
-                ".md": "text/plain; charset=utf-8", ".txt": "text/plain; charset=utf-8"}
+                ".md": "text/plain; charset=utf-8", ".txt": "text/plain; charset=utf-8",
+                ".woff2": "font/woff2"}  # the kit's fonts (cave/fonts/)
 OPEN_ROUTES = {("GET", "/api/auth/status"), ("POST", "/api/auth/setup"), ("POST", "/api/auth/login"),
                ("GET", "/api/auth/link"), ("POST", "/api/auth/accept"), ("GET", "/api/app/android")}
 

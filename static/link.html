@@ -1,17 +1,18 @@
 <!doctype html>
-<html lang="en" class="wa-dark cave-accent-teal">
+<html lang="en" class="wa-dark cave-accent-teal" data-cave-original="slate">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
-  <meta name="color-scheme" content="dark">
   <title>Link your account · Deal Hunter · Cougar Cave</title>
   <link rel="icon" href="/cave/icons/tag.svg" type="image/svg+xml">
+  <script src="/cave/cave-theme.js"></script>
   <link rel="stylesheet" href="/cave/webawesome/styles/webawesome.css">
   <link rel="stylesheet" href="/cave/cave-theme.css">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="/style.css">
   <script type="module" src="/cave/webawesome/webawesome.loader.js" data-webawesome="/cave/webawesome"></script>
   <script type="module" src="/cave/cave-icons.js"></script>
+  <script type="module" src="/cave/cave-ui.js"></script>
 </head>
 <body>
 <wa-page mobile-breakpoint="700px">
@@ -26,23 +27,8 @@
   </header>
 
   <!-- After a Cougar Cave sign-in that isn't linked yet: prove which Deal Hunter account is yours, once. -->
-  <main class="signin-main">
-    <wa-card class="signin">
-      <div class="wa-stack">
-        <div class="signin-head"><wa-icon src="/cave/icons/tag.svg"></wa-icon><h1>Link your Deal Hunter account</h1></div>
-        <p class="muted">You signed in with Cougar Cave. To use it for your existing Deal Hunter account, enter that
-          account's email and password once. Your watches, finds and settings stay as they are.</p>
-        <form id="link-form">
-          <label>Email <input name="email" type="email" autocomplete="username" required></label>
-          <label>Password <input name="password" type="password" autocomplete="current-password" required></label>
-          <div class="row"><button class="primary" type="submit" id="go">Link and sign in</button>
-            <a href="/">Cancel</a></div>
-          <p id="auth-error" role="alert"></p>
-        </form>
-      </div>
-    </wa-card>
-  </main>
+  <main><cave-signin></cave-signin></main>
 </wa-page>
-<script src="link.js"></script>
+<script src="/link.js"></script>
 </body>
 </html>

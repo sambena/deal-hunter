@@ -7,7 +7,21 @@
    stock themes. Run it after changing a seed: python tools/make_theme.py
 */
 
-/* Brand: BYU royal. Neutral: navy-tinted greys. Loaded after Web Awesome's default theme. */
+@font-face { font-family: "Press Start 2P"; font-style: normal; font-weight: 400; font-display: swap; src: url("fonts/press-start-2p-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "VT323"; font-style: normal; font-weight: 400; font-display: swap; src: url("fonts/vt323-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Chakra Petch"; font-style: normal; font-weight: 500; font-display: swap; src: url("fonts/chakra-petch-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "Chakra Petch"; font-style: normal; font-weight: 700; font-display: swap; src: url("fonts/chakra-petch-latin-700-normal.woff2") format("woff2"); }
+@font-face { font-family: "Figtree"; font-style: normal; font-weight: 400; font-display: swap; src: url("fonts/figtree-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Figtree"; font-style: normal; font-weight: 500; font-display: swap; src: url("fonts/figtree-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "Figtree"; font-style: normal; font-weight: 600; font-display: swap; src: url("fonts/figtree-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "Figtree"; font-style: normal; font-weight: 700; font-display: swap; src: url("fonts/figtree-latin-700-normal.woff2") format("woff2"); }
+@font-face { font-family: "Cinzel"; font-style: normal; font-weight: 400; font-display: swap; src: url("fonts/cinzel-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Cinzel"; font-style: normal; font-weight: 700; font-display: swap; src: url("fonts/cinzel-latin-700-normal.woff2") format("woff2"); }
+@font-face { font-family: "EB Garamond"; font-style: normal; font-weight: 400; font-display: swap; src: url("fonts/eb-garamond-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "EB Garamond"; font-style: italic; font-weight: 400; font-display: swap; src: url("fonts/eb-garamond-latin-400-italic.woff2") format("woff2"); }
+@font-face { font-family: "EB Garamond"; font-style: normal; font-weight: 500; font-display: swap; src: url("fonts/eb-garamond-latin-500-normal.woff2") format("woff2"); }
+
+/* Cougar, the default theme. Brand: BYU royal. Neutral: navy-tinted greys. Loaded after Web Awesome's default theme. The bar (.cave-bar) always uses these, whatever theme the page has. */
 :root, .cave-brand {
   --wa-color-brand-95: #eaf3fd;
   --wa-color-brand-90: #d6e7fc;
@@ -26,7 +40,7 @@
   --wa-color-brand-fill-loud: var(--wa-color-brand);
   --wa-color-brand-on-loud: var(--wa-color-brand-on);
 }
-:root {
+:root, .cave-bar {
   --wa-color-neutral-95: #eff2f5;
   --wa-color-neutral-90: #e1e5eb;
   --wa-color-neutral-80: #c0cad7;
@@ -142,6 +156,323 @@
   --wa-color-brand-on-loud: var(--wa-color-brand-on);
 }
 
+/* Theme: Cave, recreated from the hub and the Lab. class="cave-theme-cave" on <html>. */
+.cave-theme-cave {
+  --wa-color-neutral-95: #f2f1f4;
+  --wa-color-neutral-90: #e5e4eb;
+  --wa-color-neutral-80: #cac7d5;
+  --wa-color-neutral-70: #b1abc1;
+  --wa-color-neutral-60: #9891ae;
+  --wa-color-neutral-50: #7a7192;
+  --wa-color-neutral-40: #5e5672;
+  --wa-color-neutral-30: #49435a;
+  --wa-color-neutral-20: #363043;
+  --wa-color-neutral-10: #201d2a;
+  --wa-color-neutral-05: #14111a;
+  --wa-color-neutral: var(--wa-color-neutral-50);
+  --wa-color-neutral-on: white;
+  --wa-font-family-body: "VT323", ui-monospace, monospace;
+  --wa-font-family-heading: "Press Start 2P", ui-monospace, monospace;
+  --wa-font-size-scale: 1.3;
+  --wa-border-radius-scale: 0;
+  --wa-shadow-blur-scale: 0;
+}
+.cave-theme-cave.wa-dark {
+  --wa-color-surface-lowered: #120d1c;
+  --wa-color-surface-default: #241a3a;
+  --wa-color-surface-raised: #2e2148;
+  --wa-color-surface-border: #3d2c5e;
+  --wa-color-text-normal: #efe6d4;
+  --wa-color-text-quiet: #b3a7c4;
+}
+.cave-theme-cave.wa-dark:not([class*="cave-accent-"]) {
+  --wa-color-brand-95: #dcfaea;
+  --wa-color-brand-90: #b8f5d6;
+  --wa-color-brand-80: #3fe0a0;
+  --wa-color-brand-70: #1ccd8e;
+  --wa-color-brand-60: #0ab179;
+  --wa-color-brand-50: #028d60;
+  --wa-color-brand-40: #036d49;
+  --wa-color-brand-30: #065539;
+  --wa-color-brand-20: #013f28;
+  --wa-color-brand-10: #012717;
+  --wa-color-brand-05: #00180d;
+  --wa-color-brand: var(--wa-color-brand-80);
+  --wa-color-brand-key: 80;
+  --wa-color-brand-on: var(--wa-color-brand-05);
+  --wa-color-brand-fill-loud: var(--wa-color-brand);
+  --wa-color-brand-on-loud: var(--wa-color-brand-on);
+}
+
+/* Theme: Gilded, recreated from the Player and Chronicle. class="cave-theme-gilded" on <html>. */
+.cave-theme-gilded {
+  --wa-color-neutral-95: #f3f1ee;
+  --wa-color-neutral-90: #e8e5de;
+  --wa-color-neutral-80: #cfc8ba;
+  --wa-color-neutral-70: #b8ae98;
+  --wa-color-neutral-60: #a29478;
+  --wa-color-neutral-50: #857555;
+  --wa-color-neutral-40: #67593e;
+  --wa-color-neutral-30: #51462e;
+  --wa-color-neutral-20: #3c3320;
+  --wa-color-neutral-10: #251e11;
+  --wa-color-neutral-05: #171209;
+  --wa-color-neutral: var(--wa-color-neutral-50);
+  --wa-color-neutral-on: white;
+  --wa-font-family-body: "EB Garamond", Garamond, Georgia, serif;
+  --wa-font-family-heading: "Cinzel", Georgia, serif;
+  --wa-font-size-scale: 1.12;
+  --wa-border-radius-scale: 1.67;
+  --wa-shadow-blur-scale: 2;
+}
+.cave-theme-gilded.wa-dark {
+  --wa-color-surface-lowered: #0a0e13;
+  --wa-color-surface-default: #131b25;
+  --wa-color-surface-raised: #1a2430;
+  --wa-color-surface-border: #3a3424;
+  --wa-color-text-normal: #f1e8d2;
+  --wa-color-text-quiet: #9d9582;
+}
+.cave-theme-gilded.wa-dark:not([class*="cave-accent-"]) {
+  --wa-color-brand-95: #f6f1e4;
+  --wa-color-brand-90: #eee4cb;
+  --wa-color-brand-80: #ddc790;
+  --wa-color-brand-70: #d9b75c;
+  --wa-color-brand-60: #b79009;
+  --wa-color-brand-50: #937302;
+  --wa-color-brand-40: #715803;
+  --wa-color-brand-30: #594400;
+  --wa-color-brand-20: #413201;
+  --wa-color-brand-10: #291e00;
+  --wa-color-brand-05: #1a1200;
+  --wa-color-brand: var(--wa-color-brand-70);
+  --wa-color-brand-key: 70;
+  --wa-color-brand-on: var(--wa-color-brand-05);
+  --wa-color-brand-fill-loud: var(--wa-color-brand);
+  --wa-color-brand-on-loud: var(--wa-color-brand-on);
+}
+
+/* Theme: Slate, recreated from Deal Hunter and Win Doctor. class="cave-theme-slate" on <html>. */
+.cave-theme-slate {
+  --wa-color-neutral-95: #eff2f5;
+  --wa-color-neutral-90: #e1e5eb;
+  --wa-color-neutral-80: #c0cad7;
+  --wa-color-neutral-70: #a1b0c3;
+  --wa-color-neutral-60: #8498b1;
+  --wa-color-neutral-50: #637995;
+  --wa-color-neutral-40: #4a5d75;
+  --wa-color-neutral-30: #39485c;
+  --wa-color-neutral-20: #283545;
+  --wa-color-neutral-10: #17202b;
+  --wa-color-neutral-05: #0d131b;
+  --wa-color-neutral: var(--wa-color-neutral-50);
+  --wa-color-neutral-on: white;
+  --wa-font-family-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --wa-font-family-heading: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --wa-font-size-scale: 0.93;
+  --wa-border-radius-scale: 1;
+  --wa-shadow-blur-scale: 0.5;
+}
+.cave-theme-slate.wa-dark {
+  --wa-color-surface-lowered: #111418;
+  --wa-color-surface-default: #1a1f26;
+  --wa-color-surface-raised: #222932;
+  --wa-color-surface-border: #2e3742;
+  --wa-color-text-normal: #e6e9ee;
+  --wa-color-text-quiet: #8b95a3;
+}
+.cave-theme-slate.wa-dark:not([class*="cave-accent-"]) {
+  --wa-color-brand-95: #e9f3fe;
+  --wa-color-brand-90: #d5e7fd;
+  --wa-color-brand-80: #a6cdfb;
+  --wa-color-brand-70: #77b2f8;
+  --wa-color-brand-60: #4ea1ff;
+  --wa-color-brand-50: #0977da;
+  --wa-color-brand-40: #075ba9;
+  --wa-color-brand-30: #024787;
+  --wa-color-brand-20: #023464;
+  --wa-color-brand-10: #001f41;
+  --wa-color-brand-05: #00132c;
+  --wa-color-brand: var(--wa-color-brand-60);
+  --wa-color-brand-key: 60;
+  --wa-color-brand-on: var(--wa-color-brand-05);
+  --wa-color-brand-fill-loud: var(--wa-color-brand);
+  --wa-color-brand-on-loud: var(--wa-color-brand-on);
+}
+
+/* Theme: Roster, recreated from RaidRoster. class="cave-theme-roster" on <html>. */
+.cave-theme-roster {
+  --wa-color-neutral-95: #f0f1f5;
+  --wa-color-neutral-90: #e2e5ec;
+  --wa-color-neutral-80: #c3c9d7;
+  --wa-color-neutral-70: #a6afc4;
+  --wa-color-neutral-60: #8a95b1;
+  --wa-color-neutral-50: #6b7796;
+  --wa-color-neutral-40: #505b75;
+  --wa-color-neutral-30: #3e475d;
+  --wa-color-neutral-20: #2d3345;
+  --wa-color-neutral-10: #1a1f2b;
+  --wa-color-neutral-05: #0f131c;
+  --wa-color-neutral: var(--wa-color-neutral-50);
+  --wa-color-neutral-on: white;
+  --wa-font-family-body: "Figtree", system-ui, sans-serif;
+  --wa-font-family-heading: "Chakra Petch", "Figtree", sans-serif;
+  --wa-font-size-scale: 1;
+  --wa-border-radius-scale: 2;
+  --wa-shadow-blur-scale: 1.5;
+}
+.cave-theme-roster.wa-dark {
+  --wa-color-surface-lowered: #0d111c;
+  --wa-color-surface-default: #161c2b;
+  --wa-color-surface-raised: #1c2335;
+  --wa-color-surface-border: #283149;
+  --wa-color-text-normal: #e9edf6;
+  --wa-color-text-quiet: #98a2b8;
+}
+.cave-theme-roster.wa-dark:not([class*="cave-accent-"]) {
+  --wa-color-brand-95: #ffecef;
+  --wa-color-brand-90: #ffdae1;
+  --wa-color-brand-80: #feb0c0;
+  --wa-color-brand-70: #fb84a0;
+  --wa-color-brand-60: #ff5d8c;
+  --wa-color-brand-50: #d80e63;
+  --wa-color-brand-40: #a70a4b;
+  --wa-color-brand-30: #85043a;
+  --wa-color-brand-20: #63032a;
+  --wa-color-brand-10: #400018;
+  --wa-color-brand-05: #2b000e;
+  --wa-color-brand: var(--wa-color-brand-60);
+  --wa-color-brand-key: 60;
+  --wa-color-brand-on: var(--wa-color-brand-05);
+  --wa-color-brand-fill-loud: var(--wa-color-brand);
+  --wa-color-brand-on-loud: var(--wa-color-brand-on);
+}
+.cave-theme-roster.wa-light {
+  --wa-color-surface-lowered: #eef1f6;
+  --wa-color-surface-default: #ffffff;
+  --wa-color-surface-raised: #ffffff;
+  --wa-color-surface-border: #dbe1ea;
+  --wa-color-text-normal: #131a2a;
+  --wa-color-text-quiet: #5a6479;
+}
+.cave-theme-roster.wa-light:not([class*="cave-accent-"]) {
+  --wa-color-brand-95: #feedef;
+  --wa-color-brand-90: #fcdce0;
+  --wa-color-brand-80: #f7b5bf;
+  --wa-color-brand-70: #ef8ea0;
+  --wa-color-brand-60: #e56583;
+  --wa-color-brand-50: #c8325f;
+  --wa-color-brand-40: #a31d49;
+  --wa-color-brand-30: #830f37;
+  --wa-color-brand-20: #630628;
+  --wa-color-brand-10: #400217;
+  --wa-color-brand-05: #2b010d;
+  --wa-color-brand: var(--wa-color-brand-50);
+  --wa-color-brand-key: 50;
+  --wa-color-brand-on: white;
+  --wa-color-brand-fill-loud: var(--wa-color-brand);
+  --wa-color-brand-on-loud: var(--wa-color-brand-on);
+}
+
+/* Theme: Ember, recreated from Agent Relay. class="cave-theme-ember" on <html>. */
+.cave-theme-ember {
+  --wa-color-neutral-95: #f2f2ee;
+  --wa-color-neutral-90: #e7e5de;
+  --wa-color-neutral-80: #cdc9ba;
+  --wa-color-neutral-70: #b5af98;
+  --wa-color-neutral-60: #9e9678;
+  --wa-color-neutral-50: #807755;
+  --wa-color-neutral-40: #635b3e;
+  --wa-color-neutral-30: #4e472e;
+  --wa-color-neutral-20: #393420;
+  --wa-color-neutral-10: #231f11;
+  --wa-color-neutral-05: #151309;
+  --wa-color-neutral: var(--wa-color-neutral-50);
+  --wa-color-neutral-on: white;
+  --wa-font-family-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --wa-font-family-heading: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --wa-font-size-scale: 0.93;
+  --wa-border-radius-scale: 1;
+  --wa-shadow-blur-scale: 0.5;
+}
+.cave-theme-ember.wa-dark {
+  --wa-color-surface-lowered: #161615;
+  --wa-color-surface-default: #20201e;
+  --wa-color-surface-raised: #2a2a27;
+  --wa-color-surface-border: #34332f;
+  --wa-color-text-normal: #ecebe6;
+  --wa-color-text-quiet: #9b9a93;
+}
+.cave-theme-ember.wa-dark:not([class*="cave-accent-"]) {
+  --wa-color-brand-95: #ffeee3;
+  --wa-color-brand-90: #ffdec8;
+  --wa-color-brand-80: #fdb886;
+  --wa-color-brand-70: #fb923c;
+  --wa-color-brand-60: #df7605;
+  --wa-color-brand-50: #b35d00;
+  --wa-color-brand-40: #8a4701;
+  --wa-color-brand-30: #6d3704;
+  --wa-color-brand-20: #512700;
+  --wa-color-brand-10: #331601;
+  --wa-color-brand-05: #220c00;
+  --wa-color-brand: var(--wa-color-brand-70);
+  --wa-color-brand-key: 70;
+  --wa-color-brand-on: var(--wa-color-brand-05);
+  --wa-color-brand-fill-loud: var(--wa-color-brand);
+  --wa-color-brand-on-loud: var(--wa-color-brand-on);
+}
+.cave-theme-ember.wa-light {
+  --wa-color-surface-lowered: #f6f6f4;
+  --wa-color-surface-default: #ffffff;
+  --wa-color-surface-raised: #ffffff;
+  --wa-color-surface-border: #e2e1dc;
+  --wa-color-text-normal: #1d1d1b;
+  --wa-color-text-quiet: #6b6b66;
+}
+.cave-theme-ember.wa-light:not([class*="cave-accent-"]) {
+  --wa-color-brand-95: #fdeee9;
+  --wa-color-brand-90: #faded5;
+  --wa-color-brand-80: #f4baa7;
+  --wa-color-brand-70: #eb957a;
+  --wa-color-brand-60: #e1704c;
+  --wa-color-brand-50: #c2410c;
+  --wa-color-brand-40: #9e3101;
+  --wa-color-brand-30: #7c2604;
+  --wa-color-brand-20: #5e1901;
+  --wa-color-brand-10: #3b0d01;
+  --wa-color-brand-05: #280600;
+  --wa-color-brand: var(--wa-color-brand-50);
+  --wa-color-brand-key: 50;
+  --wa-color-brand-on: white;
+  --wa-color-brand-fill-loud: var(--wa-color-brand);
+  --wa-color-brand-on-loud: var(--wa-color-brand-on);
+}
+
+/* Theme swatches in the Appearance picker */
+.cave-swatch-cougar span:nth-child(1) { background: #061426; }
+.cave-swatch-cougar span:nth-child(2) { background: #0b2240; }
+.cave-swatch-cougar span:nth-child(3) { background: #0062b8; }
+.cave-swatch-cave span:nth-child(1) { background: #120d1c; }
+.cave-swatch-cave span:nth-child(2) { background: #241a3a; }
+.cave-swatch-cave span:nth-child(3) { background: #3fe0a0; }
+.cave-swatch-gilded span:nth-child(1) { background: #0a0e13; }
+.cave-swatch-gilded span:nth-child(2) { background: #131b25; }
+.cave-swatch-gilded span:nth-child(3) { background: #d9b75c; }
+.cave-swatch-slate span:nth-child(1) { background: #111418; }
+.cave-swatch-slate span:nth-child(2) { background: #1a1f26; }
+.cave-swatch-slate span:nth-child(3) { background: #4ea1ff; }
+.cave-swatch-roster span:nth-child(1) { background: #0d111c; }
+.cave-swatch-roster span:nth-child(2) { background: #161c2b; }
+.cave-swatch-roster span:nth-child(3) { background: #ff5d8c; }
+.cave-swatch-ember span:nth-child(1) { background: #161615; }
+.cave-swatch-ember span:nth-child(2) { background: #20201e; }
+.cave-swatch-ember span:nth-child(3) { background: #fb923c; }
+.cave-swatch-original span:nth-child(1) { background: #3fe0a0; }
+.cave-swatch-original span:nth-child(2) { background: #d9b75c; }
+.cave-swatch-original span:nth-child(3) { background: #2dd4bf; }
+.cave-swatch-original span:nth-child(4) { background: #ff5d8c; }
+.cave-swatch-original span:nth-child(5) { background: #fb923c; }
+
 /* Surfaces and text. Dark (navy) is the default; light is for apps that follow the device setting. */
 .wa-dark {
   --wa-color-surface-lowered: #061426;
@@ -151,7 +482,7 @@
   --wa-color-text-normal: #ffffff;
   --wa-color-text-quiet: #a9bdd6;
   --wa-color-text-link: var(--wa-color-brand-70);
-  --wa-color-focus: var(--wa-color-brand-70);
+  --wa-color-focus: #7cb2f3; /* royal 70: focus is the brand in every app, never the app's accent */
 }
 .wa-light {
   --wa-color-surface-lowered: #f2f6fb;
@@ -161,6 +492,7 @@
   --wa-color-text-normal: #002e5d;
   --wa-color-text-quiet: #4a6283;
   --wa-color-text-link: var(--wa-color-brand-40);
+  --wa-color-focus: #0062b8; /* royal */
 }
 :root {
   --wa-content-spacing: 0;
@@ -168,6 +500,13 @@
 
 /* The ecosystem bar: identical in every app, always BYU navy. Layout comes from Web Awesome's wa-cluster. */
 .cave-bar {
+  /* Whatever theme the page uses, the bar keeps Cougar's type, size and shape. */
+  --wa-font-family-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --wa-font-family-heading: var(--wa-font-family-body);
+  --wa-font-size-scale: 1;
+  --wa-border-radius-scale: 1;
+  --wa-shadow-blur-scale: 1;
+  font-family: var(--wa-font-family-body);
   background: #002e5d;
   color: #ffffff;
   border-bottom: 1px solid #1d3f6e;
@@ -185,4 +524,53 @@
 .cave-bar wa-avatar { --size: 1.75rem; font-size: var(--wa-font-size-s); }
 
 /* The page sits on the lowered surface so cards (default surface) stand out from it. */
-wa-page { background-color: var(--wa-color-surface-lowered); }
+body, wa-page { background-color: var(--wa-color-surface-lowered); }
+/* native.css gives buttons a display value, which would otherwise beat the hidden attribute. */
+[hidden] { display: none !important; }
+
+/* The sign-in card (cave-signin.js renders it): RaidRoster's card, identical in every app. It follows the page's
+   theme; only the app icon takes the app's accent, and only the first way in gets the primary button. */
+cave-signin { display: flex; justify-content: center; padding: 10vh var(--wa-space-m) var(--wa-space-2xl); }
+.cave-signin { width: 100%; max-width: 26.25rem; font-family: var(--wa-font-family-body); }
+.cave-signin::part(body) { display: grid; gap: var(--wa-space-m); }
+.cave-signin-app { display: flex; align-items: center; gap: var(--wa-space-xs); margin: 0; font-family: var(--wa-font-family-heading);
+  font-size: calc(1.25rem * var(--wa-font-size-scale)); font-weight: var(--wa-font-weight-bold); line-height: 1.2; color: var(--wa-color-text-normal); }
+.cave-signin-app wa-icon { font-size: 1.625rem; color: var(--wa-color-brand); flex: none; }
+.cave-signin p { margin: 0; color: var(--wa-color-text-quiet); line-height: 1.45; }
+.cave-signin .cave-signin-note { font-size: var(--wa-font-size-s); }
+.cave-signin wa-button.cave-signin-primary { display: block; width: 100%; }
+.cave-signin wa-button.cave-signin-primary::part(base) { width: 100%; }
+.cave-signin form { display: grid; gap: var(--wa-space-s); margin: 0; }
+.cave-signin form label { display: grid; gap: var(--wa-space-3xs); font-weight: var(--wa-font-weight-semibold); }
+.cave-signin form wa-button:not(.cave-signin-primary) { justify-self: start; }
+.cave-or { display: flex; align-items: center; gap: var(--wa-space-s); color: var(--wa-color-text-quiet); font-size: var(--wa-font-size-s); }
+.cave-or::before, .cave-or::after { content: ""; flex: 1; border-top: 1px solid var(--wa-color-surface-border); }
+.cave-pair { display: grid; gap: var(--wa-space-2xs); text-align: center; }
+.cave-pair-code { font-size: 1.9rem; font-weight: var(--wa-font-weight-semibold); letter-spacing: .12em; color: var(--wa-color-brand); }
+
+/* Settings drawer (cave-settings.js): section list on the left, one section's content on the right. */
+wa-drawer.cave-settings { --size: min(42rem, 100vw); }
+wa-drawer.cave-settings::part(body) { padding: 0; display: grid; grid-template-columns: 12rem 1fr; min-height: 100%; }
+.cave-settings-nav { border-inline-end: 1px solid var(--wa-color-surface-border); padding: var(--wa-space-xs); display: grid; align-content: start; gap: 2px; }
+.cave-settings-nav button { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: var(--wa-space-xs); padding: var(--wa-space-xs) var(--wa-space-s);
+  border-radius: var(--wa-border-radius-m); color: var(--wa-color-text-quiet); cursor: pointer; font: inherit; min-height: 2.5rem; }
+.cave-settings-nav button:hover, .cave-settings-nav button[aria-current="true"] { background: var(--wa-color-surface-raised); color: var(--wa-color-text-normal); }
+.cave-settings-nav button[aria-current="true"] { box-shadow: inset 3px 0 0 var(--wa-color-focus); }
+.cave-settings-nav button:focus-visible { outline: 2px solid var(--wa-color-focus); outline-offset: 1px; }
+.cave-settings-pane { padding: var(--wa-space-m); display: grid; align-content: start; gap: var(--wa-space-m); min-width: 0; }
+.cave-settings-pane > [data-section] { display: grid; align-content: start; gap: var(--wa-space-s); }
+.cave-settings-pane > [data-section]:not([data-active]) { display: none; }
+.cave-settings-pane p { margin: 0; color: var(--wa-color-text-quiet); }
+.cave-settings-pane h3 { margin: 0; font-size: var(--wa-font-size-l); font-weight: var(--wa-font-weight-semibold); }
+.cave-themes { display: grid; grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr)); gap: var(--wa-space-xs); }
+.cave-themes button { all: unset; box-sizing: border-box; display: grid; gap: var(--wa-space-2xs); padding: var(--wa-space-xs); border-radius: var(--wa-border-radius-m);
+  border: 1px solid var(--wa-color-surface-border); cursor: pointer; font: inherit; font-size: var(--wa-font-size-s); }
+.cave-themes button[aria-pressed="true"] { border-color: var(--wa-color-focus); box-shadow: 0 0 0 1px var(--wa-color-focus); }
+.cave-themes button:focus-visible { outline: 2px solid var(--wa-color-focus); outline-offset: 1px; }
+.cave-themes .swatch { display: flex; height: 2rem; border-radius: var(--wa-border-radius-s); overflow: hidden; border: 1px solid var(--wa-color-surface-border); }
+.cave-themes .swatch span { flex: 1; }
+@media (max-width: 640px) {
+  wa-drawer.cave-settings::part(body) { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  .cave-settings-nav { display: flex; overflow-x: auto; border-inline-end: 0; border-bottom: 1px solid var(--wa-color-surface-border); }
+  .cave-settings-nav button { white-space: nowrap; }
+}

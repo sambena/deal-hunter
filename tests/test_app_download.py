@@ -101,10 +101,10 @@ class LockdownTest(unittest.TestCase):
     def test_signed_out_gets_only_the_sign_in_page(self):
         status, body, _ = self.get("/", signed_in=False)
         self.assertEqual(status, 200)
-        self.assertIn(b"auth-form", body)
+        self.assertIn(b"<cave-signin>", body)
         self.assertNotIn(b"app.js", body)
         self.assertEqual(self.get("/style.css", signed_in=False)[0], 200)
-        self.assertIn(b"auth-form", self.get("/index.html", signed_in=False)[1])
+        self.assertIn(b"<cave-signin>", self.get("/index.html", signed_in=False)[1])
         for path in ("/app.js", "/api.html", "/nope.html"):
             self.assertEqual(self.get(path, signed_in=False)[0], 401, path)
         for path in ("/api/state", "/api/made-up-route", "/api/settings"):
@@ -145,6 +145,16 @@ class LockdownTest(unittest.TestCase):
         self.assertTrue(status == 200 and headers["Content-Type"].startswith("text/javascript"), (status, headers["Content-Type"]))
         status, _, headers = self.raw_get("/cave/system-icons.svg")
         self.assertEqual((status, headers["Content-Type"]), (200, "image/svg+xml"))
+        # Kit 0.4.0: the theme switcher, the account menu / sign-in card / settings drawer, and the themes' fonts.
+        for path in ("/cave/cave-theme.js", "/cave/cave-ui.js"):
+            status, _, headers = self.raw_get(path)
+            self.assertTrue(status == 200 and headers["Content-Type"].startswith("text/javascript"), (path, status))
+        fonts = sorted(p.name for p in (self.s.CAVE_DIR / "fonts").glob("*.woff2"))
+        self.assertTrue(fonts)
+        for name in fonts:
+            status, body, headers = self.raw_get(f"/cave/fonts/{name}")
+            self.assertEqual((status, headers["Content-Type"], body[:4]), (200, "font/woff2", b"wOF2"), name)
+        self.assertEqual(self.raw_get("/cave/fonts/../../app.js")[0] in (401, 404), True)
         self.assertIn(b"cave/webawesome/webawesome.loader.js", self.raw_get("/")[1])  # the sign-in page uses it
 
     def test_cave_prefix_does_not_open_the_app(self):

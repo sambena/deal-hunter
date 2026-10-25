@@ -1,5 +1,8 @@
-/* Colours come from the shared Cougar Cave theme (cave/cave-theme.css, Web Awesome tokens). Deal Hunter's accent
-   is teal (class cave-accent-teal on <html>); a focus (Tech, Cars, …) may override --accent for its own content. */
+/* Token bridge: every colour comes from the shared Cougar Cave theme (cave/cave-theme.css, Web Awesome tokens), so
+   Deal Hunter follows whichever theme the viewer picks (cave/cave-theme.js). Deal Hunter's accent is teal (class
+   cave-accent-teal on <html>); a focus (Tech, Cars, …) may override --accent for its own content. Only the shop tags
+   and the watch colours (app.js) keep their own. The bar, sign-in card, account menu and settings drawer are the
+   kit's (cave/cave-ui.js) and have no styles here. */
 :root {
   --bg: var(--wa-color-surface-lowered); --panel: var(--wa-color-surface-default); --panel2: var(--wa-color-surface-raised);
   --line: var(--wa-color-surface-border); --text: var(--wa-color-text-normal); --muted: var(--wa-color-text-quiet);
@@ -7,7 +10,6 @@
   --good: var(--wa-color-success-60); --great: var(--wa-color-success-70); --on-great: var(--wa-color-success-05);
   --warn: var(--wa-color-warning-70); --bad: var(--wa-color-danger-60); --on-bad: var(--wa-color-danger-on);
   --photo: var(--wa-color-neutral-95); --shade: var(--wa-color-shadow);
-  color-scheme: dark;
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 var(--wa-font-family-body); }
@@ -114,19 +116,6 @@ table.radar input[data-f=max] { width: 6em; }
 #radar-box h3 { margin: 14px 0 4px; }
 .custom-row { display: flex; gap: 6px; margin: 4px 0; }
 .custom-row input { flex: 1; min-width: 0; }
-/* Signed-out pages (login.html, link.html and the sign-in messages): one centred card under the bar. */
-.signin-main { display: flex; justify-content: center; padding: 8vh 16px 16px; }
-wa-card.signin { width: 100%; max-width: 420px; }
-.signin-head { display: flex; align-items: center; gap: 10px; }
-.signin-head wa-icon { font-size: 28px; color: var(--accent); }
-.signin-head h1 { font-size: 20px; margin: 0; }
-.signin p { margin: 0; }
-.or { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; }
-.or wa-divider { flex: 1; }
-wa-button.wide { width: 100%; }
-.signin form label { display: block; margin: 8px 0; }
-.signin form input { width: 100%; }
-#auth-error { color: var(--bad); min-height: 1.2em; }
 .device { border-top: 1px solid var(--line); padding: 6px 0; }
 table.people input.limit { width: 4.5em; }
 table.people td { vertical-align: middle; }

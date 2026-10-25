@@ -236,25 +236,34 @@ $("#acct-save").addEventListener("click", e => busy(e.target, async () => {
 
 async function signOut() {
   const out = await api("POST", "/api/auth/logout");
+  try { sessionStorage.setItem("dh-signed-out", "1"); } catch {}  // the sign-in card then says so
   // A Cougar Cave session also ends the Cougar Cave sign-in, on the login service's own page.
   if (out.end_session) location.assign(out.end_session);
   else location.reload();
 }
 
-// The Cougar Cave bar: who is signed in, and the account menu (Settings, Sign out).
+// The Cougar Cave bar: who is signed in, and the shared account menu (<cave-account>: Settings, Appearance, Sign out).
 function fillBar() {
-  const me = state.me || {};
-  const initials = (me.name || me.email || "?").split(/\s+/).map(w => w[0]).join("").slice(0, 2).toUpperCase();
-  $$("[data-cave-name]").forEach(n => (n.textContent = me.name || ""));
-  $$("[data-cave-email]").forEach(n => (n.textContent = me.email || ""));
-  $("#account wa-avatar").initials = initials;
-  $("#account").hidden = false;
+  const me = state.me || {}, account = $("cave-account");
+  const data = { name: me.name || "", email: me.email || "", items: [{ label: "Settings", icon: "settings", value: "settings" }] };
+  customElements.whenDefined("cave-account").then(() => {
+    if (JSON.stringify(account.data) !== JSON.stringify(data)) account.data = data;  // refresh() runs every minute
+  });
+  account.hidden = false;
 }
-$("#account").addEventListener("wa-select", e => {
-  const value = e.detail.item.value;
-  if (value === "settings") goTab("settings");
+$("cave-account").addEventListener("cave-account-select", e => {
+  const value = e.detail.value;
+  if (value === "settings") openSettings();
   if (value === "signout") signOut().catch(err => toast(err.message, true));
 });
+
+// Settings live in the shared settings drawer (<cave-settings>); #settings opens it over the current tab.
+function openSettings(section) {
+  customElements.whenDefined("cave-settings").then(() => $("cave-settings").show(section));
+}
+$("#settings-nav").addEventListener("click", e => { e.preventDefault(); openSettings(); });
+// Filled each time it opens (from Settings or the menu's Appearance), as the Settings tab was.
+document.addEventListener("wa-show", e => { if (e.target.matches?.("wa-drawer.cave-settings")) fillSettings(); });
 
 function esc(s) {
   return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -356,7 +365,11 @@ const aiOn = () => state.settings.ai_provider && state.settings.ai_provider !== 
 
 // The sections are real links (#finds, #watches, …), so the back button and bookmarks work.
 function showTab(name) {
-  if (name === "admin" && !(state.me && state.me.role === "admin")) name = "settings";
+  if (name === "admin" && !(state.me && state.me.role === "admin")) name = "finds";
+  if (name === "settings") {  // an old link or bookmark: open the drawer over Finds
+    openSettings();
+    name = "finds";
+  }
   if (!$("#tab-" + name)) name = "finds";
   $$(".dh-nav [data-tab]").forEach(b => {
     b.classList.toggle("active", b.dataset.tab === name);
@@ -367,7 +380,7 @@ function showTab(name) {
   try { localStorage.setItem("tab", name); } catch {}
   if (name === "finds") loadListings();
   if (name === "hardware") renderMachines();
-  if (name === "settings" || name === "admin") fillSettings();
+  if (name === "admin") fillSettings();
 }
 function goTab(name) {
   if (location.hash !== "#" + name) history.pushState(null, "", "#" + name);
@@ -1564,6 +1577,7 @@ $("#test-discord").addEventListener("click", e => busy(e.target, async () => {
   await refresh();
   let tab = location.hash.slice(1);
   if (!tab) try { tab = localStorage.getItem("tab") || "finds"; } catch { tab = "finds"; }
+  if (tab === "settings" && !location.hash) tab = "finds";  // remembered from when Settings was a tab
   showTab(tab);
   setInterval(async () => {
     await refresh();

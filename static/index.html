@@ -1,16 +1,17 @@
 <!doctype html>
-<html lang="en" class="wa-dark cave-accent-teal">
+<html lang="en" class="wa-dark cave-accent-teal" data-cave-original="slate">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Deal Hunter · Cougar Cave</title>
-  <meta name="color-scheme" content="dark">
   <link rel="icon" href="/cave/icons/tag.svg" type="image/svg+xml">
+  <script src="/cave/cave-theme.js"></script>
   <link rel="stylesheet" href="/cave/webawesome/styles/webawesome.css">
   <link rel="stylesheet" href="/cave/cave-theme.css">
   <link rel="stylesheet" href="style.css">
   <script type="module" src="/cave/webawesome/webawesome.loader.js" data-webawesome="/cave/webawesome"></script>
   <script type="module" src="/cave/cave-icons.js"></script>
+  <script type="module" src="/cave/cave-ui.js"></script>
 </head>
 <body>
 <wa-page mobile-breakpoint="700px">
@@ -36,17 +37,7 @@
       <wa-dropdown-item data-cave-owner hidden href="https://auth.cougarcave.dev/owner/"><wa-icon slot="icon" src="/cave/icons/shield-lock.svg"></wa-icon>Owner console<wa-badge slot="details" variant="brand">Owner</wa-badge></wa-dropdown-item>
     </wa-dropdown>
     <div class="cave-end">
-      <wa-dropdown id="account" data-cave-signed-in hidden placement="bottom-end">
-        <wa-button slot="trigger" appearance="plain" size="s" with-caret>
-          <wa-avatar slot="start" initials="" label="Your account"></wa-avatar><span class="cave-name" data-cave-name></span>
-        </wa-button>
-        <wa-dropdown-item disabled><span data-cave-name></span><span slot="details" data-cave-email></span></wa-dropdown-item>
-        <wa-divider></wa-divider>
-        <wa-dropdown-item href="https://auth.cougarcave.dev/if/user/"><wa-icon slot="icon" src="/cave/icons/user.svg"></wa-icon>Cougar Cave account</wa-dropdown-item>
-        <wa-dropdown-item value="settings"><wa-icon slot="icon" src="/cave/icons/settings.svg"></wa-icon>Settings</wa-dropdown-item>
-        <wa-divider></wa-divider>
-        <wa-dropdown-item value="signout"><wa-icon slot="icon" src="/cave/icons/logout.svg"></wa-icon>Sign out</wa-dropdown-item>
-      </wa-dropdown>
+      <cave-account data-cave-signed-in hidden></cave-account>
     </div>
   </header>
 
@@ -54,7 +45,7 @@
     <a href="#finds" data-tab="finds" class="active">Finds <span id="new-badge" class="badge" hidden></span></a>
     <a href="#watches" data-tab="watches">Watches</a>
     <a href="#hardware" data-tab="hardware">My Stuff</a>
-    <a href="#settings" data-tab="settings">Settings</a>
+    <a href="#settings" id="settings-nav">Settings</a>
     <a href="#admin" data-tab="admin" id="admin-nav" hidden>Admin</a>
     <span class="spacer"></span>
     <select id="focus-pick" aria-label="What you're hunting" title="What you're hunting: shows only that, everywhere (saved to your account)">
@@ -201,167 +192,6 @@
       <div id="machines"></div>
     </section>
 
-    <!-- SETTINGS -->
-    <section id="tab-settings" class="tab" hidden>
-      <form id="settings-form">
-        <div class="panel" id="account-panel">
-          <h2>Your account</h2>
-          <p class="muted" id="account-who"></p>
-          <div class="grid">
-            <label>Name <input id="acct-name"></label>
-            <label>Email <input id="acct-email" type="email"></label>
-            <label>Current password (to change email or password) <input id="acct-current" type="password" autocomplete="current-password"></label>
-            <label>New password <input id="acct-new" type="password" autocomplete="new-password"></label>
-          </div>
-          <div class="row"><button type="button" id="acct-save">Save account</button></div>
-          <p class="app-link" hidden><a href="/download/android">Get the Android app</a> <span class="muted"></span></p>
-          <h3>Signed in on</h3>
-          <div id="acct-devices"></div>
-        </div>
-
-        <div class="panel">
-          <h2>Junk words</h2>
-          <p class="muted">Finds with these words in the title (or description) are always hidden. One per line.</p>
-          <label><textarea name="junk_terms" rows="6"></textarea></label>
-        </div>
-
-        <div class="panel">
-          <h2>My sizes</h2>
-          <p class="muted">Used to fill in new clothes and shoes watches. Only you see them.</p>
-          <div class="grid">
-            <label>Usually shop <select name="sizes.department"><option value="">Anyone</option><option value="men">Men</option>
-              <option value="women">Women</option><option value="kids">Kids</option></select></label>
-            <label>Shoe size <input name="sizes.shoe" placeholder="10.5"></label>
-            <label>Tops <input name="sizes.top" placeholder="M"></label>
-            <label>Pants <input name="sizes.pants" placeholder="32x30"></label>
-          </div>
-        </div>
-
-        <div class="panel">
-          <h2>Local area</h2>
-          <p class="muted">Local sources only show things you can pick up within this distance. eBay also uses the ZIP for shipping estimates.</p>
-          <div class="grid">
-            <label>Your ZIP code <input name="zip_code" inputmode="numeric" placeholder="84057"></label>
-            <label>Radius (miles) <input name="local_radius_miles" type="number" min="1" max="500"></label>
-          </div>
-        </div>
-
-        <div class="panel">
-          <h2>Discord</h2>
-          <label class="toggle"><input type="checkbox" name="discord_enabled"> Post new finds to Discord</label>
-          <label class="toggle"><input type="checkbox" name="discord_deals_only"> Only when it's a deal (10%+ under this watch's typical price)</label>
-          <label>Webhook URL <input name="discord_webhook" type="password" autocomplete="off"></label>
-          <details class="help guide">
-            <summary>How to get a Discord webhook (free)</summary>
-            <ol>
-              <li>In Discord, hover over the channel you want alerts in and click the gear (<b>Edit Channel</b>).</li>
-              <li>Open <b>Integrations → Webhooks → New Webhook</b>. Name it "Deal Hunter" if you like.</li>
-              <li>Click <b>Copy Webhook URL</b>, paste it below, tick <b>Post new finds to Discord</b>, and save.</li>
-              <li>Press <b>Send test message</b> to check it works.</li>
-            </ol>
-            <p>You need Manage Webhooks permission on the server. Anyone with the link can post to that channel, so keep it private.</p>
-          </details>
-          <button type="button" id="test-discord">Send test message</button>
-        </div>
-
-        <div class="panel">
-          <h2>AI</h2>
-          <p class="muted">Off by default. AI only runs when you press an AI button, never in the background.
-            Paid models show the cost and ask first, and stop working once a request could take you past your monthly limit.</p>
-          <div class="spend" id="ai-spend"></div>
-          <label data-member>Whose AI
-            <select name="ai_source">
-              <option value="shared" id="ai-source-shared">Use the shared AI</option>
-              <option value="own">Use my own key</option>
-            </select>
-          </label>
-          <div id="ai-own">
-          <div class="grid">
-            <label>Mode
-              <select name="ai_provider"><option value="off">Off (rules only)</option></select>
-            </label>
-            <label>Monthly limit (US $) <input name="ai_monthly_limit" type="number" min="0" step="0.5"></label>
-          </div>
-          <label class="toggle"><input type="checkbox" name="ai_confirm"> Show the cost and ask before every paid AI request</label>
-          <div data-provider="claude">
-          <div class="grid">
-            <label>Claude model <select name="claude_model" data-models="claude"></select></label>
-            <label>Anthropic API key <input name="anthropic_api_key" type="password" autocomplete="off" data-ph="from console.anthropic.com"></label>
-          </div>
-          <details class="help guide">
-            <summary>How to get a Claude (Anthropic) key: pay as you go</summary>
-            <ol>
-              <li>Go to <a href="https://console.anthropic.com/" target="_blank" rel="noopener">console.anthropic.com</a> and sign in. This is separate from a Claude Pro/Max subscription, which can't be used here.</li>
-              <li>Open <b>Billing</b> and buy a few dollars of credit. $5 lasts a long time with the cheaper models.</li>
-              <li>Under <b>Settings → Limits</b>, set a monthly spend limit. That cap is on Anthropic's side, on top of the limit above.</li>
-              <li>Open <b>API Keys → Create Key</b>, copy it (it's only shown once), paste it below, and save.</li>
-            </ol>
-            <p>Claude Haiku 4.5 is the cheapest. Opus 5.5 gives the best judgement on listings.</p>
-          </details>
-          </div>
-          <div data-provider="openai">
-          <div class="grid">
-            <label>OpenAI model <select name="openai_model" data-models="openai"></select></label>
-            <label>OpenAI API key <input name="openai_api_key" type="password" autocomplete="off" data-ph="from platform.openai.com"></label>
-          </div>
-          <details class="help guide">
-            <summary>How to get an OpenAI (ChatGPT) key: pay as you go</summary>
-            <ol>
-              <li>Go to <a href="https://platform.openai.com/" target="_blank" rel="noopener">platform.openai.com</a> and sign in. A ChatGPT Plus subscription doesn't include API use.</li>
-              <li>Open <b>Settings → Billing</b> and add a few dollars of credit.</li>
-              <li>Under <b>Settings → Limits</b>, set a monthly budget.</li>
-              <li>Open <b>API keys → Create new secret key</b>, copy it (it's only shown once), paste it below, and save.</li>
-            </ol>
-          </details>
-          </div>
-          <div data-provider="gemini">
-          <div class="grid">
-            <label>Gemini model <select name="gemini_model" data-models="gemini"></select></label>
-            <label>Gemini API key <input name="gemini_api_key" type="password" autocomplete="off" data-ph="from aistudio.google.com"></label>
-          </div>
-          <label class="toggle"><input type="checkbox" name="gemini_free_tier"> My Gemini key is on the free tier (no billing set up in Google)</label>
-          <p class="muted">When ticked, Gemini requests count as $0 and don't use up the monthly limit. Untick it if you
-            turn on billing in Google, so real costs are tracked and capped again. Your key's tier is shown on
-            aistudio.google.com/apikey under "Billing Tier".</p>
-          <details class="help guide">
-            <summary>How to get a Google Gemini key: free tier, then pay as you go</summary>
-            <ol>
-              <li>Go to <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> and sign in with a Google account.</li>
-              <li>Click <b>Create API key</b>. Pick or create a Google Cloud project when asked.</li>
-              <li>Copy the key, paste it below, and save.</li>
-            </ol>
-            <p>Without billing turned on, the key uses Google's free tier: limited requests per day, and Google may use the prompts to improve its products. Turning on billing in Google Cloud lifts the limits and the cost is shown above.</p>
-          </details>
-          </div>
-          <div data-provider="ollama">
-          <div class="grid">
-            <label>Ollama URL <input name="ollama_url"></label>
-            <label>Ollama model <input name="ollama_model"></label>
-          </div>
-          <details class="help guide">
-            <summary>How to set up Ollama (free, runs on your own computer)</summary>
-            <ol>
-              <li>Install Ollama from <a href="https://ollama.com/download" target="_blank" rel="noopener">ollama.com</a> on a computer with a decent graphics card.</li>
-              <li>In a terminal there, run <code>ollama pull qwen3.5:4b</code> (about 3.4 GB, fits a 6 GB graphics card).</li>
-              <li>Put that computer's address in <b>Ollama URL</b>, e.g. <code>http://192.168.1.50:11434</code>. To reach it from another machine, set <code>OLLAMA_HOST=0.0.0.0</code> on the Ollama computer.</li>
-              <li>Type the model name (<code>qwen3.5:4b</code>) in <b>Ollama model</b> and save.</li>
-            </ol>
-            <p>It costs nothing, but without a graphics card each answer can take a minute or more. Small local models
-              are quick but make more mistakes about hardware than the paid models.</p>
-            <p>At home this is already set up: the URL <code>http://192.168.86.82:11434</code> reaches Ollama on
-              the Proxmox server (waking it if it's asleep) from the house network or the VPN.</p>
-          </details>
-          </div>
-          <p class="muted" id="ai-price-note"></p>
-          </div>
-        </div>
-
-        <div class="row sticky-save">
-          <button type="submit" class="primary">Save settings</button>
-          <span id="settings-msg" class="muted"></span>
-        </div>
-      </form>
-    </section>
     <!-- ADMIN (only the admin sees this tab; the server enforces it too) -->
     <section id="tab-admin" class="tab" hidden>
       <form id="admin-form">
@@ -526,6 +356,168 @@ Leave blank and the AI does its best."></textarea></label>
     <wa-button slot="footer" appearance="plain" data-dialog="close">Cancel</wa-button>
     <wa-button slot="footer" variant="brand" id="ask-ok"></wa-button>
   </wa-dialog>
+  <!-- SETTINGS: each person's own, in the shared settings drawer (<cave-settings>, cave/cave-ui.js), opened from the
+       account menu or the Settings link. One form around it, so every section's Save saves them all. -->
+  <form id="settings-form">
+  <cave-settings label="Settings">
+    <section data-section="account" data-label="Your account" data-icon="user" id="account-panel">
+      <h3>Your account</h3>
+      <p class="muted" id="account-who"></p>
+      <div class="grid">
+        <label>Name <input id="acct-name"></label>
+        <label>Email <input id="acct-email" type="email"></label>
+        <label>Current password (to change email or password) <input id="acct-current" type="password" autocomplete="current-password"></label>
+        <label>New password <input id="acct-new" type="password" autocomplete="new-password"></label>
+      </div>
+      <div class="row"><button type="button" id="acct-save">Save account</button></div>
+      <p class="app-link" hidden><a href="/download/android">Get the Android app</a> <span class="muted"></span></p>
+      <h3>Signed in on</h3>
+      <div id="acct-devices"></div>
+    </section>
+
+    <section data-section="junk" data-label="Junk words" data-icon="x">
+      <h3>Junk words</h3>
+      <p class="muted">Finds with these words in the title (or description) are always hidden. One per line.</p>
+      <label><textarea name="junk_terms" rows="6"></textarea></label>
+      <div class="row"><button type="submit" class="primary">Save settings</button></div>
+    </section>
+
+    <section data-section="sizes" data-label="My sizes" data-icon="tag">
+      <h3>My sizes</h3>
+      <p class="muted">Used to fill in new clothes and shoes watches. Only you see them.</p>
+      <div class="grid">
+        <label>Usually shop <select name="sizes.department"><option value="">Anyone</option><option value="men">Men</option>
+          <option value="women">Women</option><option value="kids">Kids</option></select></label>
+        <label>Shoe size <input name="sizes.shoe" placeholder="10.5"></label>
+        <label>Tops <input name="sizes.top" placeholder="M"></label>
+        <label>Pants <input name="sizes.pants" placeholder="32x30"></label>
+      </div>
+      <div class="row"><button type="submit" class="primary">Save settings</button></div>
+    </section>
+
+    <section data-section="local" data-label="Local area" data-icon="home">
+      <h3>Local area</h3>
+      <p class="muted">Local sources only show things you can pick up within this distance. eBay also uses the ZIP for shipping estimates.</p>
+      <div class="grid">
+        <label>Your ZIP code <input name="zip_code" inputmode="numeric" placeholder="84057"></label>
+        <label>Radius (miles) <input name="local_radius_miles" type="number" min="1" max="500"></label>
+      </div>
+      <div class="row"><button type="submit" class="primary">Save settings</button></div>
+    </section>
+
+    <section data-section="discord" data-label="Discord" data-icon="messages">
+      <h3>Discord</h3>
+      <label class="toggle"><input type="checkbox" name="discord_enabled"> Post new finds to Discord</label>
+      <label class="toggle"><input type="checkbox" name="discord_deals_only"> Only when it's a deal (10%+ under this watch's typical price)</label>
+      <label>Webhook URL <input name="discord_webhook" type="password" autocomplete="off"></label>
+      <details class="help guide">
+        <summary>How to get a Discord webhook (free)</summary>
+        <ol>
+          <li>In Discord, hover over the channel you want alerts in and click the gear (<b>Edit Channel</b>).</li>
+          <li>Open <b>Integrations → Webhooks → New Webhook</b>. Name it "Deal Hunter" if you like.</li>
+          <li>Click <b>Copy Webhook URL</b>, paste it below, tick <b>Post new finds to Discord</b>, and save.</li>
+          <li>Press <b>Send test message</b> to check it works.</li>
+        </ol>
+        <p>You need Manage Webhooks permission on the server. Anyone with the link can post to that channel, so keep it private.</p>
+      </details>
+      <button type="button" id="test-discord">Send test message</button>
+      <div class="row"><button type="submit" class="primary">Save settings</button></div>
+    </section>
+
+    <section data-section="ai" data-label="AI" data-icon="settings">
+      <h3>AI</h3>
+      <p class="muted">Off by default. AI only runs when you press an AI button, never in the background.
+        Paid models show the cost and ask first, and stop working once a request could take you past your monthly limit.</p>
+      <div class="spend" id="ai-spend"></div>
+      <label data-member>Whose AI
+        <select name="ai_source">
+          <option value="shared" id="ai-source-shared">Use the shared AI</option>
+          <option value="own">Use my own key</option>
+        </select>
+      </label>
+      <div id="ai-own">
+      <div class="grid">
+        <label>Mode
+          <select name="ai_provider"><option value="off">Off (rules only)</option></select>
+        </label>
+        <label>Monthly limit (US $) <input name="ai_monthly_limit" type="number" min="0" step="0.5"></label>
+      </div>
+      <label class="toggle"><input type="checkbox" name="ai_confirm"> Show the cost and ask before every paid AI request</label>
+      <div data-provider="claude">
+      <div class="grid">
+        <label>Claude model <select name="claude_model" data-models="claude"></select></label>
+        <label>Anthropic API key <input name="anthropic_api_key" type="password" autocomplete="off" data-ph="from console.anthropic.com"></label>
+      </div>
+      <details class="help guide">
+        <summary>How to get a Claude (Anthropic) key: pay as you go</summary>
+        <ol>
+          <li>Go to <a href="https://console.anthropic.com/" target="_blank" rel="noopener">console.anthropic.com</a> and sign in. This is separate from a Claude Pro/Max subscription, which can't be used here.</li>
+          <li>Open <b>Billing</b> and buy a few dollars of credit. $5 lasts a long time with the cheaper models.</li>
+          <li>Under <b>Settings → Limits</b>, set a monthly spend limit. That cap is on Anthropic's side, on top of the limit above.</li>
+          <li>Open <b>API Keys → Create Key</b>, copy it (it's only shown once), paste it below, and save.</li>
+        </ol>
+        <p>Claude Haiku 4.5 is the cheapest. Opus 5.5 gives the best judgement on listings.</p>
+      </details>
+      </div>
+      <div data-provider="openai">
+      <div class="grid">
+        <label>OpenAI model <select name="openai_model" data-models="openai"></select></label>
+        <label>OpenAI API key <input name="openai_api_key" type="password" autocomplete="off" data-ph="from platform.openai.com"></label>
+      </div>
+      <details class="help guide">
+        <summary>How to get an OpenAI (ChatGPT) key: pay as you go</summary>
+        <ol>
+          <li>Go to <a href="https://platform.openai.com/" target="_blank" rel="noopener">platform.openai.com</a> and sign in. A ChatGPT Plus subscription doesn't include API use.</li>
+          <li>Open <b>Settings → Billing</b> and add a few dollars of credit.</li>
+          <li>Under <b>Settings → Limits</b>, set a monthly budget.</li>
+          <li>Open <b>API keys → Create new secret key</b>, copy it (it's only shown once), paste it below, and save.</li>
+        </ol>
+      </details>
+      </div>
+      <div data-provider="gemini">
+      <div class="grid">
+        <label>Gemini model <select name="gemini_model" data-models="gemini"></select></label>
+        <label>Gemini API key <input name="gemini_api_key" type="password" autocomplete="off" data-ph="from aistudio.google.com"></label>
+      </div>
+      <label class="toggle"><input type="checkbox" name="gemini_free_tier"> My Gemini key is on the free tier (no billing set up in Google)</label>
+      <p class="muted">When ticked, Gemini requests count as $0 and don't use up the monthly limit. Untick it if you
+        turn on billing in Google, so real costs are tracked and capped again. Your key's tier is shown on
+        aistudio.google.com/apikey under "Billing Tier".</p>
+      <details class="help guide">
+        <summary>How to get a Google Gemini key: free tier, then pay as you go</summary>
+        <ol>
+          <li>Go to <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> and sign in with a Google account.</li>
+          <li>Click <b>Create API key</b>. Pick or create a Google Cloud project when asked.</li>
+          <li>Copy the key, paste it below, and save.</li>
+        </ol>
+        <p>Without billing turned on, the key uses Google's free tier: limited requests per day, and Google may use the prompts to improve its products. Turning on billing in Google Cloud lifts the limits and the cost is shown above.</p>
+      </details>
+      </div>
+      <div data-provider="ollama">
+      <div class="grid">
+        <label>Ollama URL <input name="ollama_url"></label>
+        <label>Ollama model <input name="ollama_model"></label>
+      </div>
+      <details class="help guide">
+        <summary>How to set up Ollama (free, runs on your own computer)</summary>
+        <ol>
+          <li>Install Ollama from <a href="https://ollama.com/download" target="_blank" rel="noopener">ollama.com</a> on a computer with a decent graphics card.</li>
+          <li>In a terminal there, run <code>ollama pull qwen3.5:4b</code> (about 3.4 GB, fits a 6 GB graphics card).</li>
+          <li>Put that computer's address in <b>Ollama URL</b>, e.g. <code>http://192.168.1.50:11434</code>. To reach it from another machine, set <code>OLLAMA_HOST=0.0.0.0</code> on the Ollama computer.</li>
+          <li>Type the model name (<code>qwen3.5:4b</code>) in <b>Ollama model</b> and save.</li>
+        </ol>
+        <p>It costs nothing, but without a graphics card each answer can take a minute or more. Small local models
+          are quick but make more mistakes about hardware than the paid models.</p>
+        <p>At home this is already set up: the URL <code>http://192.168.86.82:11434</code> reaches Ollama on
+          the Proxmox server (waking it if it's asleep) from the house network or the VPN.</p>
+      </details>
+      </div>
+      <p class="muted" id="ai-price-note"></p>
+      </div>
+      <div class="row"><button type="submit" class="primary">Save settings</button></div>
+    </section>
+  </cave-settings>
+  </form>
   <wa-toast id="toasts" placement="bottom-center"></wa-toast>
   <script src="app.js"></script>
 </body>

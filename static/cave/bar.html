@@ -1,0 +1,42 @@
+<!--
+  The Cougar Cave ecosystem bar. Paste it as the first child of <wa-page> and fill in:
+    {CAVE}       where this app serves the cave/ folder, e.g. /static/cave
+    {APP_HOME}   the app's home URL, e.g. /
+    {APP_ICON}   one of icons/*.svg, e.g. flask
+    {APP_NAME}   e.g. Lab
+  In the app switcher, give the current app type="checkbox" checked and drop its href.
+  The app's own script shows [data-cave-signed-in] or [data-cave-signed-out] (both start hidden), unhides
+  [data-cave-owner] for the owner, and sets the account menu's data (cave-ui.js):
+    document.querySelector('cave-account').data = { name, email, items: [{ label, icon, href | value }],
+      signOut: [{ label: 'Sign out', value: 'signout' }] }
+  and listens for its cave-account-select event. On the sign-in page, leave [data-cave-signed-out] hidden:
+  the card already has the button.
+-->
+<header slot="header" class="cave-bar cave-brand wa-dark wa-cluster wa-gap-s wa-align-items-center">
+  <a class="cave-home wa-cluster wa-gap-2xs wa-align-items-center" href="https://cougarcave.dev">
+    <img src="{CAVE}/icons/cougar.svg" alt="" width="24" height="24"><span>Cougar Cave</span>
+  </a>
+  <wa-divider orientation="vertical"></wa-divider>
+  <a class="cave-app wa-cluster wa-gap-2xs wa-align-items-center" href="{APP_HOME}">
+    <wa-icon src="{CAVE}/icons/{APP_ICON}.svg"></wa-icon><span>{APP_NAME}</span>
+  </a>
+  <wa-dropdown>
+    <wa-button slot="trigger" appearance="plain" size="s">
+      <wa-icon src="{CAVE}/icons/layout-grid.svg" label="Cougar Cave apps"></wa-icon>
+    </wa-button>
+    <wa-dropdown-item href="https://cougarcave.dev"><wa-icon slot="icon" src="{CAVE}/icons/home.svg"></wa-icon>Hub</wa-dropdown-item>
+    <wa-dropdown-item href="https://lab.cougarcave.dev"><wa-icon slot="icon" src="{CAVE}/icons/flask.svg"></wa-icon>Lab</wa-dropdown-item>
+    <wa-dropdown-item href="https://music.cougarcave.dev"><wa-icon slot="icon" src="{CAVE}/icons/music.svg"></wa-icon>Player</wa-dropdown-item>
+    <wa-dropdown-item href="https://deals.cougarcave.dev"><wa-icon slot="icon" src="{CAVE}/icons/tag.svg"></wa-icon>Deal Hunter</wa-dropdown-item>
+    <wa-dropdown-item href="https://raidroster.cougarcave.dev"><wa-icon slot="icon" src="{CAVE}/icons/pokeball.svg"></wa-icon>RaidRoster</wa-dropdown-item>
+    <wa-dropdown-item href="https://relay.cougarcave.dev"><wa-icon slot="icon" src="{CAVE}/icons/messages.svg"></wa-icon>Relay</wa-dropdown-item>
+    <wa-divider data-cave-owner hidden></wa-divider>
+    <wa-dropdown-item data-cave-owner hidden href="https://auth.cougarcave.dev/owner/"><wa-icon slot="icon" src="{CAVE}/icons/shield-lock.svg"></wa-icon>Owner console<wa-badge slot="details" variant="brand">Owner</wa-badge></wa-dropdown-item>
+  </wa-dropdown>
+  <div class="cave-end">
+    <cave-account data-cave-signed-in hidden></cave-account>
+    <wa-button data-cave-signed-out hidden class="cave-brand" variant="brand" size="s" href="{SIGN_IN}">
+      <img slot="start" src="{CAVE}/icons/cougar.svg" alt="" width="16" height="16">Sign in with Cougar Cave
+    </wa-button>
+  </div>
+</header>
