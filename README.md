@@ -118,6 +118,13 @@ Spending is capped:
 Prices live in `ai.py` (`MODELS`), checked 2026-10-04. A model with no known price can't be used.
 A Claude Pro/Max or ChatGPT subscription can't be used here; these need API keys.
 
+The admin's AI comes from the owner console's shared settings file (`COUGAR_AI_SETTINGS`). Its entry can pin a
+`model`, or give a `tier` and an `effort`:
+- `cheapest` (the default) is the provider's lowest-priced model in `MODELS`. `balanced` and `best` are the newest
+  Sonnet or Opus, Gemini Flash or Pro. OpenAI's models here are in neither family, so those tiers give its cheapest.
+- A pinned model wins over the tier. A model with no price turns the admin's AI off.
+- `effort` (`low`, `medium`, `high`) is sent only to models that take one; without it, requests ask for `low`.
+
 **AI review** (Finds, when AI is on) looks at the finds shown (up to 40) in one request: say anything
 specific in the dialog (or leave it blank), pick which AI, and choose whether to hide the bad deals (to
 Dismissed; Undo brings them back; starred finds are never hidden). Each find gets a verdict and reason, and
