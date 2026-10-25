@@ -25,7 +25,7 @@
     <div class="panel">
       <p>Everything the Deal Hunter page does is available to your own apps and scripts as JSON.</p>
       <ul>
-        <li><b>Address:</b> the API port on the machine running Deal Hunter, e.g. <code>http://192.168.86.82:8781</code>.
+        <li><b>Address:</b> the API port on the machine running Deal Hunter, e.g. <code>http://THIS-SERVER:8781</code>.
           It's meant for your home network or VPN, not the internet.</li>
         <li><b>Sign in:</b> <code>POST /api/auth/login</code> with <code>{"email", "password", "device_name": "Pixel 10"}</code>
           (no header needed) returns <code>{"token": "dht_…", "user": {"id", "name", "email", "role"}}</code>. Send the token with
@@ -38,12 +38,12 @@
         <li>Errors come back as <code>{"error": "..."}</code> with an HTTP status (401 = missing or wrong key).</li>
         <li>The API port can't read or change settings or keys; do that on the Deal Hunter page.</li>
       </ul>
-      <pre>curl -H "Authorization: Bearer YOUR_KEY" http://192.168.86.82:8781/api/listings?status=new
+      <pre>curl -H "Authorization: Bearer YOUR_KEY" http://THIS-SERVER:8781/api/listings?status=new
 
 curl -X POST -H "Authorization: Bearer YOUR_KEY" -H "Content-Type: application/json" \
   -d '{"name": "RTX 3060 12GB", "query": "rtx 3060 12gb -8gb", "max_price": 250}' \
-  http://192.168.86.82:8781/api/watches</pre>
-      <p class="muted">PowerShell: <code>Invoke-RestMethod -Headers @{Authorization="Bearer YOUR_KEY"} http://192.168.86.82:8781/api/state</code></p>
+  http://THIS-SERVER:8781/api/watches</pre>
+      <p class="muted">PowerShell: <code>Invoke-RestMethod -Headers @{Authorization="Bearer YOUR_KEY"} http://THIS-SERVER:8781/api/state</code></p>
     </div>
 
     <div class="panel">

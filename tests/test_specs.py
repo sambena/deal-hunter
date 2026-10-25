@@ -24,8 +24,8 @@ gpu: NVIDIA GeForce RTX 4070 SUPER
 gpu: Microsoft Basic Display Adapter
 disk: 238GB Inland NVMe SSD 256GB SSD"""
 
-# Printed by specs.LINUX_COMMAND on the Frigate box (a Dell OptiPlex).
-FRIGATE = """cpu: Intel(R) Core(TM) i5-7500 CPU @ 3.40GHz
+# Printed by specs.LINUX_COMMAND on a Dell OptiPlex.
+OPTIPLEX = """cpu: Intel(R) Core(TM) i5-7500 CPU @ 3.40GHz
 board: Dell Inc. 0XHGV1
 system: Dell Inc. OptiPlex 7050
 ram: 16GB total
@@ -49,7 +49,7 @@ class ParseTest(unittest.TestCase):
         ])
 
     def test_linux_output_with_an_oem_board(self):
-        self.assertEqual(parts(FRIGATE), [
+        self.assertEqual(parts(OPTIPLEX), [
             ("cpu", "Intel Core i5-7500"),
             ("motherboard", "Dell OptiPlex 7050 (board 0XHGV1)"),
             ("ram", "16GB"),
@@ -79,7 +79,7 @@ class ParseTest(unittest.TestCase):
     def test_platform_is_found_from_raw_cpu_names(self):
         # The raw name glued "cpu" onto the suffix and read the i7-7800X as LGA1151.
         self.assertEqual(hardware.cpu_socket("Intel(R) Core(TM) i7-7800X CPU @ 3.50GHz"), "LGA2066")
-        self.assertEqual(hardware.detect_platform(specs.parse_report(FRIGATE))[0], "LGA1151")
+        self.assertEqual(hardware.detect_platform(specs.parse_report(OPTIPLEX))[0], "LGA1151")
 
     def test_merge_keeps_other_categories(self):
         old = [{"category": "cpu", "model": "old"}, {"category": "network", "model": "Lite-On network adapter"}]
@@ -98,7 +98,7 @@ class EndpointTest(unittest.TestCase):
         db.DB_PATH = Path(self.tmp.name) / "t.db"
         import server
         self.server = server
-        self.mid = db.save_machine({"name": "Rosie", "kind": "pc",
+        self.mid = db.save_machine({"name": "Study", "kind": "pc",
                                     "parts": [{"category": "network", "model": "Lite-On network adapter"}]})
 
     def tearDown(self):

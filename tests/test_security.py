@@ -31,7 +31,7 @@ class NetguardTest(unittest.TestCase):
                 netguard.check(url, local_ok=True)
 
     def test_private_addresses_blocked_unless_local_ok(self):
-        for ip in ("127.0.0.1", "192.168.86.82", "10.0.0.5", "169.254.169.254", "::1", "100.64.0.1"):
+        for ip in ("127.0.0.1", "192.168.1.20", "10.0.0.5", "169.254.169.254", "::1", "100.64.0.1"):
             with mock.patch.object(socket, "getaddrinfo", resolves_to(ip)):
                 with self.assertRaises(netguard.BlockedURL, msg=ip):
                     netguard.check("http://sneaky.example.com:5000/x", local_ok=False)
@@ -43,7 +43,7 @@ class NetguardTest(unittest.TestCase):
         netguard.check_discord("https://discord.com/api/webhooks/1/abc")
         for url in ("http://discord.com/api/webhooks/1/abc", "https://evil.com/api/webhooks/1",
                     "https://discord.com.evil.com/api/webhooks/1", "https://discord.com/other",
-                    "http://192.168.86.82:5000/api/restart"):
+                    "http://192.168.1.20:5000/api/restart"):
             with self.assertRaises(netguard.BlockedURL, msg=url):
                 netguard.check_discord(url)
 
@@ -82,17 +82,17 @@ class DbTest(unittest.TestCase):
 
 class MemberAddressTest(DbTest):
     def test_members_cant_save_private_addresses(self):
-        with db.as_user(self.sis), mock.patch.object(socket, "getaddrinfo", resolves_to("192.168.86.82")):
+        with db.as_user(self.sis), mock.patch.object(socket, "getaddrinfo", resolves_to("192.168.1.20")):
             for key in ("ha_url", "ollama_url"):
                 with self.assertRaises(self.s.HTTPError) as cm:
-                    self.s.put_settings({key: "http://frigate.lan:5000/api/restart?"}, {})
+                    self.s.put_settings({key: "http://nas.lan:5000/api/restart?"}, {})
                 self.assertEqual(cm.exception.status, 400)
             with self.assertRaises(self.s.HTTPError):
-                self.s.put_settings({"discord_webhook": "http://192.168.86.82:5000/api/restart"}, {})
+                self.s.put_settings({"discord_webhook": "http://192.168.1.20:5000/api/restart"}, {})
             # Saving the form with the unchanged default Ollama address still works.
             self.s.put_settings({"ollama_url": db.DEFAULT_SETTINGS["ollama_url"], "zip_code": "84057"}, {})
-        with mock.patch.object(socket, "getaddrinfo", resolves_to("192.168.86.131")):
-            self.s.put_settings({"ha_url": "http://192.168.86.131"}, {})  # the admin's home network is fine
+        with mock.patch.object(socket, "getaddrinfo", resolves_to("192.168.1.30")):
+            self.s.put_settings({"ha_url": "http://192.168.1.30"}, {})  # the admin's home network is fine
 
     def test_members_own_ollama_cant_reach_the_home_network(self):
         with db.as_user(self.sis):

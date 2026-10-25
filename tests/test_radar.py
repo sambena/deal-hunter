@@ -24,7 +24,7 @@ class RadarTest(unittest.TestCase):
         self.pc = db.save_machine({"name": "Dexter", "kind": "pc",
                                    "parts": [{"category": "cpu", "model": "AMD Ryzen 7 3700X"},
                                              {"category": "motherboard", "model": "MSI MPG B550 GAMING PLUS"}]})
-        self.empty_pc = db.save_machine({"name": "Rosie", "kind": "pc", "parts": []})
+        self.empty_pc = db.save_machine({"name": "Study", "kind": "pc", "parts": []})
         self.tv = db.save_machine({"name": "Living room TV", "kind": "tv", "model": "LG OLED65B2AUA"})
         self.plug = db.save_machine({"name": "Microwave plug", "kind": "smart home", "model": "Third Reality 3RSP02064Z"})
 
@@ -40,7 +40,7 @@ class RadarTest(unittest.TestCase):
         self.assertEqual([i["category"] for i in pc_items], ["cpu", "ram"])  # best CPU + one RAM kit
         self.assertEqual(pc_items[0]["query"], "5800x3d")
         why = {s["name"]: s["why"] for s in res["skipped"]}
-        self.assertIn("Get specs", why["Rosie"])
+        self.assertIn("Get specs", why["Study"])
         self.assertIn("AI", why["Living room TV"])
         self.assertNotIn("Microwave plug", why)  # smart-home gadgets aren't radar material
         self.assertEqual(res["gear_count"], 1)
@@ -66,11 +66,11 @@ class RadarTest(unittest.TestCase):
 
     def test_no_watch_without_a_search(self):
         # LGA1700 boards take DDR4 or DDR5, so the rules can't name a RAM kit.
-        db.save_machine({"name": "Rosie", "kind": "pc", "parts": [{"category": "cpu", "model": "Intel Core i7-12700"}]},
+        db.save_machine({"name": "Study", "kind": "pc", "parts": [{"category": "cpu", "model": "Intel Core i7-12700"}]},
                         self.empty_pc)
         res = self.server.deal_radar({}, {})
-        rosie = [i for i in res["items"] if i["machine_id"] == self.empty_pc]
-        self.assertEqual([i["category"] for i in rosie], ["cpu"])
+        study = [i for i in res["items"] if i["machine_id"] == self.empty_pc]
+        self.assertEqual([i["category"] for i in study], ["cpu"])
         self.assertTrue(all(i["query"] for i in res["items"]))
 
     def test_already_watched_is_flagged(self):

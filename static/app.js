@@ -1531,8 +1531,8 @@ function fillSettings() {
   showCheckMode();
   const port = state.api_port;
   $("#api-status").innerHTML = (s.api_key ? "An API key is set. " : "No API key yet, so the API is off. ") +
-    (port ? `Apps use <code>http://${esc(location.hostname === "localhost" ? "localhost" : "THIS-SERVER")}:${port}</code>
-      (for this install, <code>http://192.168.86.82:${port}</code> on your network).` : "The API port isn't switched on in this install.");
+    (port ? `Apps use <code>http://${esc(location.hostname)}:${port}</code>
+      (this server's address as you reached it, on the API port).` : "The API port isn't switched on in this install.");
   $("#api-key-new").textContent = s.api_key ? "Replace API key" : "Create API key";
   $("#api-key-box").hidden = true;
 }
