@@ -70,12 +70,33 @@ def require_admin() -> None:
 
 # ---- API --------------------------------------------------------------------
 
+# The admin's AI is managed in the owner console (ai.managed()), so the admin can't set it here.
+ADMIN_MANAGED_AI = set(ai.AI_KEYS) | {"ai_monthly_limit"}
+
+
+def public_settings() -> dict:
+    """Settings for the browser. For the admin, the AI fields show what the owner console set (a key as true or
+    false, never the key itself), with "ai_managed" saying so."""
+    s = db.public_settings(admin=is_admin())
+    if is_admin():
+        m = ai.managed()
+        on = "off" not in m
+        s.update({p["key"]: on and m["provider"] == name for name, p in ai.PROVIDERS.items() if p["key"]})
+        s.update(ai_provider=m["provider"] if on else "off", ai_monthly_limit=m["monthly_usd"] if on else 0.0,
+                 gemini_free_tier=False,
+                 ai_managed={"on": on, "provider": m.get("provider"), "model": m.get("model"),
+                             "monthly_usd": m.get("monthly_usd"), "reason": m.get("off", "")})
+        if on:
+            s[ai.PROVIDERS[m["provider"]]["model"]] = m["model"]
+    return s
+
+
 @route("GET", "/api/state")
 def get_state(body, params):
     return {
         "watches": db.list_watches(),
         "machines": db.list_machines(),
-        "settings": db.public_settings(admin=is_admin()),
+        "settings": public_settings(),
         "me": auth.public_user(me()),
         "api_port": API_PORT["port"],
         "ai": {**ai.catalog(), "budget": ai.budget(ai.settings_for()),
@@ -652,8 +673,9 @@ def draft_watches(body, params):
 
 @route("PUT", "/api/settings")
 def put_settings(body, params):
-    # Blank secret fields in the form mean "keep the current value".
-    changes = {k: v for k, v in body.items() if not (k in db.SECRET_KEYS and v in ("", None, True))}
+    # Blank secret fields in the form mean "keep the current value". The admin's AI is the owner console's.
+    changes = {k: v for k, v in body.items() if not (k in db.SECRET_KEYS and v in ("", None, True))
+               and not (is_admin() and k in ADMIN_MANAGED_AI)}
     if "check_times" in changes:
         changes["check_times"] = poller.clean_times(changes["check_times"])
     if "check_mode" in changes and changes["check_mode"] not in ("interval", "times"):
@@ -673,7 +695,7 @@ def put_settings(body, params):
     except netguard.BlockedURL as e:
         raise HTTPError(400, str(e)) from e
     db.update_settings(changes, shared_allowed=is_admin())  # members can only change their own settings
-    return db.public_settings(admin=is_admin())
+    return public_settings()
 
 
 @route("POST", "/api/api-key")

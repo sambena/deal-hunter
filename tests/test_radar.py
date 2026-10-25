@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import ai  # noqa: E402
 import db  # noqa: E402
+import shared_ai_file  # noqa: E402
 
 
 class RadarTest(unittest.TestCase):
@@ -45,7 +46,8 @@ class RadarTest(unittest.TestCase):
         self.assertEqual(res["gear_count"], 1)
 
     def test_one_ai_request_covers_the_gear(self):
-        settings = {**db.get_settings(), "ai_provider": "gemini", "gemini_api_key": "k", "gemini_free_tier": True}
+        shared_ai_file.use(self, provider="gemini", key="k", model="gemini-3.5-flash-lite")
+        settings = db.get_settings()
         answer = json.dumps({"suggestions": [
             {"device_id": self.tv, "name": "LG C4 65\"", "category": "tv", "query": "oled65c4", "exclude": [],
              "max_price": 1300, "reason": "brighter panel, 144 Hz"},

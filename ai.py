@@ -6,9 +6,11 @@ Every paid request goes through one gate:
   2. refuse if the worst case would push this month's spend past the limit,
   3. call the provider and record what it actually billed.
 
-Whose AI: the admin uses their own settings. Other people either use their own key ("own") or the
-admin's AI ("shared"), within limits the admin sets per person: requests a day, and dollars a month of
-paid AI. The admin's monthly limit covers everything run on the admin's key, by anyone.
+Whose AI: the admin's AI (provider, model, key and monthly limit) comes only from the owner console's shared
+settings file (shared_ai.py), never from the database or the environment; with no file or no entry it is off.
+Other people either use their own key ("own") or the admin's AI ("shared"), within limits the admin sets per
+person: requests a day, and dollars a month of paid AI. The admin's monthly limit covers everything run on the
+admin's key, by anyone.
 
 Providers:
   claude  Anthropic API, needs `pip install anthropic` and an API key
@@ -28,6 +30,7 @@ import urllib.request
 
 import db
 import netguard
+import shared_ai
 
 
 class AIError(Exception):
@@ -39,7 +42,10 @@ class AIError(Exception):
 MODELS = [
     {"provider": "claude", "id": "claude-opus-5-5", "label": "Claude Opus 5.5 (best)", "in": 4.00, "out": 20.00, "effort": True},
     {"provider": "claude", "id": "claude-sonnet-5-5", "label": "Claude Sonnet 5.5", "in": 2.00, "out": 10.00, "effort": True},
-    {"provider": "claude", "id": "claude-haiku-4-5", "label": "Claude Haiku 4.5 (cheapest)", "in": 1.00, "out": 5.00, "effort": False},
+    # Checked 2026-10-25 on Anthropic's pricing page: a prompt over 100,000 tokens pays the higher row.
+    {"provider": "claude", "id": "claude-haiku-5-5", "label": "Claude Haiku 5.5 (cheapest)", "in": 0.10, "out": 0.50, "effort": True,
+     "long": {"over": 100_000, "in": 0.50, "out": 2.50}},
+    {"provider": "claude", "id": "claude-haiku-4-5", "label": "Claude Haiku 4.5", "in": 1.00, "out": 5.00, "effort": False},
     {"provider": "claude", "id": "claude-opus-5", "label": "Claude Opus 5 (older)", "in": 5.00, "out": 25.00, "effort": True},
     {"provider": "openai", "id": "gpt-6-astra", "label": "GPT-6 Astra (best)", "in": 10.00, "out": 50.00, "effort": True},
     {"provider": "openai", "id": "gpt-6.1-sol", "label": "GPT-6.1 Sol", "in": 2.00, "out": 10.00, "effort": True},
@@ -77,6 +83,37 @@ REVIEW_MAX = 40
 
 AI_KEYS = ("ai_provider", "ollama_url", "ollama_model", "anthropic_api_key", "claude_model", "openai_api_key",
            "openai_model", "gemini_api_key", "gemini_model", "gemini_free_tier")
+# The admin's model when the owner console doesn't name one: each provider's cheapest.
+MANAGED_DEFAULT_MODELS = {"claude": "claude-haiku-5-5", "openai": "gpt-6-luna", "gemini": "gemini-3.5-flash-lite"}
+MANAGED_OFF = "The admin's AI is off in the owner console."
+
+
+def managed() -> dict:
+    """The admin's AI from the owner console's shared settings file: {"provider", "model", "monthly_usd", "key"},
+    or {"off": reason}. A model Deal Hunter has no price for is off too, so its cost can always be capped."""
+    m = shared_ai.load()
+    if m is None:
+        return {"off": MANAGED_OFF}
+    model = m["model"] or MANAGED_DEFAULT_MODELS[m["provider"]]
+    if not any(x["provider"] == m["provider"] and x["id"] == model for x in MODELS):
+        return {"off": f"The owner console picked a model Deal Hunter has no price for ({model})."}
+    return {**m, "model": model}
+
+
+def _admin_ai(admin_settings: dict) -> tuple[dict, dict]:
+    """The admin's AI settings (AI_KEYS and the monthly limit), from the shared file only: every key the database
+    holds is blanked, and there is no free tier, so nothing but the file decides what the admin's AI is."""
+    m = managed()
+    out = {k: admin_settings.get(k) for k in AI_KEYS}
+    out.update({p["key"]: "" for p in PROVIDERS.values() if p["key"]})
+    out["gemini_free_tier"] = False
+    if "off" in m:
+        out.update(ai_provider="off", ai_monthly_limit=0.0)
+    else:
+        p = PROVIDERS[m["provider"]]
+        out.update({"ai_provider": m["provider"], p["model"]: m["model"], p["key"]: m["key"],
+                    "ai_monthly_limit": m["monthly_usd"]})
+    return out, m
 
 
 def settings_for(user_id: int | None = None) -> dict:
@@ -84,17 +121,25 @@ def settings_for(user_id: int | None = None) -> dict:
     uid = user_id if user_id is not None else db.current_user_id()
     s = db.get_settings(uid)
     user = db.query("SELECT role, ai_shared, ai_allowance, ai_daily_cap FROM users WHERE id = ?", (uid,))[0]
-    if user["role"] == "admin" or s.get("ai_source") == "own":
-        # "trusted": the addresses in these settings are the admin's, so they may be on the home network.
-        s["_ai"] = {"source": "own", "user_id": uid, "paid_by": uid, "trusted": user["role"] == "admin"}
+    if user["role"] == "admin":
+        # The admin's AI is managed in the owner console. "trusted": the addresses are the admin's.
+        admin_ai, m = _admin_ai(s)
+        s.update(admin_ai)
+        s["_ai"] = {"source": "own", "user_id": uid, "paid_by": uid, "trusted": True, "managed": True}
+        if "off" in m:
+            s["_ai"]["blocked"] = m["off"]
+        return s
+    if s.get("ai_source") == "own":
+        s["_ai"] = {"source": "own", "user_id": uid, "paid_by": uid, "trusted": False}
         return s
     admin_id = db.admin_id()
-    admin = db.get_settings(admin_id)
-    s.update({k: admin[k] for k in AI_KEYS})
+    admin_ai, _ = _admin_ai(db.get_settings(admin_id))
+    s.update({k: admin_ai[k] for k in AI_KEYS})
     s["ai_monthly_limit"] = float(user["ai_allowance"] or 0)
     owner = db.query("SELECT name FROM users WHERE id = ?", (admin_id,))[0]["name"] or "the admin"
     s["_ai"] = {"source": "shared", "user_id": uid, "paid_by": admin_id, "owner": owner, "trusted": True,
-                "daily_cap": int(user["ai_daily_cap"] or 0), "pool_limit": float(admin.get("ai_monthly_limit") or 0)}
+                "managed": True, "daily_cap": int(user["ai_daily_cap"] or 0),
+                "pool_limit": float(admin_ai["ai_monthly_limit"] or 0)}
     if not user["ai_shared"]:
         s["ai_provider"] = "off"
         s["_ai"]["blocked"] = f"{owner} hasn't shared their AI with you. Use your own key in Settings > AI."
@@ -107,13 +152,14 @@ def choices(settings: dict) -> list[dict]:
     """The AIs a person can pick for one request: every model of each provider they have a key for. On the
     admin's shared AI, only the model the admin chose (the admin decides what friends spend on)."""
     sc = _scope(settings)
-    if sc["source"] == "shared":
+    if sc.get("managed"):
+        # The admin's AI, shared or not: only the model the owner console chose.
         try:
             info = model_info(settings)
         except AIError:
             return []
-        return [{"provider": info["provider"], "model": info["id"], "label": f"{info['label']} ({sc['owner']}'s)",
-                 "free": info["free"], "current": True}]
+        label = f"{info['label']} ({sc['owner']}'s)" if sc["source"] == "shared" else info["label"]
+        return [{"provider": info["provider"], "model": info["id"], "label": label, "free": info["free"], "current": True}]
     out = []
     current = (settings.get("ai_provider"), settings.get(PROVIDERS.get(settings.get("ai_provider"), {}).get("model", "")))
     for provider, p in PROVIDERS.items():
@@ -123,7 +169,7 @@ def choices(settings: dict) -> list[dict]:
                             "label": f"Ollama {settings['ollama_model']} (free)",
                             "current": current == ("ollama", settings["ollama_model"])})
             continue
-        if not (settings.get(p["key"]) or (provider == "claude" and os.environ.get("ANTHROPIC_API_KEY"))):
+        if not (settings.get(p["key"]) or (provider == "claude" and _env_key_ok(settings))):
             continue
         for m in MODELS:
             if m["provider"] == provider:
@@ -140,6 +186,12 @@ def with_choice(settings: dict, provider: str | None, model: str | None) -> dict
     if not any(c["provider"] == provider and c["model"] == model for c in choices(settings)):
         raise AIError("That AI isn't available to you; pick one from the list")
     return {**settings, "ai_provider": provider, PROVIDERS[provider]["model"]: model}
+
+
+def _env_key_ok(settings: dict) -> bool:
+    """Whether Claude may fall back to the ANTHROPIC_API_KEY environment variable: never for the admin's AI, whose
+    only key is the one in the owner console's file."""
+    return bool(os.environ.get("ANTHROPIC_API_KEY")) and not _scope(settings).get("managed")
 
 
 def _scope(settings: dict) -> dict:
@@ -184,6 +236,9 @@ def _price_today(m: dict) -> dict:
 
 
 def cost(info: dict, tokens_in: int, tokens_out: int) -> float:
+    long = info.get("long")
+    if long and tokens_in > long["over"]:  # the whole request pays the long-prompt price
+        info = {**info, "in": long["in"], "out": long["out"]}
     return (tokens_in * info["in"] + tokens_out * info["out"]) / 1_000_000
 
 
@@ -236,7 +291,7 @@ def estimate(settings: dict, action: str, prompt: str, schema: dict) -> dict:
     shared = sc["source"] == "shared"
     allowed, reason = True, ""
     key_setting = PROVIDERS[info["provider"]]["key"]
-    env_key = info["provider"] == "claude" and os.environ.get("ANTHROPIC_API_KEY")
+    env_key = info["provider"] == "claude" and _env_key_ok(settings)
     if key_setting and not (settings.get(key_setting) or env_key):
         allowed = False
         reason = (f"{sc['owner']}'s AI has no {PROVIDERS[info['provider']]['label']} key yet." if shared else
@@ -315,6 +370,8 @@ def _claude(settings: dict, info: dict, prompt: str, schema: dict, max_out: int)
     except ImportError as e:
         raise AIError("Claude mode needs the SDK: run  pip install anthropic") from e
     key = settings.get("anthropic_api_key") or None  # None -> SDK reads ANTHROPIC_API_KEY
+    if key is None and not _env_key_ok(settings):
+        raise AIError("Claude has no API key")
     client = anthropic.Anthropic(api_key=key, timeout=180)
     output_config = {"format": {"type": "json_schema", "schema": schema}}
     if info["effort"]:

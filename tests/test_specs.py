@@ -10,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import ai  # noqa: E402
 import db  # noqa: E402
+import shared_ai_file  # noqa: E402
 import hardware  # noqa: E402
 import specs  # noqa: E402
 
@@ -118,7 +119,8 @@ class EndpointTest(unittest.TestCase):
         self.assertEqual((cm.exception.status, str(cm.exception)), (422, "need_ai"))
 
     def test_ai_reads_other_text_through_the_budget_gate(self):
-        settings = {**db.get_settings(), "ai_provider": "gemini", "gemini_api_key": "k", "gemini_free_tier": True}
+        shared_ai_file.use(self, provider="gemini", key="k", model="gemini-3.5-flash-lite")
+        settings = db.get_settings()
         answer = '{"parts": [{"category": "cpu", "model": "Intel Core i7-12700"}, ' \
                  '{"category": "gpu", "model": "NVIDIA GeForce RTX 3060 12GB"}]}'
         with mock.patch.object(db, "get_settings", lambda *a: settings), \
