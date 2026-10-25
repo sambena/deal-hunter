@@ -1,29 +1,40 @@
+/* Token bridge: every colour comes from the shared Cougar Cave theme (cave/cave-theme.css, Web Awesome tokens), so
+   Deal Hunter follows whichever theme the viewer picks (cave/cave-theme.js). Deal Hunter's accent is teal (class
+   cave-accent-teal on <html>); a focus (Tech, Cars, …) may override --accent for its own content. Only the shop tags
+   and the watch colours (app.js) keep their own. The bar, sign-in card, account menu and settings drawer are the
+   kit's (cave/cave-ui.js) and have no styles here. */
 :root {
-  --bg: #111418; --panel: #1a1f26; --panel2: #222932; --line: #2e3742;
-  --text: #e6e9ee; --muted: #8b95a3; --accent: #4ea1ff; --good: #3ecf8e; --great: #22e07a; --warn: #ffb547; --bad: #ff6b6b;
-  color-scheme: dark;
+  --bg: var(--wa-color-surface-lowered); --panel: var(--wa-color-surface-default); --panel2: var(--wa-color-surface-raised);
+  --line: var(--wa-color-surface-border); --text: var(--wa-color-text-normal); --muted: var(--wa-color-text-quiet);
+  --accent: var(--wa-color-brand); --on-accent: var(--wa-color-brand-on);
+  --good: var(--wa-color-success-60); --great: var(--wa-color-success-70); --on-great: var(--wa-color-success-05);
+  --warn: var(--wa-color-warning-70); --bad: var(--wa-color-danger-60); --on-bad: var(--wa-color-danger-on);
+  --photo: var(--wa-color-neutral-95); --shade: var(--wa-color-shadow);
 }
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 var(--wa-font-family-body); }
 [hidden] { display: none !important; }
+/* Until Web Awesome has loaded, its menus and dialogs would show as plain text; keep them out of sight. */
+wa-dropdown:not(:defined), wa-dialog:not(:defined), wa-toast:not(:defined) { display: none; }
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
 code { background: var(--panel2); padding: 1px 5px; border-radius: 4px; }
 
-header { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
-  padding: 10px 20px; background: var(--panel); border-bottom: 1px solid var(--line); }
-h1 { font-size: 18px; margin: 0; }
-nav { display: flex; gap: 4px; }
-nav button { background: none; border: none; color: var(--muted); padding: 8px 12px; border-radius: 6px; }
-nav button.active { background: var(--panel2); color: var(--text); }
-.status { margin-left: auto; color: var(--muted); font-size: 12px; }
-.badge { background: var(--accent); color: #fff; border-radius: 10px; padding: 0 7px; font-size: 11px; }
+/* Section links under the Cougar Cave bar: the active one in the app's accent, underlined. */
+.dh-nav { max-width: 1300px; margin: 0 auto; padding: var(--wa-space-2xs) 20px; row-gap: var(--wa-space-2xs); }
+.dh-nav a { color: var(--muted); padding: 8px 2px; border-bottom: 2px solid transparent; text-decoration: none; }
+.dh-nav a:hover { color: var(--text); text-decoration: none; }
+.dh-nav a.active { color: var(--accent); border-bottom-color: var(--accent); }
+.dh-nav select { max-width: 13em; }
+.status { color: var(--muted); font-size: 12px; }
+.badge { background: var(--accent); color: var(--on-accent); border-radius: 10px; padding: 0 7px; font-size: 11px; }
 .pill { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; border: 1px solid var(--line);
   color: var(--muted); border-radius: 10px; padding: 1px 7px; vertical-align: middle; }
 
 main { max-width: 1300px; margin: 0 auto; padding: 20px; }
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
 .panel h2 { font-size: 15px; margin: 0 0 12px; }
+.panel h3 { font-size: 14px; margin: 14px 0 6px; }  /* Web Awesome's heading scale is larger */
 .muted { color: var(--muted); }
 .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .row input { flex: 1; min-width: 200px; }
@@ -36,24 +47,26 @@ label.toggle, .checks label { flex-direction: row; align-items: center; color: v
 
 input, select, textarea, button { font: inherit; color: var(--text); }
 input, select, textarea { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 7px 9px; }
-input[type=checkbox] { width: auto; margin-right: 6px; }
+input[type=checkbox], input[type=radio] { width: auto; margin-right: 6px; padding: 0; }
 textarea { resize: vertical; width: 100%; }
 button { background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; cursor: pointer; }
 button:hover { border-color: var(--muted); }
-button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 button.danger { color: var(--bad); }
 button.small { padding: 3px 8px; font-size: 12px; }
 button:disabled { opacity: .5; cursor: wait; }
 .help { margin: 0 0 12px; color: var(--muted); }
 .help summary { cursor: pointer; }
 .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+/* Web Awesome's native styles make form controls full width; in toolbars and the nav row they size to fit. */
+.toolbar select, .dh-nav select, .row select { width: auto; }
 .sticky-save { position: sticky; bottom: 0; background: var(--bg); padding: 12px 0; }
 
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; }
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
 .card.new { border-color: var(--accent); }
 .card.dismissed { opacity: .5; }
-.card .img { position: relative; height: 150px; background: #fff center/contain no-repeat; }
+.card .img { position: relative; height: 150px; background: var(--photo) center/contain no-repeat; }
 .card .img.none { background: var(--panel2); display: grid; place-items: center; color: var(--muted); }
 .card .body { padding: 10px 12px; flex: 1; display: flex; flex-direction: column; gap: 6px; }
 .card .title { font-weight: 600; }
@@ -63,7 +76,7 @@ button:disabled { opacity: .5; cursor: wait; }
 .deal { font-size: 11px; font-weight: 700; border-radius: 4px; padding: 2px 6px; margin-left: 6px; vertical-align: middle; }
 .deal.good { background: color-mix(in srgb, var(--good) 20%, transparent); color: var(--good); }
 /* The bigger the discount, the stronger the badge: "great" is solid green, "good" a light tint. */
-.deal.great { background: var(--great); color: #06210f; }
+.deal.great { background: var(--great); color: var(--on-great); }
 .ai-note { background: var(--panel2); border-radius: 6px; padding: 6px 8px; font-size: 12px; }
 .empty { color: var(--muted); padding: 40px; text-align: center; grid-column: 1 / -1; }
 
@@ -77,16 +90,15 @@ th { color: var(--muted); font-weight: 500; font-size: 12px; }
 .suggestion { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
 .suggestion .max { width: 100px; }
 
-#toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--panel2);
-  border: 1px solid var(--line); padding: 10px 16px; border-radius: 8px; z-index: 10; max-width: 90vw; }
-#toast.err { border-color: var(--bad); color: var(--bad); }
+#ask-text { white-space: pre-line; margin-top: 0; }
+#ask-field input { width: 100%; }
 
 .spend { margin: 8px 0 12px; }
-.meter { height: 8px; border-radius: 4px; background: var(--line, #333); overflow: hidden; margin: 6px 0; max-width: 420px; }
+.meter { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; margin: 6px 0; max-width: 420px; }
 table.people input.ai-cap, table.people input.ai-allowance { width: 4.5em; }
 .card .watch-link { color: inherit; text-decoration: none; border-bottom: 1px dotted currentColor; }
 .card .watch-link:hover { color: var(--accent); }
-.meter span { display: block; height: 100%; background: var(--accent, #4a9eff); }
+.meter span { display: block; height: 100%; background: var(--accent); }
 .guide { margin: 8px 0; }
 .guide ol { margin: 6px 0 4px 20px; padding: 0; line-height: 1.5; }
 .guide a { color: var(--accent); }
@@ -104,11 +116,6 @@ table.radar input[data-f=max] { width: 6em; }
 #radar-box h3 { margin: 14px 0 4px; }
 .custom-row { display: flex; gap: 6px; margin: 4px 0; }
 .custom-row input { flex: 1; min-width: 0; }
-#auth-screen { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: flex-start; justify-content: center; padding: 10vh 16px 16px; z-index: 50; overflow: auto; }
-#auth-form { width: 100%; max-width: 420px; }
-#auth-form label { display: block; margin: 8px 0; }
-#auth-form input { width: 100%; }
-#auth-error { color: var(--bad); min-height: 1.2em; }
 .device { border-top: 1px solid var(--line); padding: 6px 0; }
 table.people input.limit { width: 4.5em; }
 table.people td { vertical-align: middle; }
@@ -126,17 +133,17 @@ table.people td { vertical-align: middle; }
 input[type=color] { width: 44px; height: 30px; padding: 2px; }
 .row input[type=color], .row input[type=checkbox] { flex: none; min-width: 0; }
 .src-tag { position: absolute; top: 6px; left: 6px; padding: 1px 6px; border-radius: 4px; font-size: 11px; font-weight: 700;
-  line-height: 16px; box-shadow: 0 1px 2px rgba(0, 0, 0, .35); pointer-events: none; }
+  line-height: 16px; box-shadow: var(--wa-shadow-s); pointer-events: none; }
 .machine:not([data-kind="vehicle"]) .vehicle-only { display: none; }
 .recalls-box { margin-top: 10px; display: flex; flex-direction: column; gap: 10px; }
 .recall { border-left: 3px solid var(--warn); padding: 4px 10px; display: flex; flex-direction: column; gap: 3px; }
 .recall.park { border-left-color: var(--bad); }
-.title-flag { color: #fff; background: var(--bad); border-radius: 4px; padding: 0 6px; font-weight: 600; font-size: 12px; }
+.title-flag { color: var(--on-bad); background: var(--bad); border-radius: 4px; padding: 0 6px; font-weight: 600; font-size: 12px; }
 .vehicle-facts { display: flex; gap: 10px; flex-wrap: wrap; font-size: 13px; }
-.vehicle-facts .title-flag { color: #fff; background: var(--bad); border-radius: 4px; padding: 0 6px; font-weight: 600; }
+.vehicle-facts .title-flag { color: var(--on-bad); background: var(--bad); border-radius: 4px; padding: 0 6px; font-weight: 600; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .chip { border-radius: 999px; padding: 3px 10px; font-size: 13px; }
-.chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.chip.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .kind-head { margin: 18px 2px 8px; font-size: 15px; color: var(--muted); }
 .prices svg { width: 100%; max-width: 560px; height: auto; display: block; }
 .prices .pc-med { fill: none; stroke: var(--accent); stroke-width: 2; }
@@ -145,7 +152,7 @@ input[type=color] { width: 44px; height: 30px; padding: 2px; }
 .prices .pc-lab { fill: var(--muted); font-size: 11px; }
 dialog#review-dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 12px;
   width: min(560px, calc(100vw - 32px)); padding: 18px; }
-dialog#review-dialog::backdrop { background: rgba(0, 0, 0, .55); }
+dialog#review-dialog::backdrop { background: var(--wa-color-overlay-modal); }
 #review-form { display: flex; flex-direction: column; gap: 12px; }
 #review-form h2 { margin: 0; }
 #review-tweaks { margin-bottom: 12px; }

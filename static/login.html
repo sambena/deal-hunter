@@ -1,30 +1,35 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="wa-dark cave-accent-teal" data-cave-original="slate">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
-  <title>Deal Hunter</title>
-  <link rel="stylesheet" href="style.css">
+  <title>Sign in · Deal Hunter · Cougar Cave</title>
+  <link rel="icon" href="/cave/icons/tag.svg" type="image/svg+xml">
+  <script src="/cave/cave-theme.js"></script>
+  <link rel="stylesheet" href="/cave/webawesome/styles/webawesome.css">
+  <link rel="stylesheet" href="/cave/cave-theme.css">
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/cave/webawesome/webawesome.loader.js" data-webawesome="/cave/webawesome"></script>
+  <script type="module" src="/cave/cave-icons.js"></script>
+  <script type="module" src="/cave/cave-ui.js"></script>
 </head>
 <body>
+<wa-page mobile-breakpoint="700px">
+  <header slot="header" class="cave-bar cave-brand wa-dark wa-cluster wa-gap-s wa-align-items-center">
+    <a class="cave-home wa-cluster wa-gap-2xs wa-align-items-center" href="https://cougarcave.dev">
+      <img src="/cave/icons/cougar.svg" alt="" width="24" height="24"><span>Cougar Cave</span>
+    </a>
+    <wa-divider orientation="vertical"></wa-divider>
+    <a class="cave-app wa-cluster wa-gap-2xs wa-align-items-center" href="/">
+      <wa-icon src="/cave/icons/tag.svg"></wa-icon><span>Deal Hunter</span>
+    </a>
+  </header>
+
   <!-- What signed-out visitors get: sign in, first-time setup, or an invite / password-reset link. Nothing else
-       of Deal Hunter is served until signed in. -->
-  <div id="auth-screen">
-  <form id="auth-form" class="panel" hidden>
-    <h2 id="title">Sign in to Deal Hunter</h2>
-    <p class="muted" id="intro"></p>
-    <label data-new>Your name <input name="name" autocomplete="name"></label>
-    <label data-email>Email <input name="email" type="email" autocomplete="username"></label>
-    <label>Password <input name="password" type="password" autocomplete="current-password" required></label>
-    <label data-new data-confirm>Password again <input name="password2" type="password" autocomplete="new-password"></label>
-    <div class="row"><button class="primary" type="submit" id="go">Sign in</button></div>
-    <div class="row" id="central-row" hidden><span class="muted">or</span>
-      <button type="button" id="central">Sign in with Cougar Cave</button></div>
-    <p id="auth-error"></p>
-    <p id="app" hidden><a id="app-link" href="#">Get the Android app</a> <span class="muted" id="app-note"></span></p>
-  </form>
-  </div>
-  <script src="login.js"></script>
+       of Deal Hunter is served until signed in. The card is the shared Cougar Cave one (cave/cave-ui.js). -->
+  <main><cave-signin></cave-signin></main>
+</wa-page>
+<script src="/login.js"></script>
 </body>
 </html>

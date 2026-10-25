@@ -333,6 +333,9 @@ class CentralLoginTest(unittest.TestCase):
         self.assertIn(b"turned off", body)
         _, status_body = None, json.loads(self.browser().get("/api/auth/status")[2])
         self.assertFalse(status_body["central"])
+        # The sign-in card is offered only what is on: no central button, the email and password form stays.
+        self.assertIsNone(status_body["signin"]["central"])
+        self.assertEqual(status_body["signin"]["password"]["label"], "Email")
         pw = self.browser()
         self.assertEqual(pw.get("/api/auth/login", "POST", {"email": "sis@example.com", "password": "sister pass 1"})[0], 200)
         self.assertEqual(self.state_of(pw), 200)  # the app's own sign-in is unchanged
@@ -351,11 +354,24 @@ class CentralLoginTest(unittest.TestCase):
         self.assertEqual(b.get("/auth/central")[0], 401)  # just a signed-out page, no redirect
         self.assertEqual(b.get("/auth/callback?code=x&state=y")[0], 401)
         self.assertFalse(json.loads(b.get("/api/auth/status")[2])["central"])
+        self.assertIsNone(json.loads(b.get("/api/auth/status")[2])["signin"]["central"])
         self.assertIsNone(oidc.CentralLogin.from_config(None, Path(self.tmp.name)))
         self.assertIsNone(oidc.CentralLogin.from_config({"enabled": "yes"}, Path(self.tmp.name)))
 
     def test_status_offers_the_button_only_when_on(self):
-        self.assertTrue(json.loads(self.browser().get("/api/auth/status")[2])["central"])
+        status = json.loads(self.browser().get("/api/auth/status")[2])
+        self.assertTrue(status["central"])
+        self.assertEqual(status["signin"]["central"], "/auth/central")  # the card's "Sign in with Cougar Cave"
+        self.assertIn("password", status["signin"])
+
+    def test_sign_in_messages_use_the_shared_card(self):
+        central.set_switch("off")
+        status, _, body, _ = self.browser().get("/auth/central")
+        self.assertEqual(status, 403)
+        self.assertIn(b'<cave-signin data-variant="warning" data-message="Cougar Cave sign-in is turned off', body)
+        self.assertIn(b'src="/login.js"', body)
+        self.assertNotIn(b"<script>", body)  # the message travels in an attribute, never inline script
+        self.assertIn(b'data-message="&lt;b&gt;"', oidc.page("<b>")[2])
 
     def test_the_api_port_has_no_central_routes(self):
         b = self.browser(self.api.server_port)
