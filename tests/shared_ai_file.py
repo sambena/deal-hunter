@@ -11,10 +11,12 @@ from unittest import mock
 _tick = [1_700_000_000_000_000_000]
 
 
-def contract(provider="anthropic", key="fake-key", monthly=5.0, model=None, ai=True, app="deals", keys=None):
+def contract(provider="anthropic", key="fake-key", monthly=5.0, model=None, ai=True, app="deals", keys=None,
+             tier=None, effort=None):
     entry = {"ai": ai, "provider": provider, "monthly_usd": monthly}
-    if model:
-        entry["model"] = model
+    for name, value in (("model", model), ("tier", tier), ("effort", effort)):
+        if value:
+            entry[name] = value
     all_keys = {"anthropic": "", "openai": "", "gemini": ""}
     all_keys[provider] = key
     all_keys.update(keys or {})

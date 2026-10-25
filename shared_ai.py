@@ -1,7 +1,8 @@
 """The admin's AI settings from the owner console's shared settings file (version 1 of its format).
 
     {"version": 1, "keys": {"anthropic": "...", "openai": "", "gemini": ""},
-     "apps": {"deals": {"ai": true, "provider": "anthropic", "monthly_usd": 1.0, "model": "optional"}}}
+     "apps": {"deals": {"ai": true, "provider": "anthropic", "monthly_usd": 1.0, "model": "optional",
+                        "tier": "cheapest | balanced | best (optional)", "effort": "low | medium | high (optional)"}}}
 
 load() returns this app's entry with only the key for its own provider, or None, which means the admin's AI is off.
 It fails closed: a missing or unreadable file, bad JSON, an unknown version, no entry, "ai" not true, an unknown
@@ -21,6 +22,7 @@ import threading
 APP = "deals"
 DEFAULT_PATH = "/run/cougar-ai/settings.json"
 VERSION = 1
+EFFORTS = ("low", "medium", "high")
 # The file's provider names, and Deal Hunter's names for them.
 PROVIDERS = {"anthropic": "claude", "openai": "openai", "gemini": "gemini"}
 
@@ -79,13 +81,16 @@ def _entry(data, app: str):
     key = keys.get(provider)
     if not isinstance(key, str) or not key.strip():
         return None, f"the AI settings file has no {provider} key for {app}"
-    model = entry.get("model")
+    model, tier, effort = entry.get("model"), entry.get("tier"), entry.get("effort")
+    # tier and effort are optional; an unknown value is ignored (cheapest, and the default effort), never an error.
     return {"provider": PROVIDERS[provider], "model": model if isinstance(model, str) and model else None,
+            "tier": tier if isinstance(tier, str) else None, "effort": effort if effort in EFFORTS else None,
             "monthly_usd": float(limit), "key": key.strip()}, ""
 
 
 def load(app: str = APP, where: str | None = None) -> dict | None:
-    """This app's AI from the shared file: {"provider", "model" (or None), "monthly_usd", "key"}, or None (off)."""
+    """This app's AI from the shared file: {"provider", "model", "tier", "effort" (each or None), "monthly_usd",
+    "key"}, or None (off)."""
     where = where or path()
     data, reason = _read(where)
     result, why = (None, reason) if data is None else _entry(data, app)

@@ -38,23 +38,24 @@ class AIError(Exception):
 
 
 # US dollars per million tokens, checked 2026-10-04. Thinking/reasoning tokens bill as output.
-# `effort`: the model takes a reasoning-effort setting (we always ask for the lowest useful one).
+# `family` and `gen` (compared as numbers, newest wins): how the owner console's tier picks a model (resolve()).
+# `effort`: the model takes a reasoning-effort setting (the console's, or the lowest useful one).
 MODELS = [
-    {"provider": "claude", "id": "claude-opus-5-5", "label": "Claude Opus 5.5 (best)", "in": 4.00, "out": 20.00, "effort": True},
-    {"provider": "claude", "id": "claude-sonnet-5-5", "label": "Claude Sonnet 5.5", "in": 2.00, "out": 10.00, "effort": True},
+    {"provider": "claude", "id": "claude-opus-5-5", "family": "opus", "gen": (5, 5), "label": "Claude Opus 5.5 (best)", "in": 4.00, "out": 20.00, "effort": True},
+    {"provider": "claude", "id": "claude-sonnet-5-5", "family": "sonnet", "gen": (5, 5), "label": "Claude Sonnet 5.5", "in": 2.00, "out": 10.00, "effort": True},
     # Checked 2026-10-25 on Anthropic's pricing page: a prompt over 100,000 tokens pays the higher row.
-    {"provider": "claude", "id": "claude-haiku-5-5", "label": "Claude Haiku 5.5 (cheapest)", "in": 0.10, "out": 0.50, "effort": True,
+    {"provider": "claude", "id": "claude-haiku-5-5", "family": "haiku", "gen": (5, 5), "label": "Claude Haiku 5.5 (cheapest)", "in": 0.10, "out": 0.50, "effort": True,
      "long": {"over": 100_000, "in": 0.50, "out": 2.50}},
-    {"provider": "claude", "id": "claude-haiku-4-5", "label": "Claude Haiku 4.5", "in": 1.00, "out": 5.00, "effort": False},
-    {"provider": "claude", "id": "claude-opus-5", "label": "Claude Opus 5 (older)", "in": 5.00, "out": 25.00, "effort": True},
-    {"provider": "openai", "id": "gpt-6-astra", "label": "GPT-6 Astra (best)", "in": 10.00, "out": 50.00, "effort": True},
-    {"provider": "openai", "id": "gpt-6.1-sol", "label": "GPT-6.1 Sol", "in": 2.00, "out": 10.00, "effort": True},
-    {"provider": "openai", "id": "gpt-6-luna", "label": "GPT-6 Luna (cheapest)", "in": 0.10, "out": 0.50, "effort": True},
-    {"provider": "gemini", "id": "gemini-3.1-pro-preview", "label": "Gemini 3.1 Pro (best, preview)", "in": 2.00, "out": 12.00, "effort": True},
+    {"provider": "claude", "id": "claude-haiku-4-5", "family": "haiku", "gen": (4, 5), "label": "Claude Haiku 4.5", "in": 1.00, "out": 5.00, "effort": False},
+    {"provider": "claude", "id": "claude-opus-5", "family": "opus", "gen": (5,), "label": "Claude Opus 5 (older)", "in": 5.00, "out": 25.00, "effort": True},
+    {"provider": "openai", "id": "gpt-6-astra", "family": "astra", "gen": (6,), "label": "GPT-6 Astra (best)", "in": 10.00, "out": 50.00, "effort": True},
+    {"provider": "openai", "id": "gpt-6.1-sol", "family": "sol", "gen": (6, 1), "label": "GPT-6.1 Sol", "in": 2.00, "out": 10.00, "effort": True},
+    {"provider": "openai", "id": "gpt-6-luna", "family": "luna", "gen": (6,), "label": "GPT-6 Luna (cheapest)", "in": 0.10, "out": 0.50, "effort": True},
+    {"provider": "gemini", "id": "gemini-3.1-pro-preview", "family": "pro", "gen": (3, 1), "label": "Gemini 3.1 Pro (best, preview)", "in": 2.00, "out": 12.00, "effort": True},
     # Half price until the end of 2026, then $1.50 / $7.50.
-    {"provider": "gemini", "id": "gemini-3.8-flash", "label": "Gemini 3.8 Flash", "in": 1.50, "out": 7.50, "effort": True,
+    {"provider": "gemini", "id": "gemini-3.8-flash", "family": "flash", "gen": (3, 8), "label": "Gemini 3.8 Flash", "in": 1.50, "out": 7.50, "effort": True,
      "promo": {"until": "2027-01-01", "in": 0.75, "out": 3.75}},
-    {"provider": "gemini", "id": "gemini-3.5-flash-lite", "label": "Gemini 3.5 Flash-Lite (cheapest)", "in": 0.30, "out": 2.50, "effort": True},
+    {"provider": "gemini", "id": "gemini-3.5-flash-lite", "family": "flash-lite", "gen": (3, 5), "label": "Gemini 3.5 Flash-Lite (cheapest)", "in": 0.30, "out": 2.50, "effort": True},
 ]
 
 PROVIDERS = {
@@ -83,20 +84,39 @@ REVIEW_MAX = 40
 
 AI_KEYS = ("ai_provider", "ollama_url", "ollama_model", "anthropic_api_key", "claude_model", "openai_api_key",
            "openai_model", "gemini_api_key", "gemini_model", "gemini_free_tier")
-# The admin's model when the owner console doesn't name one: each provider's cheapest.
-MANAGED_DEFAULT_MODELS = {"claude": "claude-haiku-5-5", "openai": "gpt-6-luna", "gemini": "gemini-3.5-flash-lite"}
+# Which family the console's "balanced" and "best" tiers mean (the rule agreed with the owner console). OpenAI's
+# mini and plain GPT models aren't in MODELS, so for OpenAI those tiers fall back to cheapest.
+TIERS = {"claude": {"balanced": "sonnet", "best": "opus"}, "openai": {"balanced": "mini", "best": "plain"},
+         "gemini": {"balanced": "flash", "best": "pro"}}
 MANAGED_OFF = "The admin's AI is off in the owner console."
 
 
+def resolve(provider: str, tier: str | None = None, models: list | None = None) -> str | None:
+    """The model a console tier means for a provider, only ever one with a price here, so every call can be capped.
+    "cheapest" (the default) is the lowest input + output price today, the newest winning a tie; "balanced" and
+    "best" are the newest model of their family. An unknown tier, or one with no model here, gives cheapest; with
+    no priced model at all, None."""
+    priced = [m for m in (MODELS if models is None else models)
+              if m["provider"] == provider and m.get("in") is not None and m.get("out") is not None]
+    family = TIERS.get(provider, {}).get(tier)
+    in_family = [m for m in priced if family and m.get("family") == family]
+    if in_family:
+        return max(in_family, key=lambda m: m["gen"])["id"]
+    if not priced:
+        return None
+    return min(priced, key=lambda m: (sum(_price_today(m).values()), [-g for g in m["gen"]]))["id"]
+
+
 def managed() -> dict:
-    """The admin's AI from the owner console's shared settings file: {"provider", "model", "monthly_usd", "key"},
-    or {"off": reason}. A model Deal Hunter has no price for is off too, so its cost can always be capped."""
+    """The admin's AI from the owner console's shared settings file: {"provider", "model", "monthly_usd", "key",
+    "effort"}, or {"off": reason}. A pinned model wins over the tier. A model Deal Hunter has no price for is off
+    too, so its cost can always be capped."""
     m = shared_ai.load()
     if m is None:
         return {"off": MANAGED_OFF}
-    model = m["model"] or MANAGED_DEFAULT_MODELS[m["provider"]]
-    if not any(x["provider"] == m["provider"] and x["id"] == model for x in MODELS):
-        return {"off": f"The owner console picked a model Deal Hunter has no price for ({model})."}
+    model = m["model"] or resolve(m["provider"], m.get("tier"))
+    if not model or not any(x["provider"] == m["provider"] and x["id"] == model for x in MODELS):
+        return {"off": f"The owner console picked a model Deal Hunter has no price for ({model or 'none'})."}
     return {**m, "model": model}
 
 
@@ -125,7 +145,8 @@ def settings_for(user_id: int | None = None) -> dict:
         # The admin's AI is managed in the owner console. "trusted": the addresses are the admin's.
         admin_ai, m = _admin_ai(s)
         s.update(admin_ai)
-        s["_ai"] = {"source": "own", "user_id": uid, "paid_by": uid, "trusted": True, "managed": True}
+        s["_ai"] = {"source": "own", "user_id": uid, "paid_by": uid, "trusted": True, "managed": True,
+                    "effort": m.get("effort")}
         if "off" in m:
             s["_ai"]["blocked"] = m["off"]
         return s
@@ -201,6 +222,14 @@ def _scope(settings: dict) -> dict:
     uid = db.current_user_id()
     admin = db.query("SELECT role FROM users WHERE id = ?", (uid,))[0]["role"] == "admin"
     return {"source": "own", "user_id": uid, "paid_by": uid, "trusted": admin}
+
+
+def effort_for(settings: dict, info: dict) -> str | None:
+    """The reasoning effort to send: the owner console's for the admin's AI, else "low"; None for a model that
+    doesn't take one (Claude Haiku 4.5 rejects it)."""
+    if not info.get("effort"):
+        return None
+    return (settings.get("_ai") or {}).get("effort") or "low"
 
 
 def _day_start(now: float | None = None) -> float:
@@ -374,8 +403,9 @@ def _claude(settings: dict, info: dict, prompt: str, schema: dict, max_out: int)
         raise AIError("Claude has no API key")
     client = anthropic.Anthropic(api_key=key, timeout=180)
     output_config = {"format": {"type": "json_schema", "schema": schema}}
-    if info["effort"]:
-        output_config["effort"] = "low"
+    effort = effort_for(settings, info)
+    if effort:
+        output_config["effort"] = effort
     # No server-side fallback: it can re-run a declined request on a pricier model, past the budget.
     try:
         response = client.messages.create(model=info["id"], max_tokens=max_out,
@@ -462,13 +492,16 @@ def _require_key(settings: dict, provider: str, name: str) -> str:
 
 def _openai(settings: dict, info: dict, prompt: str, schema: dict, max_out: int):
     key = _require_key(settings, "openai", "OpenAI")
-    data = _post_json("https://api.openai.com/v1/responses", {"Authorization": f"Bearer {key}"}, {
+    body = {
         "model": info["id"],
         "input": [{"role": "user", "content": prompt}],
-        "reasoning": {"effort": "low"},
         "max_output_tokens": max_out,  # includes reasoning tokens
         "text": {"format": {"type": "json_schema", "name": "answer", "strict": True, "schema": schema}},
-    }, "OpenAI")
+    }
+    effort = effort_for(settings, info)
+    if effort:
+        body["reasoning"] = {"effort": effort}
+    data = _post_json("https://api.openai.com/v1/responses", {"Authorization": f"Bearer {key}"}, body, "OpenAI")
     usage = data.get("usage") or {}
     text, problem = "", None
     for item in data.get("output") or []:
@@ -488,8 +521,10 @@ def _openai(settings: dict, info: dict, prompt: str, schema: dict, max_out: int)
 def _gemini(settings: dict, info: dict, prompt: str, schema: dict, max_out: int):
     key = _require_key(settings, "gemini", "Gemini")
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{info['id']}:generateContent"
-    config = {"responseMimeType": "application/json", "responseJsonSchema": schema,
-              "maxOutputTokens": max_out, "thinkingConfig": {"thinkingLevel": "low"}}
+    config = {"responseMimeType": "application/json", "responseJsonSchema": schema, "maxOutputTokens": max_out}
+    effort = effort_for(settings, info)
+    if effort:
+        config["thinkingConfig"] = {"thinkingLevel": effort}
     data = _post_json(url, {"x-goog-api-key": key},
                       {"contents": [{"role": "user", "parts": [{"text": prompt}]}], "generationConfig": config},
                       "Gemini")
