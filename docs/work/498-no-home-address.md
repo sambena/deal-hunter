@@ -20,4 +20,4 @@ Do not rewrite git history; that's the owner's decision. Don't change behaviour.
 - The API help shows a correct URL in the real page (dev run). `pytest` passes.
 
 ## Note for the owner
-The old address stays in git history. Removing it from history means rewriting the repo; that's Sam's call, and with a private LAN address the risk is low.
+The old address stays in git history. Removing it from history means rewriting the repo; that's the owner's call, and with a private LAN address the risk is low.

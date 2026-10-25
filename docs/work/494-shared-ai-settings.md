@@ -21,7 +21,7 @@ Everything run on the admin's AI ("shared") uses that key and stays within that 
    - the admin's AI uses the file's provider, model and key, and the file's `monthly_usd` replaces the admin's monthly limit;
    - the admin's key fields in Settings > AI show "Managed in the owner console" and are read-only.
 3. **When it doesn't:** with no file or no entry (the fail-closed reader returns nothing), the admin's AI is **off**. Do not fall back to keys in the database or the environment, so there is one source.
-4. **People with their own key ("own"):** unchanged in this item. Whether to keep that option is Sam's question; ask in the PR.
+4. **People with their own key ("own"):** unchanged in this item. Whether to keep that option is the owner's question; ask in the PR.
 
 ## Acceptance (fake keys, temp file, no real calls)
 - **Valid:** with a file setting `deals` to anthropic, a key and $1, the admin's AI is on, uses that key, and its monthly limit is $1. A friend on "shared" uses the same key and limit.
