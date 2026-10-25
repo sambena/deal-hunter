@@ -20,7 +20,7 @@ class AdminSettingsTest(unittest.TestCase):
         self.member = db.execute("INSERT INTO users (email, name, role, created_at) VALUES ('f@x.y', 'F', 'member', ?)",
                                  (time.time(),))
         db.update_settings({"ebay_client_id": "sam-id", "ebay_client_secret": "sam-secret", "poll_minutes": 15,
-                            "ha_url": "http://192.168.86.131", "ha_token": "sam-ha"})
+                            "ha_url": "http://192.168.1.30", "ha_token": "sam-ha"})
 
     def tearDown(self):
         if db._conn:

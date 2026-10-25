@@ -206,7 +206,7 @@ def _computers(devices: list[dict], machines: list[dict]) -> tuple[list[dict], s
                 refs.append(pi_board["id"])
         used.update(refs)
         match = match_machine(name, machines)
-        if match and match["id"] in by_match:  # "Bazzite" and "Main Bazzite" are the same box
+        if match and match["id"] in by_match:  # "Gaming PC" and "Main Gaming PC" are the same box
             merged = by_match[match["id"]]
             merged["refs"] += refs
             merged["parts"] += [p for p in parts if p not in merged["parts"]]

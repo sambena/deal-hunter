@@ -8,7 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import hardware  # noqa: E402
 
-BUTTER = {"name": "Butter", "parts": [{"category": "cpu", "model": "Intel Core i7-4790"},
+ATTIC = {"name": "Attic", "parts": [{"category": "cpu", "model": "Intel Core i7-4790"},
                                       {"category": "ram", "model": "16GB DDR3"},
                                       {"category": "gpu", "model": "AMD Radeon RX 6500 XT"},
                                       {"category": "motherboard", "model": "MSI z87 Mpower"}]}
@@ -26,11 +26,11 @@ class OlderIntelTest(unittest.TestCase):
                               ("ASRock Z77 Extreme4", "LGA1155"), ("ASUS P8P67", "LGA1155"), ("MSI H61M-P20", "LGA1155")]:
             self.assertEqual(hardware.detect_platform([{"category": "motherboard", "model": board}])[0], socket, board)
 
-    def test_butter_gets_the_4790k_and_32gb_but_not_broadwell_on_z87(self):
-        out = hardware.suggest(BUTTER)
+    def test_attic_gets_the_4790k_and_32gb_but_not_broadwell_on_z87(self):
+        out = hardware.suggest(ATTIC)
         self.assertEqual(out["platform"], "Intel 8/9-series (LGA1150)")
         names = [s["name"] for s in out["suggestions"]]
-        self.assertEqual(names, ["i7-4790K for Butter", "DDR3 4X8GB kit for Butter"])
+        self.assertEqual(names, ["i7-4790K for Attic", "DDR3 4X8GB kit for Attic"])
         self.assertEqual(out["suggestions"][1]["query"], "ddr3 4x8gb|32gb")
 
     def test_broadwell_offered_on_z97_or_an_unknown_board(self):

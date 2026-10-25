@@ -39,9 +39,9 @@ HA_DEVICES = [
      "integrations": ["ping"], "domains": ["binary_sensor"], "entry_type": None},
     {"id": "pc1-wake", "name": "Dexter", "make": None, "model": None, "area": None,
      "integrations": [], "domains": ["button"], "entry_type": None},
-    {"id": "new-nic", "name": "Rosie", "make": "Lite-On Network Communication (Dongguan) Limited", "model": None,
+    {"id": "new-nic", "name": "Study", "make": "Lite-On Network Communication (Dongguan) Limited", "model": None,
      "area": None, "integrations": [], "domains": ["device_tracker"], "entry_type": None},
-    {"id": "new-ping", "name": "Rosie", "make": "Ping", "model": None, "area": None,
+    {"id": "new-ping", "name": "Study", "make": "Ping", "model": None, "area": None,
      "integrations": ["ping"], "domains": ["binary_sensor"], "entry_type": None},
     {"id": "phone-client", "name": "Galaxy-Watch", "make": "Samsung Electronics", "model": None, "area": None,
      "integrations": [], "domains": ["device_tracker"], "entry_type": None},
@@ -69,9 +69,9 @@ class ClassifyTest(unittest.TestCase):
         for ref in ("pc1-ping", "pc1-wake"):
             self.assertNotIn(ref, c)
         # A computer that isn't here yet comes in as a new PC with its network card as a part.
-        rosie = c["new-nic"]
-        self.assertEqual((rosie["kind"], rosie["match_id"], rosie["checked"]), ("pc", None, True))
-        self.assertEqual(rosie["parts"], [{"category": "network", "model": "Lite-On network adapter"}])
+        study = c["new-nic"]
+        self.assertEqual((study["kind"], study["match_id"], study["checked"]), ("pc", None, True))
+        self.assertEqual(study["parts"], [{"category": "network", "model": "Lite-On network adapter"}])
         # A tracked network client from a non-PC vendor isn't turned into a computer.
         self.assertFalse(c.get("phone-client", {}).get("computer"))
 
@@ -197,7 +197,7 @@ class LinkTest(unittest.TestCase):
         self.assertEqual(self.server.ha_import({"devices": [pick]}, {}), {"added": 0, "linked": 0})  # again: no-op
 
     def test_new_computer_notes_say_get_specs(self):
-        pick = {"refs": ["r1"], "name": "Rosie", "kind": "pc", "computer": True, "match_id": None,
+        pick = {"refs": ["r1"], "name": "Study", "kind": "pc", "computer": True, "match_id": None,
                 "parts": [{"category": "network", "model": "Lite-On network adapter"}]}
         self.assertEqual(self.server.ha_import({"devices": [pick]}, {}), {"added": 1, "linked": 0})
         self.assertIn("Get specs", db.list_machines()[0]["notes"])

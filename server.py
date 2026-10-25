@@ -1057,7 +1057,7 @@ OPEN_ROUTES = {("GET", "/api/auth/status"), ("POST", "/api/auth/setup"), ("POST"
                ("GET", "/api/auth/link"), ("POST", "/api/auth/accept"), ("GET", "/api/app/android")}
 
 # The Android app's latest build. The Android project publishes it into a folder (config "downloads_dir";
-# on the Frigate box ~/deal-hunter-app mounted read-only) with android.json beside it:
+# for example a read-only mount) with android.json beside it:
 # {"versionName", "versionCode", "sha256"}. Signed-in people can get it, and so can anyone holding a
 # working invite or reset link, so an invited friend can install it before they have an account.
 DOWNLOADS = {"dir": None}
@@ -1387,6 +1387,8 @@ def main() -> None:
     if oidc.enabled():
         print("Cougar Cave sign-in is on (config \"oidc\")")
     DOWNLOADS["dir"] = config.get("downloads_dir")
+    if config.get("ollama_url"):  # this install's Ollama address, kept out of the public code
+        db.DEFAULT_SETTINGS["ollama_url"] = config["ollama_url"]
     if "--no-poll" not in sys.argv:
         poller.start()
     if config.get("api_port"):

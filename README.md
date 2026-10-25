@@ -13,6 +13,9 @@ while it's running. No packages to install, unless you turn on central login (be
 To reach it from your phone, copy `config.example.json` to `config.json` and
 set `"host": "0.0.0.0"`. There's no login, so only do that on your home network.
 
+`config.json` can also hold `"ollama_url"`, this install's Ollama address (the default is
+`http://localhost:11434`), so a home address never has to be in the code.
+
 ## Sources
 
 | Source | Key | Notes |
