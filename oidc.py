@@ -15,6 +15,7 @@ import os
 import re
 import secrets
 import stat
+import time
 import traceback
 import urllib.parse
 from pathlib import Path
@@ -26,7 +27,11 @@ import central
 TX_SECONDS = 300
 CALLBACK_PATH = "/auth/callback"
 LINK_PATH = "/auth/link"  # POST: prove which Deal Hunter account is yours, to link it (see link.html)
-ROUTES = ("/auth/central", CALLBACK_PATH, "/auth/logout", LINK_PATH)
+BACKCHANNEL_PATH = "/auth/backchannel"
+BACKCHANNEL_EVENT = "http://schemas.openid.net/event/backchannel-logout"
+BACKCHANNEL_LIMIT = 60
+BACKCHANNEL_MAX_BODY = 16384
+ROUTES = ("/auth/central", CALLBACK_PATH, "/auth/logout", LINK_PATH, BACKCHANNEL_PATH)
 REQUIRED = ("issuer", "client_id", "callback", "authorize_url", "token_url", "jwks_url", "client_secret_file")
 
 # The shared Cougar Cave look (static/cave/, served signed out): the bar, and the shared sign-in card
@@ -194,6 +199,63 @@ class CentralLogin:
     def logout() -> Response:
         """Where the login service sends people after signing out: back to the sign-in page, no session needed."""
         return 302, [("Location", "/")], b""
+
+    def validate_logout_token(self, token):
+        """Relay PR 18's logout validation, using only this registration and its pinned key cache."""
+        import jwt
+        from cougar_login.login_validation import LoginRejected
+        try:
+            header = jwt.get_unverified_header(token)
+            if (header.get('alg') != 'RS256' or not isinstance(header.get('kid'), str) or not header['kid']
+                    or any(k in header for k in ('jku', 'x5u', 'jwk', 'crit'))):
+                raise LoginRejected('header')
+            keys = self.cache.get(header['kid'])
+            found = [k for k in keys.get('keys', []) if k.get('kid') == header['kid']]
+            if len(found) != 1 or found[0].get('kty') != 'RSA' or found[0].get('use', 'sig') != 'sig':
+                raise LoginRejected('key')
+            claims = jwt.decode(token, jwt.PyJWK.from_dict(found[0], algorithm='RS256').key, algorithms=['RS256'],
+                                issuer=self.provider.issuer, audience=self.provider.client_id,
+                                leeway=self.provider.clock_tolerance,
+                                options={'require': ['iss', 'aud', 'iat', 'jti', 'events']})
+        except LoginRejected:
+            raise
+        except jwt.ExpiredSignatureError:
+            raise LoginRejected('expired-token') from None
+        except jwt.InvalidIssuerError:
+            raise LoginRejected('issuer') from None
+        except jwt.InvalidAudienceError:
+            raise LoginRejected('audience') from None
+        except jwt.InvalidSignatureError:
+            raise LoginRejected('signature') from None
+        except jwt.MissingRequiredClaimError as e:
+            raise LoginRejected('missing-' + e.claim) from None
+        except Exception:
+            raise LoginRejected('invalid-token') from None
+        events = claims.get('events')
+        if not isinstance(events, dict) or BACKCHANNEL_EVENT not in events:
+            raise LoginRejected('event')
+        if 'nonce' in claims:
+            raise LoginRejected('nonce')
+        if not isinstance(claims.get('sub'), str) or not claims['sub']:
+            raise LoginRejected('subject')
+        if not isinstance(claims['jti'], str) or not claims['jti']:
+            raise LoginRejected('jti')
+        if 'azp' in claims and claims['azp'] != self.provider.client_id:
+            raise LoginRejected('authorized-party')
+        if (not isinstance(claims['iat'], (int, float))
+                or not -self.provider.clock_tolerance <= time.time() - claims['iat'] <= 300):
+            raise LoginRejected('time')
+        return claims
+
+    def backchannel(self, raw: bytes) -> None:
+        """Validate the bounded form and end only the linked person's sessions. No token in errors or audit."""
+        from cougar_login.login_validation import LoginRejected
+        token = urllib.parse.parse_qs(raw.decode('ascii'), strict_parsing=True,
+                                      max_num_fields=4).get('logout_token', [''])
+        if len(token) != 1 or not token[0]:
+            raise LoginRejected('form')
+        claims = self.validate_logout_token(token[0])
+        central.backchannel_logout(claims['iss'], claims['sub'], claims['jti'])
 
 
 # Any /auth/... URL with a query, wherever it sits in a log line: a request line (even a malformed one, or one
