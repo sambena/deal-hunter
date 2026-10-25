@@ -1018,6 +1018,14 @@ def _check_privileged(method: str, path: str, body, user: dict | None) -> None:
 # ---- HTTP plumbing ----------------------------------------------------------
 
 SIGNED_OUT_FILES = {"login.html", "login.js", "style.css", "link.html", "link.js"}
+# The shared Cougar Cave look (Web Awesome, its theme and icons), vendored in static/cave/. The sign-in pages
+# need it, so it is served signed out too; it holds nothing about Deal Hunter or its people.
+CAVE_DIR = STATIC_DIR / "cave"
+# Set here rather than guessed: Windows' registry can map .js to text/plain, and browsers refuse to run a
+# module script (the Web Awesome loader) that isn't served as JavaScript.
+STATIC_TYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
+                ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".json": "application/json",
+                ".md": "text/plain; charset=utf-8", ".txt": "text/plain; charset=utf-8"}
 OPEN_ROUTES = {("GET", "/api/auth/status"), ("POST", "/api/auth/setup"), ("POST", "/api/auth/login"),
                ("GET", "/api/auth/link"), ("POST", "/api/auth/accept"), ("GET", "/api/app/android")}
 
@@ -1060,9 +1068,11 @@ SECURITY_HEADERS = [  # for when the site faces the internet
     ("X-Content-Type-Options", "nosniff"),
     ("X-Frame-Options", "DENY"),
     # Scripts only from this site (no inline ones), so injected markup can't run code. Listing images come
-    # from the shops' sites; inline style attributes are used for image backgrounds and meters.
+    # from the shops' sites; inline style attributes are used for image backgrounds and meters. Web Awesome
+    # (static/cave/) builds its own small icons (caret, close, check, menu) as data: URLs and fetch()es them,
+    # so connect-src allows data: too; that reaches no other site.
     ("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
-                                "img-src 'self' https: data:; connect-src 'self'; object-src 'none'; "
+                                "img-src 'self' https: data:; connect-src 'self' data:; object-src 'none'; "
                                 "base-uri 'none'; form-action 'self'; frame-ancestors 'none'"),
     ("Referrer-Policy", "same-origin"),
 ]
@@ -1291,12 +1301,12 @@ class Handler(BaseHTTPRequestHandler):
             # Signed out, the site is just its sign-in page: the app, its script and the API docs stay hidden.
             if rel == "index.html":
                 rel = "login.html"
-            elif rel not in SIGNED_OUT_FILES:
+            elif rel not in SIGNED_OUT_FILES and not (rel.startswith("cave/") and CAVE_DIR in (STATIC_DIR / rel).resolve().parents):
                 return self._send(401, b"Sign in to Deal Hunter", "text/plain")
         target = (STATIC_DIR / rel).resolve()
         if STATIC_DIR not in target.parents or not target.is_file():
             return self._send(404, b"not found", "text/plain")
-        ctype = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
+        ctype = STATIC_TYPES.get(target.suffix.lower()) or mimetypes.guess_type(target.name)[0] or "application/octet-stream"
         self._send(200, target.read_bytes(), ctype)
 
     def do_GET(self):

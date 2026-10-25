@@ -26,6 +26,7 @@ function show(m, intro = "") {
   $("#go").textContent = { login: "Sign in", setup: "Create my account", invite: "Create my account",
     reset: "Save new password" }[m];
   $("#intro").textContent = intro;
+  $("#intro").hidden = !intro;
   form.hidden = false;
 }
 
@@ -39,8 +40,6 @@ async function offerApp(code) {
     $("#app").hidden = false;
   } catch {}
 }
-
-$("#central").addEventListener("click", () => { location.href = "/auth/central"; });
 
 form.addEventListener("submit", async e => {
   e.preventDefault();
@@ -77,5 +76,7 @@ form.addEventListener("submit", async e => {
   show(status.setup_needed ? "setup" : "login", status.setup_needed
     ? "Welcome. You'll be the admin: pick your name, the email you'll sign in with, and a password." : "");
   // Central sign-in, when the server has it on: the button goes to Cougar Cave and comes back signed in.
+  // It is then the page's one primary action, and the email and password form sits below it, under "Or".
   $("#central-row").hidden = !(status.central && mode === "login");
+  $("#go").classList.toggle("primary", $("#central-row").hidden);
 })();

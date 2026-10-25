@@ -1,30 +1,70 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="wa-dark cave-accent-teal">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Deal Hunter</title>
+  <title>Deal Hunter · Cougar Cave</title>
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" href="/cave/icons/tag.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/cave/webawesome/styles/webawesome.css">
+  <link rel="stylesheet" href="/cave/cave-theme.css">
   <link rel="stylesheet" href="style.css">
+  <script type="module" src="/cave/webawesome/webawesome.loader.js" data-webawesome="/cave/webawesome"></script>
 </head>
 <body>
-  <header>
-    <h1 id="brand">Deal Hunter</h1>
-    <select id="focus-pick" title="What you're hunting: shows only that, everywhere (saved to your account)">
+<wa-page mobile-breakpoint="700px">
+  <header slot="header" class="cave-bar cave-brand wa-dark wa-cluster wa-gap-s wa-align-items-center">
+    <a class="cave-home wa-cluster wa-gap-2xs wa-align-items-center" href="https://cougarcave.dev">
+      <img src="/cave/icons/cougar.svg" alt="" width="24" height="24"><span>Cougar Cave</span>
+    </a>
+    <wa-divider orientation="vertical"></wa-divider>
+    <a class="cave-app wa-cluster wa-gap-2xs wa-align-items-center" href="/">
+      <wa-icon src="/cave/icons/tag.svg"></wa-icon><span>Deal Hunter</span>
+    </a>
+    <wa-dropdown>
+      <wa-button slot="trigger" appearance="plain" size="small">
+        <wa-icon src="/cave/icons/layout-grid.svg" label="Cougar Cave apps"></wa-icon>
+      </wa-button>
+      <wa-dropdown-item href="https://cougarcave.dev"><wa-icon slot="icon" src="/cave/icons/home.svg"></wa-icon>Hub</wa-dropdown-item>
+      <wa-dropdown-item href="https://lab.cougarcave.dev"><wa-icon slot="icon" src="/cave/icons/flask.svg"></wa-icon>Lab</wa-dropdown-item>
+      <wa-dropdown-item href="https://music.cougarcave.dev"><wa-icon slot="icon" src="/cave/icons/music.svg"></wa-icon>Player</wa-dropdown-item>
+      <wa-dropdown-item type="checkbox" checked><wa-icon slot="icon" src="/cave/icons/tag.svg"></wa-icon>Deal Hunter</wa-dropdown-item>
+      <wa-dropdown-item href="https://raidroster.cougarcave.dev"><wa-icon slot="icon" src="/cave/icons/pokeball.svg"></wa-icon>RaidRoster</wa-dropdown-item>
+      <wa-dropdown-item href="https://relay.cougarcave.dev"><wa-icon slot="icon" src="/cave/icons/messages.svg"></wa-icon>Relay</wa-dropdown-item>
+      <wa-divider data-cave-owner hidden></wa-divider>
+      <wa-dropdown-item data-cave-owner hidden href="https://auth.cougarcave.dev/owner/"><wa-icon slot="icon" src="/cave/icons/shield-lock.svg"></wa-icon>Owner console<wa-badge slot="details" variant="brand">Owner</wa-badge></wa-dropdown-item>
+    </wa-dropdown>
+    <div class="cave-end">
+      <wa-dropdown id="account" data-cave-signed-in hidden placement="bottom-end">
+        <wa-button slot="trigger" appearance="plain" size="small" with-caret>
+          <wa-avatar slot="start" initials="" label="Your account"></wa-avatar><span class="cave-name" data-cave-name></span>
+        </wa-button>
+        <wa-dropdown-item disabled><span data-cave-name></span><span slot="details" data-cave-email></span></wa-dropdown-item>
+        <wa-divider></wa-divider>
+        <wa-dropdown-item href="https://auth.cougarcave.dev/if/user/"><wa-icon slot="icon" src="/cave/icons/user.svg"></wa-icon>Cougar Cave account</wa-dropdown-item>
+        <wa-dropdown-item value="settings"><wa-icon slot="icon" src="/cave/icons/settings.svg"></wa-icon>Settings</wa-dropdown-item>
+        <wa-divider></wa-divider>
+        <wa-dropdown-item value="signout"><wa-icon slot="icon" src="/cave/icons/logout.svg"></wa-icon>Sign out</wa-dropdown-item>
+      </wa-dropdown>
+    </div>
+  </header>
+
+  <nav slot="subheader" class="dh-nav wa-cluster wa-gap-m wa-align-items-center" aria-label="Deal Hunter sections">
+    <a href="#finds" data-tab="finds" class="active">Finds <span id="new-badge" class="badge" hidden></span></a>
+    <a href="#watches" data-tab="watches">Watches</a>
+    <a href="#hardware" data-tab="hardware">My Stuff</a>
+    <a href="#settings" data-tab="settings">Settings</a>
+    <a href="#admin" data-tab="admin" id="admin-nav" hidden>Admin</a>
+    <span class="spacer"></span>
+    <select id="focus-pick" aria-label="What you're hunting" title="What you're hunting: shows only that, everywhere (saved to your account)">
       <option value="all">🔎 Everything</option>
       <option value="tech">💻 Tech</option>
       <option value="cars">🚗 Cars &amp; trucks</option>
       <option value="home">🏠 Home &amp; gear</option>
       <option value="clothes">👕 Clothes &amp; shoes</option>
     </select>
-    <nav>
-      <button data-tab="finds" class="active">Finds <span id="new-badge" class="badge" hidden></span></button>
-      <button data-tab="watches">Watches</button>
-      <button data-tab="hardware">My Stuff</button>
-      <button data-tab="settings">Settings</button>
-      <button data-tab="admin" id="admin-nav" hidden>Admin</button>
-    </nav>
-    <div class="status" id="poll-status"></div>
-  </header>
+    <span class="status" id="poll-status"></span>
+  </nav>
 
   <main>
     <!-- FINDS -->
@@ -172,8 +212,7 @@
             <label>Current password (to change email or password) <input id="acct-current" type="password" autocomplete="current-password"></label>
             <label>New password <input id="acct-new" type="password" autocomplete="new-password"></label>
           </div>
-          <div class="row"><button type="button" id="acct-save">Save account</button>
-            <span class="spacer"></span><button type="button" class="danger" id="sign-out">Sign out</button></div>
+          <div class="row"><button type="button" id="acct-save">Save account</button></div>
           <p class="app-link" hidden><a href="/download/android">Get the Android app</a> <span class="muted"></span></p>
           <h3>Signed in on</h3>
           <div id="acct-devices"></div>
@@ -478,7 +517,15 @@ Leave blank and the AI does its best."></textarea></label>
     </form>
   </dialog>
 
-  <div id="toast" hidden></div>
+</wa-page>
+
+  <wa-dialog id="ask" label="">
+    <p id="ask-text"></p>
+    <label id="ask-field" hidden><span id="ask-label"></span> <input id="ask-input" autocomplete="off"></label>
+    <wa-button slot="footer" appearance="plain" data-dialog="close">Cancel</wa-button>
+    <wa-button slot="footer" variant="brand" id="ask-ok"></wa-button>
+  </wa-dialog>
+  <wa-toast id="toasts" placement="bottom-center"></wa-toast>
   <script src="app.js"></script>
 </body>
 </html>

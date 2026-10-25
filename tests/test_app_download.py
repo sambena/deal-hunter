@@ -119,6 +119,40 @@ class LockdownTest(unittest.TestCase):
             self.assertEqual(self.get(path)[0], 200, path)
         self.assertEqual(self.get("/api/made-up-route")[0], 404)
 
+    def raw_get(self, path):
+        """Sends the path exactly as written (no client-side clean-up of ../), signed out."""
+        import http.client
+        conn = http.client.HTTPConnection("127.0.0.1", self.httpd.server_port)
+        try:
+            conn.request("GET", path)
+            r = conn.getresponse()
+            return r.status, r.read(), r.headers
+        finally:
+            conn.close()
+
+    def test_signed_out_gets_the_shared_look(self):
+        # The sign-in page needs the Cougar Cave kit, so it is served signed out, with types a browser will run.
+        status, body, headers = self.raw_get("/cave/webawesome/webawesome.loader.js?v=1")
+        self.assertEqual(status, 200)
+        self.assertTrue(headers["Content-Type"].startswith("text/javascript"), headers["Content-Type"])
+        self.assertIn(b"import", body)
+        status, _, headers = self.raw_get("/cave/cave-theme.css")
+        self.assertEqual((status, headers["Content-Type"].split(";")[0]), (200, "text/css"))
+        status, _, headers = self.raw_get("/cave/icons/tag.svg")
+        self.assertEqual((status, headers["Content-Type"]), (200, "image/svg+xml"))
+        self.assertIn(b"cave/webawesome/webawesome.loader.js", self.raw_get("/")[1])  # the sign-in page uses it
+
+    def test_cave_prefix_does_not_open_the_app(self):
+        # Climbing out of cave/ must not reach the app's own files (or anything outside static/) signed out.
+        for path in ("/cave/../app.js", "/cave/../index.html", "/cave/../api.html", "/cave/..\\app.js",
+                     "/cave/icons/../../app.js", "/cave/../../server.py", "/cave/../../config.example.json"):
+            status, body, _ = self.raw_get(path)
+            self.assertIn(status, (401, 404), path)
+            self.assertNotIn(b"use strict", body, path)
+            self.assertNotIn(b"import ", body, path)
+        self.assertIn(self.raw_get("/cave/")[0], (401, 404))  # a folder is not a file
+        self.assertEqual(self.raw_get("/cave/nope.js")[0], 404)
+
 
 if __name__ == "__main__":
     unittest.main()

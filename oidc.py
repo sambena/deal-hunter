@@ -29,15 +29,33 @@ LINK_PATH = "/auth/link"  # POST: prove which Deal Hunter account is yours, to l
 ROUTES = ("/auth/central", CALLBACK_PATH, "/auth/logout", LINK_PATH)
 REQUIRED = ("issuer", "client_id", "callback", "authorize_url", "token_url", "jwks_url", "client_secret_file")
 
-DENIED = ('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" '
-          'content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Sign in · Deal Hunter</title>'
-          '<link rel="stylesheet" href="/style.css"></head><body><div id="auth-screen"><div class="panel">'
-          '<h2>Deal Hunter</h2><p role="alert">MESSAGE</p><div class="row"><a href="/">Back to sign in</a></div>'
-          '</div></div></body></html>')
+# The shared Cougar Cave look (static/cave/, served signed out): the bar, and one card with the message.
+HEAD = ('<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+        '<meta name="robots" content="noindex"><meta name="color-scheme" content="dark">'
+        '<link rel="icon" href="/cave/icons/tag.svg" type="image/svg+xml">'
+        '<link rel="stylesheet" href="/cave/webawesome/styles/webawesome.css">'
+        '<link rel="stylesheet" href="/cave/cave-theme.css"><link rel="stylesheet" href="/style.css">')
+DENIED = ('<!doctype html><html lang="en" class="wa-dark cave-accent-teal"><head>' + HEAD +
+          '<title>Sign in · Deal Hunter · Cougar Cave</title>'
+          '<script type="module" src="/cave/webawesome/webawesome.loader.js" data-webawesome="/cave/webawesome"></script>'
+          '</head><body><wa-page mobile-breakpoint="700px">'
+          '<header slot="header" class="cave-bar cave-brand wa-dark wa-cluster wa-gap-s wa-align-items-center">'
+          '<a class="cave-home wa-cluster wa-gap-2xs wa-align-items-center" href="https://cougarcave.dev">'
+          '<img src="/cave/icons/cougar.svg" alt="" width="24" height="24"><span>Cougar Cave</span></a>'
+          '<wa-divider orientation="vertical"></wa-divider>'
+          '<a class="cave-app wa-cluster wa-gap-2xs wa-align-items-center" href="/">'
+          '<wa-icon src="/cave/icons/tag.svg"></wa-icon><span>Deal Hunter</span></a></header>'
+          '<main class="signin-main"><wa-card class="signin"><div class="wa-stack">'
+          '<div class="signin-head"><wa-icon src="/cave/icons/tag.svg"></wa-icon><h1>Deal Hunter</h1></div>'
+          '<wa-callout variant="warning"><span role="alert">MESSAGE</span></wa-callout>'
+          '<div><wa-button appearance="outlined" href="/">Back to sign in</wa-button></div>'
+          '</div></wa-card></main></wa-page></body></html>')
 # The callback answers 200 and navigates from this origin (Relay's design choice), so the session cookie set
 # here is sent on the next request. A meta refresh, because the page's security policy forbids inline script.
-GO = ('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=/">'
-      '<title>Signing in</title></head><body><p>Signing in… <a href="/">Continue</a></p></body></html>')
+# Only the colours load here: the page is gone at once.
+GO = ('<!doctype html><html lang="en" class="wa-dark cave-accent-teal"><head>' + HEAD +
+      '<meta http-equiv="refresh" content="0;url=/"><title>Signing in · Deal Hunter · Cougar Cave</title></head>'
+      '<body><main class="signin-main"><p>Signing in… <a href="/">Continue</a></p></main></body></html>')
 GO_LINK = GO.replace("url=/", "url=/link.html").replace('href="/"', 'href="/link.html"')
 
 # What a response from here is: (status, extra headers, HTML body). The server adds the security headers.

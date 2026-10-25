@@ -161,6 +161,8 @@ class HeadersTest(unittest.TestCase):
         self.assertIn("script-src 'self'", csp)
         self.assertNotIn("unsafe-inline';", csp.split("script-src")[1].split(";")[0])
         self.assertNotIn("<script>", (server.STATIC_DIR / "login.html").read_text())
+        # Web Awesome fetches its own data: icons; nothing may connect to another site.
+        self.assertEqual(csp.split("connect-src")[1].split(";")[0].split(), ["'self'", "data:"])
 
 
 if __name__ == "__main__":

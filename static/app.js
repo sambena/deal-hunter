@@ -51,7 +51,7 @@ const KIND_ICONS = { pc: "💻", server: "🗄️", tv: "📺", monitor: "🖥�
 // Focus: one person's view of Deal Hunter (everything, or just tech, cars or home), saved to their account.
 const FOCUS = {
   all: { brand: "Deal Hunter", stuff: "My Stuff", accent: "" },
-  tech: { brand: "Deal Hunter · Tech", stuff: "My Tech", accent: "#4ea1ff" },
+  tech: { brand: "Deal Hunter · Tech", stuff: "My Tech", accent: "" },
   cars: { brand: "Deal Hunter · Cars & trucks", stuff: "My Garage", accent: "#f97316" },
   home: { brand: "Deal Hunter · Home & gear", stuff: "My Home", accent: "#22c55e" },
   clothes: { brand: "Deal Hunter · Clothes & shoes", stuff: "My Closet", accent: "#a855f7" },
@@ -64,11 +64,11 @@ const focusMachines = () => state.machines.filter(m => focus() === "all" || m.ca
 function applyFocus() {
   const f = focus(), look = FOCUS[f];
   document.documentElement.dataset.focus = f;
+  // The focus colours only Deal Hunter's own content (--accent), never the Cougar Cave bar.
   document.documentElement.style.setProperty("--accent", look.accent || "");
   if (!look.accent) document.documentElement.style.removeProperty("--accent");
-  $("#brand").textContent = look.brand;
   $("#focus-pick").value = f;
-  $('nav button[data-tab="hardware"]').textContent = look.stuff;
+  $('.dh-nav [data-tab="hardware"]').textContent = look.stuff;
   // Add buttons that fit the focus.
   $$("[data-add-kind]").forEach(b => (b.hidden = (b.dataset.addKind === "pc" && ["cars", "home"].includes(f))
     || (b.dataset.addKind === "vehicle" && ["tech", "home"].includes(f))
@@ -180,7 +180,7 @@ $("#people-list").addEventListener("click", async e => {
     showLink(link);
     toast("Send them this reset link");
   } else {
-    if (act === "disable" && !confirm("Disable this person? They're signed out everywhere and can't sign in until you enable them.")) return;
+    if (act === "disable" && !await ask("Disable this person?", "They're signed out everywhere and can't sign in until you enable them.", "Disable person", "danger")) return;
     await api("PUT", `/api/admin/users/${id}`, { disabled: act === "disable" });
   }
   fillPeople();
@@ -234,11 +234,26 @@ $("#acct-save").addEventListener("click", e => busy(e.target, async () => {
   toast("Account saved");
 }));
 
-$("#sign-out").addEventListener("click", async () => {
+async function signOut() {
   const out = await api("POST", "/api/auth/logout");
   // A Cougar Cave session also ends the Cougar Cave sign-in, on the login service's own page.
   if (out.end_session) location.assign(out.end_session);
   else location.reload();
+}
+
+// The Cougar Cave bar: who is signed in, and the account menu (Settings, Sign out).
+function fillBar() {
+  const me = state.me || {};
+  const initials = (me.name || me.email || "?").split(/\s+/).map(w => w[0]).join("").slice(0, 2).toUpperCase();
+  $$("[data-cave-name]").forEach(n => (n.textContent = me.name || ""));
+  $$("[data-cave-email]").forEach(n => (n.textContent = me.email || ""));
+  $("#account wa-avatar").initials = initials;
+  $("#account").hidden = false;
+}
+$("#account").addEventListener("wa-select", e => {
+  const value = e.detail.item.value;
+  if (value === "settings") goTab("settings");
+  if (value === "signout") signOut().catch(err => toast(err.message, true));
 });
 
 function esc(s) {
@@ -268,14 +283,9 @@ async function aiGate(action, body = {}) {
   const e = await api("POST", "/api/ai/estimate", { action, ...body });
   if (!e.allowed) throw new Error(e.reason);
   if (e.free || !state.settings.ai_confirm) return true;
-  return confirm(`${e.action_label} with ${e.model_label}
-
-` +
-    `This will cost about ${usd(e.typical)} (at most ${usd(e.max)}).
-` +
-    `This month: ${usd(e.spent)} of your ${usd(e.limit)} limit used.
-
-Go ahead?`);
+  return ask(`${e.action_label} with ${e.model_label}?`,
+    `This will cost about ${usd(e.typical)} (at most ${usd(e.max)}).\n` +
+    `This month: ${usd(e.spent)} of your ${usd(e.limit)} limit used.`, e.action_label);
 }
 
 function money(v) { return v == null ? "price?" : "$" + Number(v).toFixed(v % 1 ? 2 : 0); }
@@ -289,13 +299,46 @@ function ago(ts) {
   return Math.floor(s / 86400) + "d ago";
 }
 
+// Finished actions: a Web Awesome toast. Errors stay until dismissed.
 function toast(msg, isErr = false) {
-  const t = $("#toast");
-  t.textContent = msg;
-  t.className = isErr ? "err" : "";
-  t.hidden = false;
-  clearTimeout(toast.timer);
-  toast.timer = setTimeout(() => (t.hidden = true), isErr ? 7000 : 3500);
+  customElements.whenDefined("wa-toast").then(() =>
+    $("#toasts").create(msg, { variant: isErr ? "danger" : "success", duration: isErr ? 0 : 4000 }));
+}
+
+// Questions that block: a Web Awesome dialog in place of confirm() and prompt(). Resolves true/false, or with
+// `input` ({label, value, placeholder}) the text typed, or null when cancelled.
+function ask(title, text, okLabel, variant = "brand", input = null) {
+  const dialog = $("#ask"), ok = $("#ask-ok"), field = $("#ask-input");
+  dialog.label = title;
+  $("#ask-text").textContent = text;
+  $("#ask-text").hidden = !text;
+  ok.textContent = okLabel;
+  ok.variant = variant;
+  $("#ask-field").hidden = !input;
+  if (input) {
+    $("#ask-label").textContent = input.label || "";
+    field.value = input.value ?? "";
+    field.placeholder = input.placeholder || "";
+  }
+  return new Promise(resolve => {
+    let answer = false;
+    const yes = () => { answer = true; dialog.open = false; };
+    const enter = e => { if (e.key === "Enter") { e.preventDefault(); yes(); } };
+    const shown = e => { if (e.target === dialog && input) field.focus(); };
+    const done = e => {
+      if (e.target !== dialog) return;
+      ok.removeEventListener("click", yes);
+      field.removeEventListener("keydown", enter);
+      dialog.removeEventListener("wa-after-show", shown);
+      dialog.removeEventListener("wa-after-hide", done);
+      resolve(input ? (answer ? field.value : null) : answer);
+    };
+    ok.addEventListener("click", yes);
+    field.addEventListener("keydown", enter);
+    dialog.addEventListener("wa-after-show", shown);
+    dialog.addEventListener("wa-after-hide", done);
+    dialog.open = true;
+  });
 }
 
 async function busy(btn, fn) {
@@ -311,16 +354,27 @@ const aiOn = () => state.settings.ai_provider && state.settings.ai_provider !== 
 
 // ---- tabs -----------------------------------------------------------------------
 
+// The sections are real links (#finds, #watches, …), so the back button and bookmarks work.
 function showTab(name) {
   if (name === "admin" && !(state.me && state.me.role === "admin")) name = "settings";
   if (!$("#tab-" + name)) name = "finds";
-  $$("nav button").forEach(b => b.classList.toggle("active", b.dataset.tab === name));
+  $$(".dh-nav [data-tab]").forEach(b => {
+    b.classList.toggle("active", b.dataset.tab === name);
+    if (b.dataset.tab === name) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
+  });
   $$(".tab").forEach(t => (t.hidden = t.id !== "tab-" + name));
+  if (location.hash !== "#" + name) history.replaceState(null, "", "#" + name);
   try { localStorage.setItem("tab", name); } catch {}
   if (name === "finds") loadListings();
+  if (name === "hardware") renderMachines();
   if (name === "settings" || name === "admin") fillSettings();
 }
-$$("nav button").forEach(b => b.addEventListener("click", () => showTab(b.dataset.tab)));
+function goTab(name) {
+  if (location.hash !== "#" + name) history.pushState(null, "", "#" + name);
+  showTab(name);
+}
+$$(".dh-nav [data-tab]").forEach(b => b.addEventListener("click", e => { e.preventDefault(); goTab(b.dataset.tab); }));
+window.addEventListener("popstate", () => showTab(location.hash.slice(1)));
 
 // ---- state ----------------------------------------------------------------------
 
@@ -330,10 +384,11 @@ async function refresh() {
   $("#admin-nav").hidden = !isAdmin;
   $$("[data-admin-only]").forEach(el => (el.hidden = !isAdmin));
   applyFocus();
+  fillBar();
   const newTotal = state.watches.filter(inFocus).reduce((n, w) => n + w.new_count, 0);
   $("#new-badge").hidden = !newTotal;
   $("#new-badge").textContent = newTotal;
-  document.title = newTotal ? `(${newTotal}) Deal Hunter` : "Deal Hunter";
+  document.title = (newTotal ? `(${newTotal}) ` : "") + "Deal Hunter · Cougar Cave";
   const p = state.poller;
   $("#poll-status").textContent = p.running ? "Checking…" :
     `Last check ${ago(p.last_cycle)}` + (p.next_cycle ? ` · next ${nextIn(p.next_cycle - state.now)}` : "");
@@ -468,7 +523,8 @@ function showDiagnosis(w) {
 // ✨ Improve with AI: suggests a better version of the watch as it stands in the form; nothing is saved.
 async function tuneWatch() {
   const f = $("#watch-form"), btn = $("#watch-tune");
-  const instructions = prompt("Anything to tell the AI? (optional)\ne.g. it finds nothing, too much junk, I want 4x4", "");
+  const instructions = await ask("Improve with AI", "", "Suggest changes", "brand",
+    { label: "Anything to tell the AI? (optional)", placeholder: "e.g. it finds nothing, too much junk, I want 4x4" });
   if (instructions === null) return;
   const watch = { ...formToWatch(f), id: Number(f.id.value) || null };
   const body = { watch, watch_id: watch.id, instructions };
@@ -548,8 +604,8 @@ $("#listings").addEventListener("click", async e => {
   if (btn && btn.dataset.act === "maxprice") {
     if (!watch) return;
     const now = watch.max_price != null ? `Now $${watch.max_price}.` : "No max price yet.";
-    const v = prompt(`Highest price for "${watch.name}", shipping included. ${now}\nFinds above it are removed; leave blank for no limit.`,
-      watch.max_price ?? "");
+    const v = await ask(`Max price for "${watch.name}"`, `Shipping included. ${now} Finds above it are removed; leave blank for no limit.`,
+      "Set max price", "brand", { label: "Highest price (US $)", value: watch.max_price ?? "" });
     if (v === null) return;
     const max = v.replace(/[$,\s]/g, "");
     if (max && !(Number(max) > 0)) return toast("Enter a price like 400", true);
@@ -561,8 +617,8 @@ $("#listings").addEventListener("click", async e => {
   if (btn && btn.dataset.act === "exclude") {
     if (!watch) return;
     const title = $(".title", card).textContent;
-    const term = (prompt(`Hide finds like this from "${watch.name}".\n\n${title}\n\nWord or phrase to exclude:`,
-      suggestExclude(title, watch)) || "").trim();
+    const term = ((await ask(`Hide finds like this from "${watch.name}"?`, title, "Exclude", "brand",
+      { label: "Word or phrase to exclude", value: suggestExclude(title, watch) })) || "").trim();
     if (!term) return;
     const r = await api("PUT", `/api/watches/${watch.id}`, { exclude: [...watch.exclude, term] });
     toast(`Excluding "${term}" · ${r.removed} find${r.removed === 1 ? "" : "s"} removed`);
@@ -833,7 +889,7 @@ $("#watch-list").addEventListener("click", async e => {
       editWatch(w);
       return tuneWatch();
     case "delete":
-      if (!confirm(`Delete "${w.name}" and all its finds?`)) return;
+      if (!await ask(`Delete watch "${w.name}"?`, "All its finds are deleted too.", "Delete watch", "danger")) return;
       await api("DELETE", `/api/watches/${id}`);
       break;
   }
@@ -1313,8 +1369,8 @@ $("#machines").addEventListener("click", async e => {
   if (act === "find-parts") {
     const data = machineFromCard(card);
     if (!(data.make && data.model && data.year)) return toast("Fill in make, model and year first (or look up the VIN)", true);
-    const part = (prompt(`What part for the ${data.year} ${data.make} ${data.model}?
-e.g. brake pads, tires 265/70R17, tonneau cover`) || "").trim();
+    const part = ((await ask(`Find parts for the ${data.year} ${data.make} ${data.model}`, "", "Find parts", "brand",
+      { label: "What part?", placeholder: "e.g. brake pads, tires 265/70R17, tonneau cover" })) || "").trim();
     if (!part) return;
     const id = await saveMachine(card);
     editWatch(null);
@@ -1345,7 +1401,7 @@ e.g. brake pads, tires 265/70R17, tonneau cover`) || "").trim();
   if (act === "add-part") return $(".parts", card).insertAdjacentHTML("beforeend", partRow({ category: "other", model: "" }));
   if (act === "rm-part") return btn.closest(".part-row").remove();
   if (act === "delete") {
-    if (!confirm("Delete this device? Its watches are kept.")) return;
+    if (!await ask("Delete this device?", "Its watches are kept.", "Delete device", "danger")) return;
     await api("DELETE", `/api/machines/${card.dataset.id}`);
     await refresh();
     return renderMachines();
@@ -1364,7 +1420,6 @@ e.g. brake pads, tires 265/70R17, tonneau cover`) || "").trim();
   });
 });
 
-$$("nav button").find(b => b.dataset.tab === "hardware").addEventListener("click", renderMachines);
 
 // ---- settings -------------------------------------------------------------------
 
@@ -1454,7 +1509,7 @@ function fillSettings() {
 }
 
 $("#api-key-new").addEventListener("click", e => busy(e.target, async () => {
-  if (state.settings.api_key && !confirm("Make a new key? Apps using the old one will stop working until you update them.")) return;
+  if (state.settings.api_key && !await ask("Replace the API key?", "Apps using the old one will stop working until you update them.", "Replace API key", "danger")) return;
   const { api_key } = await api("POST", "/api/api-key");
   $("#api-key-value").value = api_key;
   $("#api-key-box").hidden = false;
@@ -1507,10 +1562,9 @@ $("#test-discord").addEventListener("click", e => busy(e.target, async () => {
 (async () => {
   showAppLinks();
   await refresh();
-  let tab = "finds";
-  try { tab = localStorage.getItem("tab") || "finds"; } catch {}
+  let tab = location.hash.slice(1);
+  if (!tab) try { tab = localStorage.getItem("tab") || "finds"; } catch { tab = "finds"; }
   showTab(tab);
-  if (tab === "hardware") renderMachines();
   setInterval(async () => {
     await refresh();
     if (!$("#tab-finds").hidden) loadListings();
