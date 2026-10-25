@@ -773,7 +773,13 @@ def auth_logout(body, params):
     req = _request.get() or {}
     if req.get("token"):
         auth.revoke_token(req["token"])
-    return {"ok": True, "__clear_cookie__": True}
+    out = {"ok": True, "__clear_cookie__": True}
+    user = req.get("user") or {}
+    if user.get("via") == "central" and oidc.enabled():
+        # A Cougar Cave session signs out of Cougar Cave too, or "Sign in with Cougar Cave" would walk straight back
+        # in. The page then sends the browser here, which ends the central session (and so every app's).
+        out["end_session"] = oidc.LOGIN["central"].end_session_url
+    return out
 
 
 @route("GET", "/api/me")
@@ -993,7 +999,7 @@ def _is_privileged(method: str, path: str, body, user: dict | None) -> bool:
         return True
     if (method, path) == ("PUT", "/api/settings") and user.get("role") == "admin":
         return True  # all of an admin's settings: shared keys, the Home Assistant link, LAN addresses
-    if path == "/api/tokens" or path.startswith("/api/tokens/"):
+    if path.startswith("/api/tokens/"):  # signing out another of your sessions; seeing the list is ordinary
         return True
     if (method, path) == ("POST", "/api/me") and isinstance(body, dict) and (body.get("email") or body.get("new_password")):
         return True

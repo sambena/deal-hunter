@@ -202,7 +202,13 @@ async function fillAccount() {
   $("#acct-name").value = me.name || "";
   $("#acct-email").value = me.email || "";
   $("#acct-current").value = $("#acct-new").value = "";
-  const { tokens } = await api("GET", "/api/tokens");
+  let tokens;
+  try {
+    ({ tokens } = await api("GET", "/api/tokens"));
+  } catch (err) {
+    $("#acct-devices").innerHTML = `<p class="muted">${esc(err.message)}</p>`;
+    return;
+  }
   $("#acct-devices").innerHTML = tokens.length ? tokens.map(t => `<div class="row device" data-id="${t.id}">
       <span><b>${esc(t.name)}</b>${t.current ? " (this one)" : ""}<br><span class="muted">${esc(t.kind)} · signed in ${ago(t.created_at)} · last used ${ago(t.last_used)}</span></span>
       <span class="spacer"></span>${t.current ? "" : `<button type="button" class="small danger" data-act="revoke">Sign out</button>`}</div>`).join("")
@@ -229,8 +235,10 @@ $("#acct-save").addEventListener("click", e => busy(e.target, async () => {
 }));
 
 $("#sign-out").addEventListener("click", async () => {
-  await api("POST", "/api/auth/logout");
-  location.reload();
+  const out = await api("POST", "/api/auth/logout");
+  // A Cougar Cave session also ends the Cougar Cave sign-in, on the login service's own page.
+  if (out.end_session) location.assign(out.end_session);
+  else location.reload();
 });
 
 function esc(s) {
