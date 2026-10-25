@@ -146,6 +146,9 @@ class CentralLoginTest(unittest.TestCase):
         central.set_status(self.owner_ident, "active")
         central.set_status(self.member_ident, "active")
         db.execute("UPDATE users SET disabled = 0")
+        db.execute("DELETE FROM central_identities WHERE id NOT IN (?, ?)", (self.owner_ident, self.member_ident))
+        db.execute("DELETE FROM central_link_states")
+        db.execute("UPDATE users SET email = 'pal@example.com' WHERE id = ?", (self.unlinked,))
 
     # ---- helpers -------------------------------------------------------------------
 
@@ -232,11 +235,13 @@ class CentralLoginTest(unittest.TestCase):
         self.assertEqual(status, 400)
         self.assertNotIn("dh_session", b.jar)
 
-    def test_unlinked_person_is_refused_even_with_a_matching_email(self):
+    def test_unlinked_person_is_not_signed_in_even_with_a_matching_email(self):
         status, body, b, _ = self.sign_in(sub="stranger-uuid", extra={"email": "sam@example.com", "email_verified": True})
-        self.assertEqual(status, 403)
-        self.assertIn("no access to Deal Hunter", body)
+        self.assertEqual(status, 200)
+        self.assertIn("url=/link.html", body)  # offered the link page, not the admin's account
         self.assertNotIn("dh_session", b.jar)
+        self.assertEqual(self.state_of(b), 401)
+        self.assertFalse(db.query("SELECT 1 FROM central_identities WHERE subject = 'stranger-uuid'"))
 
     def test_admin_needs_both_password_and_code_markers(self):
         for amr in (("mfa",), ("pwd",), ()):
@@ -790,6 +795,164 @@ class CentralLoginTest(unittest.TestCase):
         self.assertTrue(any(c.startswith("dh_login=;") and "Max-Age=0" in c for c in cookies))
         self.assertNotIn("dh_session", b.jar)
 
+
+    # ---- self-service linking (#323): prove which account is yours with its email and password ---------------
+
+    def start_link(self, sub="pal-uuid", amr=("pwd", "mfa")):
+        """A validated central sign-in for someone not linked yet; returns their browser holding the link cookie."""
+        status, body, b, _ = self.sign_in(sub=sub, amr=amr)
+        self.assertEqual(status, 200)
+        self.assertIn("url=/link.html", body)
+        self.assertIn("dh_link", b.jar)
+        return b
+
+    def link(self, b, email="pal@example.com", password="pal pass 1"):
+        status, _, data, _ = b.get("/auth/link", "POST", {"email": email, "password": password})
+        return status, json.loads(data or b"{}")
+
+    def pal_snapshot(self):
+        rows = {}
+        for table, where in (("users", "id = ?"), ("watches", "user_id = ?"), ("machines", "user_id = ?"),
+                             ("user_settings", "user_id = ?"), ("ai_usage", "user_id = ?")):
+            rows[table] = db.query(f"SELECT * FROM {table} WHERE {where} ORDER BY rowid", (self.unlinked,))
+        return rows
+
+    def test_a_person_links_their_own_account_and_keeps_everything(self):
+        with db.as_user(self.unlinked):
+            db.create_watch({"name": "Pal 3070", "query": "rtx 3070", "sources": ["ebay"]})
+            db.update_settings({"zip_code": "84604"}, shared_allowed=False)
+        before = self.pal_snapshot()
+        b = self.start_link()
+        status, body = self.link(b)
+        self.assertEqual((status, body), (200, {"linked": True}))
+        self.assertNotIn("dh_link", b.jar)
+        self.assertEqual(json.loads(b.get("/api/me")[2])["id"], self.unlinked)
+        self.assertEqual(self.pal_snapshot(), before)  # row by row, nothing changed
+        self.assertEqual(db.query("SELECT user_id FROM central_identities WHERE subject = 'pal-uuid'"),
+                         [{"user_id": self.unlinked}])
+        status, body, again, _ = self.sign_in(sub="pal-uuid")  # from now on a central sign-in goes straight in
+        self.assertEqual(status, 200)
+        self.assertNotIn("link.html", body)
+        self.assertEqual(json.loads(again.get("/api/me")[2])["id"], self.unlinked)
+        self.assertIn("link_self", [r["action"] for r in central.audit_log(5)])
+
+    def test_linking_needs_this_browsers_link(self):
+        self.start_link()
+        status, body = self.link(self.browser())  # a browser that never signed in centrally
+        self.assertEqual(status, 400)
+        self.assertIn("Start again", body["error"])
+        forged = self.browser()
+        forged.jar["dh_link"] = "made-up-link-token"  # a link cookie that isn't this browser's
+        self.assertEqual(self.link(forged)[0], 400)
+        self.assertFalse(db.query("SELECT 1 FROM central_identities WHERE subject = 'pal-uuid'"))
+
+    def test_a_wrong_password_links_nothing_and_the_right_one_still_can(self):
+        b = self.start_link()
+        status, body = self.link(b, password="not it")
+        self.assertEqual((status, body["error"]), (401, "Wrong email or password"))
+        self.assertFalse(db.query("SELECT 1 FROM central_identities WHERE subject = 'pal-uuid'"))
+        self.assertEqual(self.link(b)[0], 200)
+
+    def test_an_existing_session_is_not_proof(self):
+        b = self.start_link()
+        self.assertEqual(b.get("/api/auth/login", "POST", {"email": "pal@example.com", "password": "pal pass 1"})[0], 200)
+        self.assertEqual(self.state_of(b), 200)  # signed in with the app's password, and holding the link cookie
+        self.assertEqual(self.link(b, password="")[0], 401)
+        self.assertFalse(db.query("SELECT 1 FROM central_identities WHERE subject = 'pal-uuid'"))
+
+    def test_someone_elses_account_cannot_be_linked_with_their_email_alone(self):
+        b = self.start_link(sub="intruder-uuid")
+        self.assertEqual(self.link(b, email="sis@example.com", password="pal pass 1")[0], 401)
+        self.assertEqual(self.link(b, email="sis@example.com", password="")[0], 401)
+        self.assertFalse(db.query("SELECT 1 FROM central_identities WHERE subject = 'intruder-uuid'"))
+
+    def test_an_account_without_a_password_cannot_be_linked_by_itself(self):
+        nopass = db.execute("INSERT INTO users (email, name, role, created_at) VALUES ('new@example.com', 'New', 'member', ?)",
+                            (time.time(),))
+        try:
+            b = self.start_link(sub="new-uuid")
+            self.assertEqual(self.link(b, email="new@example.com", password="")[0], 401)
+            self.assertEqual(self.link(b, email="new@example.com", password="anything at all")[0], 401)
+            self.assertFalse(db.query("SELECT 1 FROM central_identities WHERE user_id = ?", (nopass,)))
+            central.link(nopass, ISSUER, "new-uuid")  # the owner-run link by exact subject still works for it
+        finally:
+            db.execute("DELETE FROM users WHERE id = ?", (nopass,))
+
+    def test_a_disabled_account_cannot_be_linked(self):
+        b = self.start_link()
+        db.execute("UPDATE users SET disabled = 1 WHERE id = ?", (self.unlinked,))
+        self.assertEqual(self.link(b)[0], 403)
+        self.assertFalse(db.query("SELECT 1 FROM central_identities WHERE subject = 'pal-uuid'"))
+
+    def test_a_collision_changes_nothing(self):
+        before = db.query("SELECT * FROM central_identities ORDER BY id")
+        b = self.start_link(sub="second-uuid")  # a second central account trying to take the already linked Sis
+        status, body = self.link(b, email="sis@example.com", password="sister pass 1")
+        self.assertEqual(status, 409)
+        self.assertIn("already linked", body["error"])
+        self.assertEqual(db.query("SELECT * FROM central_identities ORDER BY id"), before)
+        self.assertEqual(self.sign_in(sub="member-uuid")[0], 200)  # the existing link still works
+
+    def test_an_expired_or_used_link_is_refused(self):
+        b = self.start_link()
+        db.execute("UPDATE central_link_states SET created_at = created_at - 400")
+        self.assertEqual(self.link(b)[0], 400)
+        b = self.start_link()
+        cookie = b.jar["dh_link"]
+        self.assertEqual(self.link(b)[0], 200)
+        db.execute("DELETE FROM central_identities WHERE subject = 'pal-uuid'")
+        b2 = self.browser()
+        b2.jar["dh_link"] = cookie  # the same link, replayed
+        self.assertEqual(self.link(b2)[0], 400)
+        self.assertFalse(db.query("SELECT 1 FROM central_identities WHERE subject = 'pal-uuid'"))
+
+    def test_shared_email_links_the_account_the_password_proved(self):
+        twin = db.execute("INSERT INTO users (email, name, password_hash, role, created_at) "
+                          "VALUES ('pal@example.com', 'Twin', ?, 'member', ?)", (auth.hash_password("twin pass 1"), time.time()))
+        try:
+            b = self.start_link(sub="twin-uuid")
+            self.assertEqual(self.link(b, password="twin pass 1")[0], 200)
+            self.assertEqual(db.query("SELECT user_id FROM central_identities WHERE subject = 'twin-uuid'"),
+                             [{"user_id": twin}])
+            self.assertFalse(db.query("SELECT 1 FROM central_identities WHERE user_id = ?", (self.unlinked,)))
+        finally:
+            db.execute("DELETE FROM central_identities WHERE user_id = ?", (twin,))
+            db.execute("DELETE FROM users WHERE id = ?", (twin,))
+
+    def test_after_an_email_change_the_link_holds_and_the_old_email_proves_nothing(self):
+        self.assertEqual(self.link(self.start_link())[0], 200)
+        db.execute("UPDATE users SET email = 'pal.new@example.com' WHERE id = ?", (self.unlinked,))
+        status, _, b, _ = self.sign_in(sub="pal-uuid")
+        self.assertEqual(json.loads(b.get("/api/me")[2])["id"], self.unlinked)
+        intruder = self.start_link(sub="intruder-uuid")
+        self.assertEqual(self.link(intruder, email="pal@example.com")[0], 401)
+
+    def test_the_admin_account_needs_both_factors_to_link(self):
+        db.execute("DELETE FROM central_identities WHERE id = ?", (self.owner_ident,))
+        try:
+            b = self.start_link(sub="owner-two-uuid", amr=("mfa",))
+            status, body = self.link(b, email="sam@example.com", password="admin pass 1")
+            self.assertEqual(status, 403)
+            self.assertIn("password and your authenticator code", body["error"])
+            self.assertFalse(db.query("SELECT 1 FROM central_identities WHERE user_id = ?", (self.admin,)))
+            b = self.start_link(sub="owner-two-uuid")
+            self.assertEqual(self.link(b, email="sam@example.com", password="admin pass 1")[0], 200)
+        finally:
+            db.execute("DELETE FROM central_identities WHERE user_id = ?", (self.admin,))
+            db.execute("INSERT INTO central_identities (id, issuer, subject, user_id, status, created_at) "
+                       "VALUES (?, ?, 'owner-uuid', ?, 'active', ?)", (self.owner_ident, ISSUER, self.admin, time.time()))
+
+    def test_linking_obeys_the_switch_the_method_and_the_guessing_limit(self):
+        b = self.start_link()
+        central.set_switch("off")
+        self.assertEqual(self.link(b)[0], 403)
+        central.set_switch("on")
+        self.assertEqual(b.get("/auth/link")[0], 405)
+        self.assertEqual(b.get("/auth/link", "POST", None, headers={"Content-Type": "text/plain", "Content-Length": "0"})[0], 415)
+        for _ in range(auth.FAIL_LIMIT):
+            self.assertEqual(self.link(b, password="guess")[0], 401)
+        self.assertEqual(self.link(b)[0], 429)  # even the right password waits now
+        self.assertFalse(db.query("SELECT 1 FROM central_identities WHERE subject = 'pal-uuid'"))
 
     # ---- privileged actions (#412): admin and account routes need a central pwd+mfa sign-in, a change a recent one
 

@@ -25,7 +25,8 @@ import central
 
 TX_SECONDS = 300
 CALLBACK_PATH = "/auth/callback"
-ROUTES = ("/auth/central", CALLBACK_PATH, "/auth/logout")
+LINK_PATH = "/auth/link"  # POST: prove which Deal Hunter account is yours, to link it (see link.html)
+ROUTES = ("/auth/central", CALLBACK_PATH, "/auth/logout", LINK_PATH)
 REQUIRED = ("issuer", "client_id", "callback", "authorize_url", "token_url", "jwks_url", "client_secret_file")
 
 DENIED = ('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" '
@@ -37,6 +38,7 @@ DENIED = ('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name
 # here is sent on the next request. A meta refresh, because the page's security policy forbids inline script.
 GO = ('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=/">'
       '<title>Signing in</title></head><body><p>Signing in… <a href="/">Continue</a></p></body></html>')
+GO_LINK = GO.replace("url=/", "url=/link.html").replace('href="/"', 'href="/link.html"')
 
 # What a response from here is: (status, extra headers, HTML body). The server adds the security headers.
 Response = tuple[int, list[tuple[str, str]], bytes]
@@ -133,6 +135,10 @@ class CentralLogin:
             user, token = central.sign_in(claims["iss"], claims["sub"], claims["auth_time"], claims.get("amr"))
         except LoginRejected:
             status, headers, body = page("Sign-in could not be completed. Start again.", 400)
+        except central.NotLinked:
+            # Validated but not linked yet: let them prove which account is theirs, in this browser, for 5 minutes.
+            link = central.begin_link(claims["iss"], claims["sub"], claims["auth_time"], claims.get("amr"))
+            status, headers, body = 200, [self.link_cookie(link, central.LINK_SECONDS, secure)], GO_LINK.encode()
         except central.CentralError as e:
             status, headers, body = page(str(e), e.status)
         else:  # anything unexpected is answered by the server's catch-all, which clears this cookie too
@@ -142,6 +148,23 @@ class CentralLogin:
 
     def clear_cookie(self, secure: bool) -> tuple[str, str]:
         return self._tx_cookie(self._cookie_name(secure), "", 0, secure)
+
+    @staticmethod
+    def link_cookie_name(secure: bool) -> str:
+        return "__Host-dh_link" if secure else "dh_link"
+
+    def link_cookie(self, value: str, max_age: int, secure: bool) -> tuple[str, str]:
+        return self._tx_cookie(self.link_cookie_name(secure), value, max_age, secure)
+
+    def link(self, body: dict, cookie_header: str, secure: bool, address: str):
+        """POST /auth/link: returns (status, JSON payload, headers, (account id, session token) or None)."""
+        token = auth.cookie_value(cookie_header, self.link_cookie_name(secure)) or ""
+        try:
+            user, session = central.complete_link(token, str(body.get("email") or ""), str(body.get("password") or ""),
+                                                  address)
+        except central.CentralError as e:
+            return e.status, {"error": str(e)}, [], None
+        return 200, {"linked": True}, [self.link_cookie("", 0, secure)], (user["id"], session)
 
     @staticmethod
     def logout() -> Response:

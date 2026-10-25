@@ -216,6 +216,14 @@ CREATE TABLE IF NOT EXISTS central_identities (  -- a Cougar Cave login linked t
     UNIQUE (issuer, subject)
 );
 CREATE TABLE IF NOT EXISTS central_state (key TEXT PRIMARY KEY, value TEXT NOT NULL);  -- the on/off switch
+CREATE TABLE IF NOT EXISTS central_link_states (  -- a validated central login waiting to be linked by its owner
+    token_hash TEXT PRIMARY KEY,        -- only a hash; the token is in that browser's cookie
+    issuer TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    amr TEXT NOT NULL,
+    auth_time REAL NOT NULL,
+    created_at REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS central_audit (  -- who did what to central sign-in; never codes, tokens or secrets
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     at REAL NOT NULL,
