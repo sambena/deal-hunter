@@ -61,17 +61,21 @@ def audit_log(limit: int = 50) -> list[dict]:
 
 
 def backchannel_logout(issuer: str, subject: str, jti: str) -> int:
-    """Relay's one-use logout: revoke the sessions attached to this exact linked identity, atomically."""
+    """Relay's one-use logout: revoke the sessions attached to this exact linked identity, atomically. Each token id
+    works once, recorded before the lookup, so a replay is refused either way. A subject Deal Hunter never linked is
+    accepted with no change and an audit row (#528): the login service sends the logout to every app, and a 400 would
+    make it retry a logout that has nothing to end (OIDC Back-Channel Logout 1.0, section 2.8)."""
     with _write() as c:
         c.execute("DELETE FROM central_logout_jti WHERE seen < ?", (time.time() - 3600,))
-        row = c.execute("SELECT id FROM central_identities WHERE issuer = ? AND subject = ?",
-                        (issuer, subject)).fetchone()
-        if row is None:
-            raise CentralError("No such person.", 400)
         try:
             c.execute("INSERT INTO central_logout_jti VALUES (?, ?)", (jti[:200], time.time()))
         except sqlite3.IntegrityError:
             raise CentralError("Logout token already used.", 400) from None
+        row = c.execute("SELECT id FROM central_identities WHERE issuer = ? AND subject = ?",
+                        (issuer, subject)).fetchone()
+        if row is None:
+            audit("logout_backchannel", "a subject not linked here: nothing to end", c)
+            return 0
         n = c.execute("DELETE FROM tokens WHERE identity_id = ?", (row['id'],)).rowcount
         audit("logout_backchannel", f"identity {row['id']}: {n} sessions ended", c)
         return n

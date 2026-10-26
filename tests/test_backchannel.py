@@ -161,16 +161,23 @@ class BackchannelTest(unittest.TestCase):
             with self.subTest(field=field):
                 self.rejected("missing-" + field, drop=(field,))
 
-    def test_unknown_person(self):
+    def test_unknown_person_is_accepted_with_nothing_ended(self):
+        """#528: a valid token for a subject never linked here is 200 (Back-Channel Logout 1.0, 2.8), changes no
+        session, audits without the subject or token, and its replay is still refused."""
         browser = self.signed_in()
         token = logout_token(sub="stranger-uuid")
-        claims = self.login.validate_logout_token(token)  # valid cryptographically; rejected by identity lookup
-        with self.assertRaisesRegex(central.CentralError, "^No such person[.]$"):
-            central.backchannel_logout(claims['iss'], claims['sub'], claims['jti'])
-        before = self.snapshot()
-        self.bare(self.post(token), 400)
-        self.assertEqual(self.snapshot(), before)
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            response = self.post(token)
+        self.assertEqual((response[0], response[2]), (200, b""))
         self.assertEqual(self.state_of(browser), 200)
+        audit = central.audit_log(1)[0]
+        self.assertEqual((audit["action"], audit["detail"]), ("logout_backchannel", "a subject not linked here: nothing to end"))
+        self.assertNotIn("stranger-uuid", json.dumps(audit) + output.getvalue())
+        self.assertNotIn(token, json.dumps(audit) + output.getvalue())
+        before = self.snapshot()
+        self.bare(self.post(token), 400)  # replay
+        self.assertEqual(self.snapshot(), before)
         self.control(browser)
 
     def test_valid_ends_only_that_identitys_sessions_and_audits_without_token(self):
