@@ -67,8 +67,8 @@ class BackchannelTest(unittest.TestCase):
         conn.close()
         return status, h, data
 
-    def signed_in(self, sub="owner-uuid"):
-        status, _, browser, _ = self.sign_in(sub=sub)
+    def signed_in(self, sub="owner-uuid", sid=None):
+        status, _, browser, _ = self.sign_in(sub=sub, **({"extra": {"sid": sid}} if sid else {}))
         self.assertEqual(status, 200)
         self.assertEqual(self.state_of(browser), 200)
         return browser
@@ -198,6 +198,52 @@ class BackchannelTest(unittest.TestCase):
         self.assertEqual(audit["action"], "logout_backchannel")
         self.assertEqual(audit["detail"], f"identity {self.owner_ident}: 2 sessions ended")
         self.assertNotIn(token, output.getvalue() + json.dumps(audit))
+
+    # ---- #551: a logout token with a sid ends only that central login session ----
+
+    def test_a_sid_logout_ends_only_that_sign_in(self):
+        a, b = self.signed_in(sid="sid-A"), self.signed_in(sid="sid-B")
+        other = self.signed_in("member-uuid", sid="sid-A")      # another person's session with the same sid value
+        self.assertEqual(db.query("SELECT sid FROM tokens WHERE via = 'central' ORDER BY id")[0]["sid"], "sid-A")
+        response = self.post(logout_token(sid="sid-A"))
+        self.assertEqual((response[0], response[2]), (200, b""))
+        self.assertEqual(self.state_of(a), 401)
+        self.assertEqual((self.state_of(b), self.state_of(other)), (200, 200))   # the control: B still works
+        audit = central.audit_log(1)[0]
+        self.assertEqual(audit["detail"], f"identity {self.owner_ident} (one sign-in): 1 sessions ended")
+        self.assertNotIn("sid-A", json.dumps(audit))
+
+    def test_a_sid_logout_also_ends_that_persons_sessions_with_no_sid(self):
+        a, old = self.signed_in(sid="sid-A"), self.signed_in()  # signed in before sids were kept: no sid
+        b = self.signed_in(sid="sid-B")
+        self.assertEqual(self.post(logout_token(sid="sid-A"))[0], 200)
+        self.assertEqual((self.state_of(a), self.state_of(old), self.state_of(b)), (401, 401, 200))
+
+    def test_a_sid_logout_leaves_the_apps_own_sign_ins(self):
+        a = self.signed_in(sid="sid-A")
+        password = auth.create_token(self.admin, "web", "password test")
+        device = auth.create_token(self.admin, "device", "device test")
+        self.assertEqual(self.post(logout_token(sid="sid-A"))[0], 200)
+        self.assertEqual(self.state_of(a), 401)
+        self.assertIsNotNone(auth.user_for_token(password))
+        self.assertIsNotNone(auth.user_for_token(device))
+
+    def test_a_sub_only_logout_still_ends_every_sign_in(self):
+        a, b, old = self.signed_in(sid="sid-A"), self.signed_in(sid="sid-B"), self.signed_in()
+        other = self.signed_in("member-uuid", sid="sid-A")
+        self.assertEqual(self.post(logout_token())[0], 200)
+        self.assertEqual((self.state_of(a), self.state_of(b), self.state_of(old)), (401, 401, 401))
+        self.assertEqual(self.state_of(other), 200)
+
+    def test_a_sid_logout_for_an_unknown_subject_is_200_and_its_replay_400(self):
+        a = self.signed_in(sid="sid-A")
+        token = logout_token(sub="stranger-uuid", sid="sid-A")
+        self.assertEqual(self.post(token)[0], 200)
+        self.assertEqual(self.state_of(a), 200)                  # the same sid value, another person: nothing ends
+        self.bare(self.post(token), 400)
+        replay = logout_token(sid="sid-A")
+        self.assertEqual(self.post(replay)[0], 200)
+        self.bare(self.post(replay), 400)
 
     def test_replay_after_database_reopen_changes_nothing(self):
         first = self.signed_in()

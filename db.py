@@ -421,9 +421,14 @@ def conn() -> sqlite3.Connection:
             for col, ddl in (("via", "TEXT"),  # 'central' for a Cougar Cave sign-in; NULL for the app's own
                              ("auth_time", "REAL"),  # when the person last proved who they are centrally
                              ("identity_id", "INTEGER"),
-                             ("amr", "TEXT")):  # the signed sign-in methods, as JSON: ["pwd", "mfa"]
+                             ("amr", "TEXT"),  # the signed sign-in methods, as JSON: ["pwd", "mfa"]
+                             ("sid", "TEXT")):  # the central login session (ID token sid) it came from (#551)
                 if col not in tcols:
                     _conn.execute(f"ALTER TABLE tokens ADD COLUMN {col} {ddl}")
+            # #551: a phone remembers the central login session (sid) of the browser that made its PIN.
+            for table in ("pair_codes", "paired_devices"):
+                if "sid" not in {r["name"] for r in _conn.execute(f"PRAGMA table_info({table})")}:
+                    _conn.execute(f"ALTER TABLE {table} ADD COLUMN sid TEXT")
             _conn.execute("CREATE INDEX IF NOT EXISTS idx_watches_user ON watches(user_id)")
             _conn.execute("CREATE INDEX IF NOT EXISTS idx_machines_user ON machines(user_id)")
             _conn.commit()
