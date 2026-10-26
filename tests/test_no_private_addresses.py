@@ -12,6 +12,8 @@ TEXT = {".py", ".js", ".html", ".css", ".md", ".json", ".txt", ".bat", ".cmd", "
         ".yaml"}
 PRIVATE = re.compile(r"\b(10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3})\b")
 EXAMPLES = {"192.168.1.10", "192.168.1.20", "192.168.1.30", "192.168.1.50", "10.0.0.5"}
+# The private ranges themselves, as the new app's "public address" rule names them (site/src/logic/ip-ranges.ts).
+EXAMPLES |= {"10.0.0.0", "172.16.0.0", "192.168.0.0"}
 
 
 def files():

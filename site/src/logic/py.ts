@@ -223,3 +223,47 @@ export function pyRepr(s: string): string {
   }
   return out + q;
 }
+
+/** A request value of the wrong type: the Python app's ValueError or TypeError, answered with its 400. */
+export class BadValue extends Error {}
+
+/** Python's int(v) for a JSON value: whole numbers and bools as they are, a float cut towards zero, a string of
+ * decimal digits (with sign, spaces and _ between digits); anything else is a BadValue. */
+export function pyInt(v: unknown): number {
+  if (typeof v === 'boolean') return v ? 1 : 0;
+  if (typeof v === 'number') {
+    if (!Number.isFinite(v)) throw new BadValue('int() of a non-finite float');
+    return Math.trunc(v);
+  }
+  if (typeof v === 'string') {
+    const s = asciiDigits(pyStrip(v));
+    if (/^[+-]?\d+(_\d+)*$/.test(s)) return Number(s.replace(/_/g, ''));
+  }
+  throw new BadValue(`int() of ${typeof v}`);
+}
+
+/** Python's float(v) for a JSON value: numbers, bools, and strings Python reads as a float (inf and nan too). */
+export function pyFloat(v: unknown): number {
+  if (typeof v === 'boolean') return v ? 1 : 0;
+  if (typeof v === 'number') return v;
+  if (typeof v === 'string') {
+    const s = asciiDigits(pyStrip(v)).replace(/(?<=\d)_(?=\d)/g, '');
+    if (/^[+-]?(\d+\.?\d*([eE][+-]?\d+)?|\.\d+([eE][+-]?\d+)?)$/.test(s)) return Number(s);
+    const word = s.toLowerCase().replace(/^[+-]/, '');
+    if (word === 'inf' || word === 'infinity') return s.startsWith('-') ? -Infinity : Infinity;
+    if (word === 'nan') return NaN;
+  }
+  throw new BadValue(`float() of ${typeof v}`);
+}
+
+/** Python's == between two JSON values where it matters here: 0 == False == 0.0, and "0" is not 0. */
+export const pyEq = (a: unknown, b: unknown): boolean =>
+  (typeof a === 'number' || typeof a === 'boolean') && (typeof b === 'number' || typeof b === 'boolean') ? Number(a) === Number(b) : a === b;
+
+/** Python's `v in (a, b, ...)`. */
+export const pyIn = (v: unknown, ...options: unknown[]): boolean => options.some((o) => pyEq(v, o));
+
+/** Python's truthiness of a JSON value. */
+export const truthy = (v: unknown): boolean =>
+  !(v === null || v === undefined || v === false || v === 0 || v === '' || (Array.isArray(v) && !v.length)
+    || (typeof v === 'object' && v !== null && !Array.isArray(v) && !Object.keys(v).length));
