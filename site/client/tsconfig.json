@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "useDefineForClassFields": false,
+    "noUncheckedIndexedAccess": false,
+    "types": [],
+    "noEmit": true,
+    "paths": { "/cave/cave-ui.js": ["../node_modules/@cougarcave/ui/dist/types/index.d.ts"] }
+  },
+  "include": ["."]
+}

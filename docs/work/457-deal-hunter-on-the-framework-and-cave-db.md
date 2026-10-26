@@ -197,5 +197,14 @@ Deal Hunter runs on the Cougar Cave web framework (`@cougarcave/server` 1.0.5, `
 - The copy: what to do with accounts that have no active central link, once the real counts are known.
 - Decision 2: removing the Python app after the restorable week, in this item or a follow-up.
 
+## Settled (cougar-reviewer, 2026-10-26, on PR #83)
+1. An admin session without both factors is refused on every `/api` route, as today.
+2. The Android pairing and header are deal-hunter-android #537 (its PR #49). The cutover waits on it; Sam decides that
+   step. Nothing in the web PRs waits on it, and this item doesn't touch the Android repository.
+3. The copy stops and lists accounts with no active central link; cougar-reviewer settles them at cutover.
+4. Removing the Python app is a follow-up item after the restorable week.
+- The one-time sign-in and re-pairing are accepted. Port 8781 stays as a second listener for paired-phone credentials
+  only.
+
 ## Handoff
-Next: cougar-reviewer's review of this brief.
+The brief is merged. Delivery step 1 (the stamped app and the `deals` schema) is the next PR.

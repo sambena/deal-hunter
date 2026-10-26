@@ -1,0 +1,35 @@
+{
+  "name": "deals",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Deal Hunter, a Cougar Cave app.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "tsc -p tsconfig.build.json && vite build",
+    "start": "node --env-file-if-exists=.env dist/server.js",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p client",
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate"
+  },
+  "dependencies": {
+    "@cougarcave/server": "file:vendor/cougarcave-server-1.0.5.tgz",
+    "@cougarcave/ui": "file:vendor/cougarcave-ui-1.1.0.tgz",
+    "drizzle-orm": "0.45.4",
+    "fastify": "5.12.7",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.5",
+    "drizzle-kit": "0.31.11",
+    "happy-dom": "21.0.4",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2",
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
+  }
+}
