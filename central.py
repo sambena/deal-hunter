@@ -77,7 +77,9 @@ def backchannel_logout(issuer: str, subject: str, jti: str) -> int:
             audit("logout_backchannel", "a subject not linked here: nothing to end", c)
             return 0
         n = c.execute("DELETE FROM tokens WHERE identity_id = ?", (row['id'],)).rowcount
-        audit("logout_backchannel", f"identity {row['id']}: {n} sessions ended", c)
+        import pairing  # late: pairing imports this module
+        d = pairing.revoke_identity(row['id'], 'logout', c)
+        audit("logout_backchannel", f"identity {row['id']}: {n} sessions ended" + (f", {d} phones" if d else ""), c)
         return n
 
 
