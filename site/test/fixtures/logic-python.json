@@ -1,0 +1,14443 @@
+{
+"normalize": [
+{
+"in": [
+"NVIDIA GeForce RTX 3080 FE"
+],
+"out": "nvidia geforce rtx 3080 fe"
+},
+{
+"in": [
+"i9-10980 XE 18-core"
+],
+"out": "i9 10980 xe 18 core"
+},
+{
+"in": [
+"RX 5700 XT 8GB"
+],
+"out": "rx 5700 xt 8gb"
+},
+{
+"in": [
+"Intel Core i9-10980XE"
+],
+"out": "intel core i9 10980xe"
+},
+{
+"in": [
+"4 x 32GB DDR4 3200"
+],
+"out": "4 x 32gb ddr4 3200"
+},
+{
+"in": [
+"vertx rtx-3080 Ti"
+],
+"out": "vertx rtx 3080 ti"
+},
+{
+"in": [
+"EVGA 3080 FTW3 Ultra"
+],
+"out": "evga 3080 ftw3 ultra"
+},
+{
+"in": [
+""
+],
+"out": ""
+},
+{
+"in": [
+"Café-racer 3080"
+],
+"out": "caf racer 3080"
+},
+{
+"in": [
+"rtx3080"
+],
+"out": "rtx3080"
+},
+{
+"in": [
+"AMD Ryzen 9 5950X (for parts)"
+],
+"out": "amd ryzen 9 5950x for parts"
+},
+{
+"in": [
+"Samsung 980 Pro 2TB NVMe"
+],
+"out": "samsung 980 pro 2tb nvme"
+},
+{
+"in": [
+"rtx 3080 broken fan"
+],
+"out": "rtx 3080 broken fan"
+},
+{
+"in": [
+"RTX ３０８０ fullwidth"
+],
+"out": "rtx fullwidth"
+}
+],
+"compact": [
+{
+"in": [
+"NVIDIA GeForce RTX 3080 FE"
+],
+"out": "nvidiageforcertx3080fe"
+},
+{
+"in": [
+"i9-10980 XE 18-core"
+],
+"out": "i910980xe18core"
+},
+{
+"in": [
+"RX 5700 XT 8GB"
+],
+"out": "rx5700xt8gb"
+},
+{
+"in": [
+"Intel Core i9-10980XE"
+],
+"out": "intelcorei910980xe"
+},
+{
+"in": [
+"4 x 32GB DDR4 3200"
+],
+"out": "4x32gbddr43200"
+},
+{
+"in": [
+"vertx rtx-3080 Ti"
+],
+"out": "vertxrtx3080ti"
+},
+{
+"in": [
+"EVGA 3080 FTW3 Ultra"
+],
+"out": "evga3080ftw3ultra"
+},
+{
+"in": [
+""
+],
+"out": ""
+},
+{
+"in": [
+"Café-racer 3080"
+],
+"out": "cafracer3080"
+},
+{
+"in": [
+"rtx3080"
+],
+"out": "rtx3080"
+},
+{
+"in": [
+"AMD Ryzen 9 5950X (for parts)"
+],
+"out": "amdryzen95950xforparts"
+},
+{
+"in": [
+"Samsung 980 Pro 2TB NVMe"
+],
+"out": "samsung980pro2tbnvme"
+},
+{
+"in": [
+"rtx 3080 broken fan"
+],
+"out": "rtx3080brokenfan"
+},
+{
+"in": [
+"RTX ３０８０ fullwidth"
+],
+"out": "rtxfullwidth"
+}
+],
+"parse_query": [
+{
+"in": [
+"rtx 3080"
+],
+"out": [
+[
+[
+"rtx"
+],
+[
+"3080"
+]
+],
+[]
+]
+},
+{
+"in": [
+"9980xe|10980xe"
+],
+"out": [
+[
+[
+"9980xe",
+"10980xe"
+]
+],
+[]
+]
+},
+{
+"in": [
+"\"ddr4 32gb\""
+],
+"out": [
+[
+[
+"ddr4 32gb"
+]
+],
+[]
+]
+},
+{
+"in": [
+"-ecc ddr4"
+],
+"out": [
+[
+[
+"ddr4"
+]
+],
+[
+"ecc"
+]
+]
+},
+{
+"in": [
+"10980xe"
+],
+"out": [
+[
+[
+"10980xe"
+]
+],
+[]
+]
+},
+{
+"in": [
+"rtx -ti"
+],
+"out": [
+[
+[
+"rtx"
+]
+],
+[
+"ti"
+]
+]
+},
+{
+"in": [
+"unclosed \"quote"
+],
+"out": [
+[
+[
+"unclosed"
+],
+[
+"quote"
+]
+],
+[]
+]
+},
+{
+"in": [
+"a|b|c d"
+],
+"out": [
+[
+[
+"a",
+"b",
+"c"
+],
+[
+"d"
+]
+],
+[]
+]
+},
+{
+"in": [
+"-"
+],
+"out": [
+[
+[
+"-"
+]
+],
+[]
+]
+},
+{
+"in": [
+"--x"
+],
+"out": [
+[],
+[
+"-x"
+]
+]
+},
+{
+"in": [
+"'single quoted' x"
+],
+"out": [
+[
+[
+"single quoted"
+],
+[
+"x"
+]
+],
+[]
+]
+},
+{
+"in": [
+"say \"a\\\"b\" c"
+],
+"out": [
+[
+[
+"say"
+],
+[
+"a\"b"
+],
+[
+"c"
+]
+],
+[]
+]
+},
+{
+"in": [
+"back\\ slash"
+],
+"out": [
+[
+[
+"back slash"
+]
+],
+[]
+]
+},
+{
+"in": [
+""
+],
+"out": [
+[],
+[]
+]
+},
+{
+"in": [
+"   "
+],
+"out": [
+[],
+[]
+]
+},
+{
+"in": [
+"x|"
+],
+"out": [
+[
+[
+"x"
+]
+],
+[]
+]
+},
+{
+"in": [
+"|y"
+],
+"out": [
+[
+[
+"y"
+]
+],
+[]
+]
+},
+{
+"in": [
+"mid\"dle word\"s"
+],
+"out": [
+[
+[
+"middle words"
+]
+],
+[]
+]
+},
+{
+"in": [
+"4x32gb"
+],
+"out": [
+[
+[
+"4x32gb"
+]
+],
+[]
+]
+},
+{
+"in": [
+"5700x"
+],
+"out": [
+[
+[
+"5700x"
+]
+],
+[]
+]
+},
+{
+"in": [
+"rx 5700 xt"
+],
+"out": [
+[
+[
+"rx"
+],
+[
+"5700"
+],
+[
+"xt"
+]
+],
+[]
+]
+},
+{
+"in": [
+"3080 -mining -lhr"
+],
+"out": [
+[
+[
+"3080"
+]
+],
+[
+"mining",
+"lhr"
+]
+]
+},
+{
+"in": [
+"ram|memory 32gb"
+],
+"out": [
+[
+[
+"ram",
+"memory"
+],
+[
+"32gb"
+]
+],
+[]
+]
+}
+],
+"search_terms": [
+{
+"in": [
+"rtx 3080"
+],
+"out": "rtx 3080"
+},
+{
+"in": [
+"9980xe|10980xe"
+],
+"out": "9980xe"
+},
+{
+"in": [
+"\"ddr4 32gb\""
+],
+"out": "ddr4 32gb"
+},
+{
+"in": [
+"-ecc ddr4"
+],
+"out": "ddr4"
+},
+{
+"in": [
+"10980xe"
+],
+"out": "10980xe"
+},
+{
+"in": [
+"rtx -ti"
+],
+"out": "rtx"
+},
+{
+"in": [
+"unclosed \"quote"
+],
+"out": "unclosed quote"
+},
+{
+"in": [
+"a|b|c d"
+],
+"out": "a d"
+},
+{
+"in": [
+"-"
+],
+"out": "-"
+},
+{
+"in": [
+"--x"
+],
+"out": ""
+},
+{
+"in": [
+"'single quoted' x"
+],
+"out": "single quoted x"
+},
+{
+"in": [
+"say \"a\\\"b\" c"
+],
+"out": "say a\"b c"
+},
+{
+"in": [
+"back\\ slash"
+],
+"out": "back slash"
+},
+{
+"in": [
+""
+],
+"out": ""
+},
+{
+"in": [
+"   "
+],
+"out": ""
+},
+{
+"in": [
+"x|"
+],
+"out": "x"
+},
+{
+"in": [
+"|y"
+],
+"out": "y"
+},
+{
+"in": [
+"mid\"dle word\"s"
+],
+"out": "middle words"
+},
+{
+"in": [
+"4x32gb"
+],
+"out": "4x32gb"
+},
+{
+"in": [
+"5700x"
+],
+"out": "5700x"
+},
+{
+"in": [
+"rx 5700 xt"
+],
+"out": "rx 5700 xt"
+},
+{
+"in": [
+"3080 -mining -lhr"
+],
+"out": "3080"
+},
+{
+"in": [
+"ram|memory 32gb"
+],
+"out": "ram 32gb"
+}
+],
+"check": [
+{
+"in": [
+"NVIDIA GeForce RTX 3080 FE",
+{
+"query": "rtx 3080"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"i9-10980 XE 18-core",
+{
+"query": "rtx 3080"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'rtx'"
+]
+},
+{
+"in": [
+"RX 5700 XT 8GB",
+{
+"query": "rtx 3080"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'rtx'"
+]
+},
+{
+"in": [
+"Intel Core i9-10980XE",
+{
+"query": "rtx 3080"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'rtx'"
+]
+},
+{
+"in": [
+"4 x 32GB DDR4 3200",
+{
+"query": "rtx 3080"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'rtx'"
+]
+},
+{
+"in": [
+"vertx rtx-3080 Ti",
+{
+"query": "rtx 3080"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"EVGA 3080 FTW3 Ultra",
+{
+"query": "rtx 3080"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'rtx'"
+]
+},
+{
+"in": [
+"",
+{
+"query": "rtx 3080"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'rtx'"
+]
+},
+{
+"in": [
+"Café-racer 3080",
+{
+"query": "rtx 3080"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'rtx'"
+]
+},
+{
+"in": [
+"rtx3080",
+{
+"query": "rtx 3080"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'rtx'"
+]
+},
+{
+"in": [
+"AMD Ryzen 9 5950X (for parts)",
+{
+"query": "rtx 3080"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'rtx'"
+]
+},
+{
+"in": [
+"Samsung 980 Pro 2TB NVMe",
+{
+"query": "rtx 3080"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'rtx'"
+]
+},
+{
+"in": [
+"rtx 3080 broken fan",
+{
+"query": "rtx 3080"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"junk 'broken'"
+]
+},
+{
+"in": [
+"RTX ３０８０ fullwidth",
+{
+"query": "rtx 3080"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '3080'"
+]
+},
+{
+"in": [
+"NVIDIA GeForce RTX 3080 FE",
+{
+"query": "9980xe|10980xe"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '9980xe|10980xe'"
+]
+},
+{
+"in": [
+"i9-10980 XE 18-core",
+{
+"query": "9980xe|10980xe"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"RX 5700 XT 8GB",
+{
+"query": "9980xe|10980xe"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '9980xe|10980xe'"
+]
+},
+{
+"in": [
+"Intel Core i9-10980XE",
+{
+"query": "9980xe|10980xe"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"4 x 32GB DDR4 3200",
+{
+"query": "9980xe|10980xe"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '9980xe|10980xe'"
+]
+},
+{
+"in": [
+"vertx rtx-3080 Ti",
+{
+"query": "9980xe|10980xe"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '9980xe|10980xe'"
+]
+},
+{
+"in": [
+"EVGA 3080 FTW3 Ultra",
+{
+"query": "9980xe|10980xe"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '9980xe|10980xe'"
+]
+},
+{
+"in": [
+"",
+{
+"query": "9980xe|10980xe"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '9980xe|10980xe'"
+]
+},
+{
+"in": [
+"Café-racer 3080",
+{
+"query": "9980xe|10980xe"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '9980xe|10980xe'"
+]
+},
+{
+"in": [
+"rtx3080",
+{
+"query": "9980xe|10980xe"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '9980xe|10980xe'"
+]
+},
+{
+"in": [
+"AMD Ryzen 9 5950X (for parts)",
+{
+"query": "9980xe|10980xe"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '9980xe|10980xe'"
+]
+},
+{
+"in": [
+"Samsung 980 Pro 2TB NVMe",
+{
+"query": "9980xe|10980xe"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '9980xe|10980xe'"
+]
+},
+{
+"in": [
+"rtx 3080 broken fan",
+{
+"query": "9980xe|10980xe"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '9980xe|10980xe'"
+]
+},
+{
+"in": [
+"RTX ３０８０ fullwidth",
+{
+"query": "9980xe|10980xe"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '9980xe|10980xe'"
+]
+},
+{
+"in": [
+"NVIDIA GeForce RTX 3080 FE",
+{
+"query": "\"ddr4 32gb\""
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'ddr4 32gb'"
+]
+},
+{
+"in": [
+"i9-10980 XE 18-core",
+{
+"query": "\"ddr4 32gb\""
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'ddr4 32gb'"
+]
+},
+{
+"in": [
+"RX 5700 XT 8GB",
+{
+"query": "\"ddr4 32gb\""
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'ddr4 32gb'"
+]
+},
+{
+"in": [
+"Intel Core i9-10980XE",
+{
+"query": "\"ddr4 32gb\""
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'ddr4 32gb'"
+]
+},
+{
+"in": [
+"4 x 32GB DDR4 3200",
+{
+"query": "\"ddr4 32gb\""
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'ddr4 32gb'"
+]
+},
+{
+"in": [
+"vertx rtx-3080 Ti",
+{
+"query": "\"ddr4 32gb\""
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'ddr4 32gb'"
+]
+},
+{
+"in": [
+"EVGA 3080 FTW3 Ultra",
+{
+"query": "\"ddr4 32gb\""
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'ddr4 32gb'"
+]
+},
+{
+"in": [
+"",
+{
+"query": "\"ddr4 32gb\""
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'ddr4 32gb'"
+]
+},
+{
+"in": [
+"Café-racer 3080",
+{
+"query": "\"ddr4 32gb\""
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'ddr4 32gb'"
+]
+},
+{
+"in": [
+"rtx3080",
+{
+"query": "\"ddr4 32gb\""
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'ddr4 32gb'"
+]
+},
+{
+"in": [
+"AMD Ryzen 9 5950X (for parts)",
+{
+"query": "\"ddr4 32gb\""
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'ddr4 32gb'"
+]
+},
+{
+"in": [
+"Samsung 980 Pro 2TB NVMe",
+{
+"query": "\"ddr4 32gb\""
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'ddr4 32gb'"
+]
+},
+{
+"in": [
+"rtx 3080 broken fan",
+{
+"query": "\"ddr4 32gb\""
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'ddr4 32gb'"
+]
+},
+{
+"in": [
+"RTX ３０８０ fullwidth",
+{
+"query": "\"ddr4 32gb\""
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'ddr4 32gb'"
+]
+},
+{
+"in": [
+"NVIDIA GeForce RTX 3080 FE",
+{
+"query": "-ecc ddr4"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'ddr4'"
+]
+},
+{
+"in": [
+"i9-10980 XE 18-core",
+{
+"query": "-ecc ddr4"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'ddr4'"
+]
+},
+{
+"in": [
+"RX 5700 XT 8GB",
+{
+"query": "-ecc ddr4"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'ddr4'"
+]
+},
+{
+"in": [
+"Intel Core i9-10980XE",
+{
+"query": "-ecc ddr4"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'ddr4'"
+]
+},
+{
+"in": [
+"4 x 32GB DDR4 3200",
+{
+"query": "-ecc ddr4"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"vertx rtx-3080 Ti",
+{
+"query": "-ecc ddr4"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'ddr4'"
+]
+},
+{
+"in": [
+"EVGA 3080 FTW3 Ultra",
+{
+"query": "-ecc ddr4"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'ddr4'"
+]
+},
+{
+"in": [
+"",
+{
+"query": "-ecc ddr4"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'ddr4'"
+]
+},
+{
+"in": [
+"Café-racer 3080",
+{
+"query": "-ecc ddr4"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'ddr4'"
+]
+},
+{
+"in": [
+"rtx3080",
+{
+"query": "-ecc ddr4"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'ddr4'"
+]
+},
+{
+"in": [
+"AMD Ryzen 9 5950X (for parts)",
+{
+"query": "-ecc ddr4"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'ddr4'"
+]
+},
+{
+"in": [
+"Samsung 980 Pro 2TB NVMe",
+{
+"query": "-ecc ddr4"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'ddr4'"
+]
+},
+{
+"in": [
+"rtx 3080 broken fan",
+{
+"query": "-ecc ddr4"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'ddr4'"
+]
+},
+{
+"in": [
+"RTX ３０８０ fullwidth",
+{
+"query": "-ecc ddr4"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'ddr4'"
+]
+},
+{
+"in": [
+"NVIDIA GeForce RTX 3080 FE",
+{
+"query": "10980xe"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '10980xe'"
+]
+},
+{
+"in": [
+"i9-10980 XE 18-core",
+{
+"query": "10980xe"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"RX 5700 XT 8GB",
+{
+"query": "10980xe"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '10980xe'"
+]
+},
+{
+"in": [
+"Intel Core i9-10980XE",
+{
+"query": "10980xe"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"4 x 32GB DDR4 3200",
+{
+"query": "10980xe"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '10980xe'"
+]
+},
+{
+"in": [
+"vertx rtx-3080 Ti",
+{
+"query": "10980xe"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '10980xe'"
+]
+},
+{
+"in": [
+"EVGA 3080 FTW3 Ultra",
+{
+"query": "10980xe"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '10980xe'"
+]
+},
+{
+"in": [
+"",
+{
+"query": "10980xe"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '10980xe'"
+]
+},
+{
+"in": [
+"Café-racer 3080",
+{
+"query": "10980xe"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '10980xe'"
+]
+},
+{
+"in": [
+"rtx3080",
+{
+"query": "10980xe"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '10980xe'"
+]
+},
+{
+"in": [
+"AMD Ryzen 9 5950X (for parts)",
+{
+"query": "10980xe"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '10980xe'"
+]
+},
+{
+"in": [
+"Samsung 980 Pro 2TB NVMe",
+{
+"query": "10980xe"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '10980xe'"
+]
+},
+{
+"in": [
+"rtx 3080 broken fan",
+{
+"query": "10980xe"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '10980xe'"
+]
+},
+{
+"in": [
+"RTX ３０８０ fullwidth",
+{
+"query": "10980xe"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '10980xe'"
+]
+},
+{
+"in": [
+"NVIDIA GeForce RTX 3080 FE",
+{
+"query": "rtx -ti"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"i9-10980 XE 18-core",
+{
+"query": "rtx -ti"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'rtx'"
+]
+},
+{
+"in": [
+"RX 5700 XT 8GB",
+{
+"query": "rtx -ti"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'rtx'"
+]
+},
+{
+"in": [
+"Intel Core i9-10980XE",
+{
+"query": "rtx -ti"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'rtx'"
+]
+},
+{
+"in": [
+"4 x 32GB DDR4 3200",
+{
+"query": "rtx -ti"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'rtx'"
+]
+},
+{
+"in": [
+"vertx rtx-3080 Ti",
+{
+"query": "rtx -ti"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"excluded 'ti'"
+]
+},
+{
+"in": [
+"EVGA 3080 FTW3 Ultra",
+{
+"query": "rtx -ti"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'rtx'"
+]
+},
+{
+"in": [
+"",
+{
+"query": "rtx -ti"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'rtx'"
+]
+},
+{
+"in": [
+"Café-racer 3080",
+{
+"query": "rtx -ti"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'rtx'"
+]
+},
+{
+"in": [
+"rtx3080",
+{
+"query": "rtx -ti"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'rtx'"
+]
+},
+{
+"in": [
+"AMD Ryzen 9 5950X (for parts)",
+{
+"query": "rtx -ti"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'rtx'"
+]
+},
+{
+"in": [
+"Samsung 980 Pro 2TB NVMe",
+{
+"query": "rtx -ti"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'rtx'"
+]
+},
+{
+"in": [
+"rtx 3080 broken fan",
+{
+"query": "rtx -ti"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"junk 'broken'"
+]
+},
+{
+"in": [
+"RTX ３０８０ fullwidth",
+{
+"query": "rtx -ti"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"NVIDIA GeForce RTX 3080 FE",
+{
+"query": "unclosed \"quote"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'unclosed'"
+]
+},
+{
+"in": [
+"i9-10980 XE 18-core",
+{
+"query": "unclosed \"quote"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'unclosed'"
+]
+},
+{
+"in": [
+"RX 5700 XT 8GB",
+{
+"query": "unclosed \"quote"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'unclosed'"
+]
+},
+{
+"in": [
+"Intel Core i9-10980XE",
+{
+"query": "unclosed \"quote"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'unclosed'"
+]
+},
+{
+"in": [
+"4 x 32GB DDR4 3200",
+{
+"query": "unclosed \"quote"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'unclosed'"
+]
+},
+{
+"in": [
+"vertx rtx-3080 Ti",
+{
+"query": "unclosed \"quote"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'unclosed'"
+]
+},
+{
+"in": [
+"EVGA 3080 FTW3 Ultra",
+{
+"query": "unclosed \"quote"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'unclosed'"
+]
+},
+{
+"in": [
+"",
+{
+"query": "unclosed \"quote"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'unclosed'"
+]
+},
+{
+"in": [
+"Café-racer 3080",
+{
+"query": "unclosed \"quote"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'unclosed'"
+]
+},
+{
+"in": [
+"rtx3080",
+{
+"query": "unclosed \"quote"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'unclosed'"
+]
+},
+{
+"in": [
+"AMD Ryzen 9 5950X (for parts)",
+{
+"query": "unclosed \"quote"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'unclosed'"
+]
+},
+{
+"in": [
+"Samsung 980 Pro 2TB NVMe",
+{
+"query": "unclosed \"quote"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'unclosed'"
+]
+},
+{
+"in": [
+"rtx 3080 broken fan",
+{
+"query": "unclosed \"quote"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'unclosed'"
+]
+},
+{
+"in": [
+"RTX ３０８０ fullwidth",
+{
+"query": "unclosed \"quote"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'unclosed'"
+]
+},
+{
+"in": [
+"NVIDIA GeForce RTX 3080 FE",
+{
+"query": "a|b|c d"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'a|b|c'"
+]
+},
+{
+"in": [
+"i9-10980 XE 18-core",
+{
+"query": "a|b|c d"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'a|b|c'"
+]
+},
+{
+"in": [
+"RX 5700 XT 8GB",
+{
+"query": "a|b|c d"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'a|b|c'"
+]
+},
+{
+"in": [
+"Intel Core i9-10980XE",
+{
+"query": "a|b|c d"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'a|b|c'"
+]
+},
+{
+"in": [
+"4 x 32GB DDR4 3200",
+{
+"query": "a|b|c d"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'a|b|c'"
+]
+},
+{
+"in": [
+"vertx rtx-3080 Ti",
+{
+"query": "a|b|c d"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'a|b|c'"
+]
+},
+{
+"in": [
+"EVGA 3080 FTW3 Ultra",
+{
+"query": "a|b|c d"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'a|b|c'"
+]
+},
+{
+"in": [
+"",
+{
+"query": "a|b|c d"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'a|b|c'"
+]
+},
+{
+"in": [
+"Café-racer 3080",
+{
+"query": "a|b|c d"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'a|b|c'"
+]
+},
+{
+"in": [
+"rtx3080",
+{
+"query": "a|b|c d"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'a|b|c'"
+]
+},
+{
+"in": [
+"AMD Ryzen 9 5950X (for parts)",
+{
+"query": "a|b|c d"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'a|b|c'"
+]
+},
+{
+"in": [
+"Samsung 980 Pro 2TB NVMe",
+{
+"query": "a|b|c d"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'a|b|c'"
+]
+},
+{
+"in": [
+"rtx 3080 broken fan",
+{
+"query": "a|b|c d"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'a|b|c'"
+]
+},
+{
+"in": [
+"RTX ３０８０ fullwidth",
+{
+"query": "a|b|c d"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'a|b|c'"
+]
+},
+{
+"in": [
+"NVIDIA GeForce RTX 3080 FE",
+{
+"query": "-"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"i9-10980 XE 18-core",
+{
+"query": "-"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"RX 5700 XT 8GB",
+{
+"query": "-"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"Intel Core i9-10980XE",
+{
+"query": "-"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"4 x 32GB DDR4 3200",
+{
+"query": "-"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"vertx rtx-3080 Ti",
+{
+"query": "-"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"EVGA 3080 FTW3 Ultra",
+{
+"query": "-"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"",
+{
+"query": "-"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"Café-racer 3080",
+{
+"query": "-"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"rtx3080",
+{
+"query": "-"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"AMD Ryzen 9 5950X (for parts)",
+{
+"query": "-"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"junk 'for parts'"
+]
+},
+{
+"in": [
+"Samsung 980 Pro 2TB NVMe",
+{
+"query": "-"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"rtx 3080 broken fan",
+{
+"query": "-"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"junk 'broken'"
+]
+},
+{
+"in": [
+"RTX ３０８０ fullwidth",
+{
+"query": "-"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"NVIDIA GeForce RTX 3080 FE",
+{
+"query": "--x"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"i9-10980 XE 18-core",
+{
+"query": "--x"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"RX 5700 XT 8GB",
+{
+"query": "--x"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"Intel Core i9-10980XE",
+{
+"query": "--x"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"4 x 32GB DDR4 3200",
+{
+"query": "--x"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"excluded '-x'"
+]
+},
+{
+"in": [
+"vertx rtx-3080 Ti",
+{
+"query": "--x"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"EVGA 3080 FTW3 Ultra",
+{
+"query": "--x"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"",
+{
+"query": "--x"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"Café-racer 3080",
+{
+"query": "--x"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"rtx3080",
+{
+"query": "--x"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"AMD Ryzen 9 5950X (for parts)",
+{
+"query": "--x"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"junk 'for parts'"
+]
+},
+{
+"in": [
+"Samsung 980 Pro 2TB NVMe",
+{
+"query": "--x"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"rtx 3080 broken fan",
+{
+"query": "--x"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"junk 'broken'"
+]
+},
+{
+"in": [
+"RTX ３０８０ fullwidth",
+{
+"query": "--x"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"NVIDIA GeForce RTX 3080 FE",
+{
+"query": "'single quoted' x"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'single quoted'"
+]
+},
+{
+"in": [
+"i9-10980 XE 18-core",
+{
+"query": "'single quoted' x"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'single quoted'"
+]
+},
+{
+"in": [
+"RX 5700 XT 8GB",
+{
+"query": "'single quoted' x"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'single quoted'"
+]
+},
+{
+"in": [
+"Intel Core i9-10980XE",
+{
+"query": "'single quoted' x"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'single quoted'"
+]
+},
+{
+"in": [
+"4 x 32GB DDR4 3200",
+{
+"query": "'single quoted' x"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'single quoted'"
+]
+},
+{
+"in": [
+"vertx rtx-3080 Ti",
+{
+"query": "'single quoted' x"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'single quoted'"
+]
+},
+{
+"in": [
+"EVGA 3080 FTW3 Ultra",
+{
+"query": "'single quoted' x"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'single quoted'"
+]
+},
+{
+"in": [
+"",
+{
+"query": "'single quoted' x"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'single quoted'"
+]
+},
+{
+"in": [
+"Café-racer 3080",
+{
+"query": "'single quoted' x"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'single quoted'"
+]
+},
+{
+"in": [
+"rtx3080",
+{
+"query": "'single quoted' x"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'single quoted'"
+]
+},
+{
+"in": [
+"AMD Ryzen 9 5950X (for parts)",
+{
+"query": "'single quoted' x"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'single quoted'"
+]
+},
+{
+"in": [
+"Samsung 980 Pro 2TB NVMe",
+{
+"query": "'single quoted' x"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'single quoted'"
+]
+},
+{
+"in": [
+"rtx 3080 broken fan",
+{
+"query": "'single quoted' x"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'single quoted'"
+]
+},
+{
+"in": [
+"RTX ３０８０ fullwidth",
+{
+"query": "'single quoted' x"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'single quoted'"
+]
+},
+{
+"in": [
+"NVIDIA GeForce RTX 3080 FE",
+{
+"query": "say \"a\\\"b\" c"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'say'"
+]
+},
+{
+"in": [
+"i9-10980 XE 18-core",
+{
+"query": "say \"a\\\"b\" c"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'say'"
+]
+},
+{
+"in": [
+"RX 5700 XT 8GB",
+{
+"query": "say \"a\\\"b\" c"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'say'"
+]
+},
+{
+"in": [
+"Intel Core i9-10980XE",
+{
+"query": "say \"a\\\"b\" c"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'say'"
+]
+},
+{
+"in": [
+"4 x 32GB DDR4 3200",
+{
+"query": "say \"a\\\"b\" c"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'say'"
+]
+},
+{
+"in": [
+"vertx rtx-3080 Ti",
+{
+"query": "say \"a\\\"b\" c"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'say'"
+]
+},
+{
+"in": [
+"EVGA 3080 FTW3 Ultra",
+{
+"query": "say \"a\\\"b\" c"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'say'"
+]
+},
+{
+"in": [
+"",
+{
+"query": "say \"a\\\"b\" c"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'say'"
+]
+},
+{
+"in": [
+"Café-racer 3080",
+{
+"query": "say \"a\\\"b\" c"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'say'"
+]
+},
+{
+"in": [
+"rtx3080",
+{
+"query": "say \"a\\\"b\" c"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'say'"
+]
+},
+{
+"in": [
+"AMD Ryzen 9 5950X (for parts)",
+{
+"query": "say \"a\\\"b\" c"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'say'"
+]
+},
+{
+"in": [
+"Samsung 980 Pro 2TB NVMe",
+{
+"query": "say \"a\\\"b\" c"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'say'"
+]
+},
+{
+"in": [
+"rtx 3080 broken fan",
+{
+"query": "say \"a\\\"b\" c"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'say'"
+]
+},
+{
+"in": [
+"RTX ３０８０ fullwidth",
+{
+"query": "say \"a\\\"b\" c"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'say'"
+]
+},
+{
+"in": [
+"NVIDIA GeForce RTX 3080 FE",
+{
+"query": "back\\ slash"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'back slash'"
+]
+},
+{
+"in": [
+"i9-10980 XE 18-core",
+{
+"query": "back\\ slash"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'back slash'"
+]
+},
+{
+"in": [
+"RX 5700 XT 8GB",
+{
+"query": "back\\ slash"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'back slash'"
+]
+},
+{
+"in": [
+"Intel Core i9-10980XE",
+{
+"query": "back\\ slash"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'back slash'"
+]
+},
+{
+"in": [
+"4 x 32GB DDR4 3200",
+{
+"query": "back\\ slash"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'back slash'"
+]
+},
+{
+"in": [
+"vertx rtx-3080 Ti",
+{
+"query": "back\\ slash"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'back slash'"
+]
+},
+{
+"in": [
+"EVGA 3080 FTW3 Ultra",
+{
+"query": "back\\ slash"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'back slash'"
+]
+},
+{
+"in": [
+"",
+{
+"query": "back\\ slash"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'back slash'"
+]
+},
+{
+"in": [
+"Café-racer 3080",
+{
+"query": "back\\ slash"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'back slash'"
+]
+},
+{
+"in": [
+"rtx3080",
+{
+"query": "back\\ slash"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'back slash'"
+]
+},
+{
+"in": [
+"AMD Ryzen 9 5950X (for parts)",
+{
+"query": "back\\ slash"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'back slash'"
+]
+},
+{
+"in": [
+"Samsung 980 Pro 2TB NVMe",
+{
+"query": "back\\ slash"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'back slash'"
+]
+},
+{
+"in": [
+"rtx 3080 broken fan",
+{
+"query": "back\\ slash"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'back slash'"
+]
+},
+{
+"in": [
+"RTX ３０８０ fullwidth",
+{
+"query": "back\\ slash"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'back slash'"
+]
+},
+{
+"in": [
+"NVIDIA GeForce RTX 3080 FE",
+{
+"query": ""
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"i9-10980 XE 18-core",
+{
+"query": ""
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"RX 5700 XT 8GB",
+{
+"query": ""
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"Intel Core i9-10980XE",
+{
+"query": ""
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"4 x 32GB DDR4 3200",
+{
+"query": ""
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"vertx rtx-3080 Ti",
+{
+"query": ""
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"EVGA 3080 FTW3 Ultra",
+{
+"query": ""
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"",
+{
+"query": ""
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"Café-racer 3080",
+{
+"query": ""
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"rtx3080",
+{
+"query": ""
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"AMD Ryzen 9 5950X (for parts)",
+{
+"query": ""
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"junk 'for parts'"
+]
+},
+{
+"in": [
+"Samsung 980 Pro 2TB NVMe",
+{
+"query": ""
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"rtx 3080 broken fan",
+{
+"query": ""
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"junk 'broken'"
+]
+},
+{
+"in": [
+"RTX ３０８０ fullwidth",
+{
+"query": ""
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"NVIDIA GeForce RTX 3080 FE",
+{
+"query": "   "
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"i9-10980 XE 18-core",
+{
+"query": "   "
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"RX 5700 XT 8GB",
+{
+"query": "   "
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"Intel Core i9-10980XE",
+{
+"query": "   "
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"4 x 32GB DDR4 3200",
+{
+"query": "   "
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"vertx rtx-3080 Ti",
+{
+"query": "   "
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"EVGA 3080 FTW3 Ultra",
+{
+"query": "   "
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"",
+{
+"query": "   "
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"Café-racer 3080",
+{
+"query": "   "
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"rtx3080",
+{
+"query": "   "
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"AMD Ryzen 9 5950X (for parts)",
+{
+"query": "   "
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"junk 'for parts'"
+]
+},
+{
+"in": [
+"Samsung 980 Pro 2TB NVMe",
+{
+"query": "   "
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"rtx 3080 broken fan",
+{
+"query": "   "
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"junk 'broken'"
+]
+},
+{
+"in": [
+"RTX ３０８０ fullwidth",
+{
+"query": "   "
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"NVIDIA GeForce RTX 3080 FE",
+{
+"query": "x|"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'x'"
+]
+},
+{
+"in": [
+"i9-10980 XE 18-core",
+{
+"query": "x|"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'x'"
+]
+},
+{
+"in": [
+"RX 5700 XT 8GB",
+{
+"query": "x|"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'x'"
+]
+},
+{
+"in": [
+"Intel Core i9-10980XE",
+{
+"query": "x|"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'x'"
+]
+},
+{
+"in": [
+"4 x 32GB DDR4 3200",
+{
+"query": "x|"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"vertx rtx-3080 Ti",
+{
+"query": "x|"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'x'"
+]
+},
+{
+"in": [
+"EVGA 3080 FTW3 Ultra",
+{
+"query": "x|"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'x'"
+]
+},
+{
+"in": [
+"",
+{
+"query": "x|"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'x'"
+]
+},
+{
+"in": [
+"Café-racer 3080",
+{
+"query": "x|"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'x'"
+]
+},
+{
+"in": [
+"rtx3080",
+{
+"query": "x|"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'x'"
+]
+},
+{
+"in": [
+"AMD Ryzen 9 5950X (for parts)",
+{
+"query": "x|"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'x'"
+]
+},
+{
+"in": [
+"Samsung 980 Pro 2TB NVMe",
+{
+"query": "x|"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'x'"
+]
+},
+{
+"in": [
+"rtx 3080 broken fan",
+{
+"query": "x|"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'x'"
+]
+},
+{
+"in": [
+"RTX ３０８０ fullwidth",
+{
+"query": "x|"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'x'"
+]
+},
+{
+"in": [
+"NVIDIA GeForce RTX 3080 FE",
+{
+"query": "|y"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'y'"
+]
+},
+{
+"in": [
+"i9-10980 XE 18-core",
+{
+"query": "|y"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'y'"
+]
+},
+{
+"in": [
+"RX 5700 XT 8GB",
+{
+"query": "|y"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'y'"
+]
+},
+{
+"in": [
+"Intel Core i9-10980XE",
+{
+"query": "|y"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'y'"
+]
+},
+{
+"in": [
+"4 x 32GB DDR4 3200",
+{
+"query": "|y"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'y'"
+]
+},
+{
+"in": [
+"vertx rtx-3080 Ti",
+{
+"query": "|y"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'y'"
+]
+},
+{
+"in": [
+"EVGA 3080 FTW3 Ultra",
+{
+"query": "|y"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'y'"
+]
+},
+{
+"in": [
+"",
+{
+"query": "|y"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'y'"
+]
+},
+{
+"in": [
+"Café-racer 3080",
+{
+"query": "|y"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'y'"
+]
+},
+{
+"in": [
+"rtx3080",
+{
+"query": "|y"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'y'"
+]
+},
+{
+"in": [
+"AMD Ryzen 9 5950X (for parts)",
+{
+"query": "|y"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'y'"
+]
+},
+{
+"in": [
+"Samsung 980 Pro 2TB NVMe",
+{
+"query": "|y"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'y'"
+]
+},
+{
+"in": [
+"rtx 3080 broken fan",
+{
+"query": "|y"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'y'"
+]
+},
+{
+"in": [
+"RTX ３０８０ fullwidth",
+{
+"query": "|y"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'y'"
+]
+},
+{
+"in": [
+"NVIDIA GeForce RTX 3080 FE",
+{
+"query": "mid\"dle word\"s"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'middle words'"
+]
+},
+{
+"in": [
+"i9-10980 XE 18-core",
+{
+"query": "mid\"dle word\"s"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'middle words'"
+]
+},
+{
+"in": [
+"RX 5700 XT 8GB",
+{
+"query": "mid\"dle word\"s"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'middle words'"
+]
+},
+{
+"in": [
+"Intel Core i9-10980XE",
+{
+"query": "mid\"dle word\"s"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'middle words'"
+]
+},
+{
+"in": [
+"4 x 32GB DDR4 3200",
+{
+"query": "mid\"dle word\"s"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'middle words'"
+]
+},
+{
+"in": [
+"vertx rtx-3080 Ti",
+{
+"query": "mid\"dle word\"s"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'middle words'"
+]
+},
+{
+"in": [
+"EVGA 3080 FTW3 Ultra",
+{
+"query": "mid\"dle word\"s"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'middle words'"
+]
+},
+{
+"in": [
+"",
+{
+"query": "mid\"dle word\"s"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'middle words'"
+]
+},
+{
+"in": [
+"Café-racer 3080",
+{
+"query": "mid\"dle word\"s"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'middle words'"
+]
+},
+{
+"in": [
+"rtx3080",
+{
+"query": "mid\"dle word\"s"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'middle words'"
+]
+},
+{
+"in": [
+"AMD Ryzen 9 5950X (for parts)",
+{
+"query": "mid\"dle word\"s"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'middle words'"
+]
+},
+{
+"in": [
+"Samsung 980 Pro 2TB NVMe",
+{
+"query": "mid\"dle word\"s"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'middle words'"
+]
+},
+{
+"in": [
+"rtx 3080 broken fan",
+{
+"query": "mid\"dle word\"s"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'middle words'"
+]
+},
+{
+"in": [
+"RTX ３０８０ fullwidth",
+{
+"query": "mid\"dle word\"s"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'middle words'"
+]
+},
+{
+"in": [
+"NVIDIA GeForce RTX 3080 FE",
+{
+"query": "4x32gb"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '4x32gb'"
+]
+},
+{
+"in": [
+"i9-10980 XE 18-core",
+{
+"query": "4x32gb"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '4x32gb'"
+]
+},
+{
+"in": [
+"RX 5700 XT 8GB",
+{
+"query": "4x32gb"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '4x32gb'"
+]
+},
+{
+"in": [
+"Intel Core i9-10980XE",
+{
+"query": "4x32gb"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '4x32gb'"
+]
+},
+{
+"in": [
+"4 x 32GB DDR4 3200",
+{
+"query": "4x32gb"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"vertx rtx-3080 Ti",
+{
+"query": "4x32gb"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '4x32gb'"
+]
+},
+{
+"in": [
+"EVGA 3080 FTW3 Ultra",
+{
+"query": "4x32gb"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '4x32gb'"
+]
+},
+{
+"in": [
+"",
+{
+"query": "4x32gb"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '4x32gb'"
+]
+},
+{
+"in": [
+"Café-racer 3080",
+{
+"query": "4x32gb"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '4x32gb'"
+]
+},
+{
+"in": [
+"rtx3080",
+{
+"query": "4x32gb"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '4x32gb'"
+]
+},
+{
+"in": [
+"AMD Ryzen 9 5950X (for parts)",
+{
+"query": "4x32gb"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '4x32gb'"
+]
+},
+{
+"in": [
+"Samsung 980 Pro 2TB NVMe",
+{
+"query": "4x32gb"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '4x32gb'"
+]
+},
+{
+"in": [
+"rtx 3080 broken fan",
+{
+"query": "4x32gb"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '4x32gb'"
+]
+},
+{
+"in": [
+"RTX ３０８０ fullwidth",
+{
+"query": "4x32gb"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '4x32gb'"
+]
+},
+{
+"in": [
+"NVIDIA GeForce RTX 3080 FE",
+{
+"query": "5700x"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '5700x'"
+]
+},
+{
+"in": [
+"i9-10980 XE 18-core",
+{
+"query": "5700x"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '5700x'"
+]
+},
+{
+"in": [
+"RX 5700 XT 8GB",
+{
+"query": "5700x"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '5700x'"
+]
+},
+{
+"in": [
+"Intel Core i9-10980XE",
+{
+"query": "5700x"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '5700x'"
+]
+},
+{
+"in": [
+"4 x 32GB DDR4 3200",
+{
+"query": "5700x"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '5700x'"
+]
+},
+{
+"in": [
+"vertx rtx-3080 Ti",
+{
+"query": "5700x"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '5700x'"
+]
+},
+{
+"in": [
+"EVGA 3080 FTW3 Ultra",
+{
+"query": "5700x"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '5700x'"
+]
+},
+{
+"in": [
+"",
+{
+"query": "5700x"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '5700x'"
+]
+},
+{
+"in": [
+"Café-racer 3080",
+{
+"query": "5700x"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '5700x'"
+]
+},
+{
+"in": [
+"rtx3080",
+{
+"query": "5700x"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '5700x'"
+]
+},
+{
+"in": [
+"AMD Ryzen 9 5950X (for parts)",
+{
+"query": "5700x"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '5700x'"
+]
+},
+{
+"in": [
+"Samsung 980 Pro 2TB NVMe",
+{
+"query": "5700x"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '5700x'"
+]
+},
+{
+"in": [
+"rtx 3080 broken fan",
+{
+"query": "5700x"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '5700x'"
+]
+},
+{
+"in": [
+"RTX ３０８０ fullwidth",
+{
+"query": "5700x"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '5700x'"
+]
+},
+{
+"in": [
+"NVIDIA GeForce RTX 3080 FE",
+{
+"query": "rx 5700 xt"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'rx'"
+]
+},
+{
+"in": [
+"i9-10980 XE 18-core",
+{
+"query": "rx 5700 xt"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'rx'"
+]
+},
+{
+"in": [
+"RX 5700 XT 8GB",
+{
+"query": "rx 5700 xt"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"Intel Core i9-10980XE",
+{
+"query": "rx 5700 xt"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'rx'"
+]
+},
+{
+"in": [
+"4 x 32GB DDR4 3200",
+{
+"query": "rx 5700 xt"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'rx'"
+]
+},
+{
+"in": [
+"vertx rtx-3080 Ti",
+{
+"query": "rx 5700 xt"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'rx'"
+]
+},
+{
+"in": [
+"EVGA 3080 FTW3 Ultra",
+{
+"query": "rx 5700 xt"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'rx'"
+]
+},
+{
+"in": [
+"",
+{
+"query": "rx 5700 xt"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'rx'"
+]
+},
+{
+"in": [
+"Café-racer 3080",
+{
+"query": "rx 5700 xt"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'rx'"
+]
+},
+{
+"in": [
+"rtx3080",
+{
+"query": "rx 5700 xt"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'rx'"
+]
+},
+{
+"in": [
+"AMD Ryzen 9 5950X (for parts)",
+{
+"query": "rx 5700 xt"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'rx'"
+]
+},
+{
+"in": [
+"Samsung 980 Pro 2TB NVMe",
+{
+"query": "rx 5700 xt"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'rx'"
+]
+},
+{
+"in": [
+"rtx 3080 broken fan",
+{
+"query": "rx 5700 xt"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'rx'"
+]
+},
+{
+"in": [
+"RTX ３０８０ fullwidth",
+{
+"query": "rx 5700 xt"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'rx'"
+]
+},
+{
+"in": [
+"NVIDIA GeForce RTX 3080 FE",
+{
+"query": "3080 -mining -lhr"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"i9-10980 XE 18-core",
+{
+"query": "3080 -mining -lhr"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '3080'"
+]
+},
+{
+"in": [
+"RX 5700 XT 8GB",
+{
+"query": "3080 -mining -lhr"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '3080'"
+]
+},
+{
+"in": [
+"Intel Core i9-10980XE",
+{
+"query": "3080 -mining -lhr"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '3080'"
+]
+},
+{
+"in": [
+"4 x 32GB DDR4 3200",
+{
+"query": "3080 -mining -lhr"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '3080'"
+]
+},
+{
+"in": [
+"vertx rtx-3080 Ti",
+{
+"query": "3080 -mining -lhr"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"EVGA 3080 FTW3 Ultra",
+{
+"query": "3080 -mining -lhr"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"",
+{
+"query": "3080 -mining -lhr"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '3080'"
+]
+},
+{
+"in": [
+"Café-racer 3080",
+{
+"query": "3080 -mining -lhr"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"rtx3080",
+{
+"query": "3080 -mining -lhr"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '3080'"
+]
+},
+{
+"in": [
+"AMD Ryzen 9 5950X (for parts)",
+{
+"query": "3080 -mining -lhr"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '3080'"
+]
+},
+{
+"in": [
+"Samsung 980 Pro 2TB NVMe",
+{
+"query": "3080 -mining -lhr"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '3080'"
+]
+},
+{
+"in": [
+"rtx 3080 broken fan",
+{
+"query": "3080 -mining -lhr"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"junk 'broken'"
+]
+},
+{
+"in": [
+"RTX ３０８０ fullwidth",
+{
+"query": "3080 -mining -lhr"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing '3080'"
+]
+},
+{
+"in": [
+"NVIDIA GeForce RTX 3080 FE",
+{
+"query": "ram|memory 32gb"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'ram|memory'"
+]
+},
+{
+"in": [
+"i9-10980 XE 18-core",
+{
+"query": "ram|memory 32gb"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'ram|memory'"
+]
+},
+{
+"in": [
+"RX 5700 XT 8GB",
+{
+"query": "ram|memory 32gb"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'ram|memory'"
+]
+},
+{
+"in": [
+"Intel Core i9-10980XE",
+{
+"query": "ram|memory 32gb"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'ram|memory'"
+]
+},
+{
+"in": [
+"4 x 32GB DDR4 3200",
+{
+"query": "ram|memory 32gb"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'ram|memory'"
+]
+},
+{
+"in": [
+"vertx rtx-3080 Ti",
+{
+"query": "ram|memory 32gb"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'ram|memory'"
+]
+},
+{
+"in": [
+"EVGA 3080 FTW3 Ultra",
+{
+"query": "ram|memory 32gb"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'ram|memory'"
+]
+},
+{
+"in": [
+"",
+{
+"query": "ram|memory 32gb"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'ram|memory'"
+]
+},
+{
+"in": [
+"Café-racer 3080",
+{
+"query": "ram|memory 32gb"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'ram|memory'"
+]
+},
+{
+"in": [
+"rtx3080",
+{
+"query": "ram|memory 32gb"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'ram|memory'"
+]
+},
+{
+"in": [
+"AMD Ryzen 9 5950X (for parts)",
+{
+"query": "ram|memory 32gb"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'ram|memory'"
+]
+},
+{
+"in": [
+"Samsung 980 Pro 2TB NVMe",
+{
+"query": "ram|memory 32gb"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'ram|memory'"
+]
+},
+{
+"in": [
+"rtx 3080 broken fan",
+{
+"query": "ram|memory 32gb"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'ram|memory'"
+]
+},
+{
+"in": [
+"RTX ３０８０ fullwidth",
+{
+"query": "ram|memory 32gb"
+},
+[
+"for parts",
+"broken"
+],
+null,
+""
+],
+"out": [
+false,
+"missing 'ram|memory'"
+]
+},
+{
+"in": [
+"RTX 3080 $400",
+{
+"query": "rtx 3080",
+"max_price": 450.0,
+"min_price": 100
+},
+[],
+400.0,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"RTX 3080",
+{
+"query": "rtx 3080",
+"max_price": 450.0
+},
+[],
+450.01,
+""
+],
+"out": [
+false,
+"over max price"
+]
+},
+{
+"in": [
+"RTX 3080",
+{
+"query": "rtx 3080",
+"min_price": 100
+},
+[],
+99.99,
+""
+],
+"out": [
+false,
+"under min price"
+]
+},
+{
+"in": [
+"RTX 3080",
+{
+"query": "rtx 3080",
+"exclude": [
+"rtx"
+]
+},
+[],
+null,
+""
+],
+"out": [
+false,
+"excluded 'rtx'"
+]
+},
+{
+"in": [
+"RTX 3080",
+{
+"query": "rtx 3080"
+},
+[
+"as is"
+],
+null,
+"Sold as is, no returns"
+],
+"out": [
+false,
+"junk 'as is'"
+]
+},
+{
+"in": [
+"RTX 3080 LHR",
+{
+"query": "rtx 3080 -lhr"
+},
+[],
+null,
+""
+],
+"out": [
+false,
+"excluded 'lhr'"
+]
+},
+{
+"in": [
+"2018 Ford F-150 XLT",
+{
+"query": "ford pickup",
+"kind": "vehicle"
+},
+[
+"as is"
+],
+null,
+"as is"
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"2018 Ford F-150 XLT",
+{
+"query": "pickup|suv ford",
+"kind": "vehicle"
+},
+[],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"2018 Ford Explorer",
+{
+"query": "ford|truck",
+"kind": "vehicle"
+},
+[],
+null,
+""
+],
+"error": "KeyError",
+"message": "'ford'"
+},
+{
+"in": [
+"2005 Chevy Silverado parts only",
+{
+"query": "truck",
+"kind": "vehicle"
+},
+[],
+null,
+""
+],
+"out": [
+false,
+"junk 'parts only'"
+]
+},
+{
+"in": [
+"2012 Honda Odyssey",
+{
+"query": "minivan",
+"kind": "vehicle"
+},
+[],
+null,
+""
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"2012 Honda Civic",
+{
+"query": "sedan",
+"kind": "vehicle"
+},
+[],
+null,
+""
+],
+"out": [
+false,
+"missing 'sedan|sedan'"
+]
+},
+{
+"in": [
+"ISO: Tacoma",
+{
+"query": "tacoma",
+"kind": "vehicle"
+},
+[],
+null,
+""
+],
+"out": [
+false,
+"junk 'iso'"
+]
+}
+],
+"still_wanted": [
+{
+"in": [
+"RTX 3080 LHR",
+400.0,
+{
+"query": "rtx -lhr"
+}
+],
+"out": false
+},
+{
+"in": [
+"RTX 3080",
+400.0,
+{
+"query": "rtx",
+"max_price": 399.0
+}
+],
+"out": false
+},
+{
+"in": [
+"RTX 3080",
+400.0,
+{
+"query": "rtx",
+"min_price": 401
+}
+],
+"out": false
+},
+{
+"in": [
+"RTX 3080",
+null,
+{
+"query": "rtx",
+"min_price": 401,
+"exclude": [
+"gtx"
+]
+}
+],
+"out": true
+},
+{
+"in": [
+"RTX 3080 mining",
+1.0,
+{
+"query": "zzz",
+"exclude": [
+"mining"
+]
+}
+],
+"out": false
+}
+],
+"body_style": [
+{
+"in": [
+"ford pickup"
+],
+"out": [
+"pickup",
+"ford"
+]
+},
+{
+"in": [
+"truck"
+],
+"out": [
+"pickup",
+""
+]
+},
+{
+"in": [
+"SUV"
+],
+"out": [
+"suv",
+""
+]
+},
+{
+"in": [
+"toyota"
+],
+"out": [
+null,
+"toyota"
+]
+},
+{
+"in": [
+"pickup|f150 4x4"
+],
+"out": [
+"pickup",
+"4x4"
+]
+},
+{
+"in": [
+"sedan coupe"
+],
+"out": [
+"sedan",
+"coupe"
+]
+},
+{
+"in": [
+"-truck ford"
+],
+"out": [
+null,
+"ford"
+]
+},
+{
+"in": [
+""
+],
+"out": [
+null,
+""
+]
+}
+],
+"vehicle_make": [
+{
+"in": [
+"2005 chevy silverado 1500"
+],
+"out": "Chevrolet"
+},
+{
+"in": [
+"2018 Toyota Tacoma TRD"
+],
+"out": "Toyota"
+},
+{
+"in": [
+"2010 land rover range rover"
+],
+"out": "Land Rover"
+},
+{
+"in": [
+"2015 Mercedes-Benz C300"
+],
+"out": "Mercedes-Benz"
+},
+{
+"in": [
+"2016 mercedes benz e350"
+],
+"out": "Mercedes-Benz"
+},
+{
+"in": [
+"1999 VW Jetta"
+],
+"out": "Volkswagen"
+},
+{
+"in": [
+"2020 tesla model 3"
+],
+"out": "Tesla"
+},
+{
+"in": [
+"2012 McLaren MP4"
+],
+"out": "McLaren"
+},
+{
+"in": [
+"2008 ford f-150"
+],
+"out": "Ford"
+},
+{
+"in": [
+"2011 mini cooper"
+],
+"out": "MINI"
+},
+{
+"in": [
+"2017 alfa romeo giulia"
+],
+"out": "Alfa Romeo"
+},
+{
+"in": [
+"no year honda civic"
+],
+"out": ""
+},
+{
+"in": [
+"2019"
+],
+"out": ""
+},
+{
+"in": [
+"1949 ford"
+],
+"out": ""
+},
+{
+"in": [
+"2050 ford"
+],
+"out": ""
+},
+{
+"in": [
+"２０１８ honda"
+],
+"out": ""
+},
+{
+"in": [
+"2014 rolls-royce ghost"
+],
+"out": "Rolls-Royce"
+},
+{
+"in": [
+"2003 am general hummer"
+],
+"out": "Am General"
+},
+{
+"in": [
+"2001 kia rio"
+],
+"out": "Kia"
+},
+{
+"in": [
+"2007 bmw 328i"
+],
+"out": "BMW"
+},
+{
+"in": [
+"2013 GMC sierra"
+],
+"out": "GMC"
+},
+{
+"in": [
+"2011 ram 1500"
+],
+"out": "Ram"
+}
+],
+"vehicle_year": [
+{
+"in": [
+"2005 chevy silverado 1500"
+],
+"out": 2005
+},
+{
+"in": [
+"2018 Toyota Tacoma TRD"
+],
+"out": 2018
+},
+{
+"in": [
+"2010 land rover range rover"
+],
+"out": 2010
+},
+{
+"in": [
+"2015 Mercedes-Benz C300"
+],
+"out": 2015
+},
+{
+"in": [
+"2016 mercedes benz e350"
+],
+"out": 2016
+},
+{
+"in": [
+"1999 VW Jetta"
+],
+"out": 1999
+},
+{
+"in": [
+"2020 tesla model 3"
+],
+"out": 2020
+},
+{
+"in": [
+"2012 McLaren MP4"
+],
+"out": 2012
+},
+{
+"in": [
+"2008 ford f-150"
+],
+"out": 2008
+},
+{
+"in": [
+"2011 mini cooper"
+],
+"out": 2011
+},
+{
+"in": [
+"2017 alfa romeo giulia"
+],
+"out": 2017
+},
+{
+"in": [
+"no year honda civic"
+],
+"out": null
+},
+{
+"in": [
+"2019"
+],
+"out": 2019
+},
+{
+"in": [
+"1949 ford"
+],
+"out": null
+},
+{
+"in": [
+"2050 ford"
+],
+"out": null
+},
+{
+"in": [
+"２０１８ honda"
+],
+"out": null
+},
+{
+"in": [
+"2014 rolls-royce ghost"
+],
+"out": 2014
+},
+{
+"in": [
+"2003 am general hummer"
+],
+"out": 2003
+},
+{
+"in": [
+"2001 kia rio"
+],
+"out": 2001
+},
+{
+"in": [
+"2007 bmw 328i"
+],
+"out": 2007
+},
+{
+"in": [
+"2013 GMC sierra"
+],
+"out": 2013
+},
+{
+"in": [
+"2011 ram 1500"
+],
+"out": 2011
+}
+],
+"vehicle_miles": [
+{
+"in": [
+"123,456 miles"
+],
+"out": 123456
+},
+{
+"in": [
+"85k miles"
+],
+"out": 85000
+},
+{
+"in": [
+"85 k mi"
+],
+"out": 85000
+},
+{
+"in": [
+"85.5k miles"
+],
+"out": 85500
+},
+{
+"in": [
+"120.5 miles"
+],
+"out": 120500
+},
+{
+"in": [
+"5 miles from campus"
+],
+"out": null
+},
+{
+"in": [
+"99 miles"
+],
+"out": null
+},
+{
+"in": [
+"100 miles"
+],
+"out": 100
+},
+{
+"in": [
+"odometer 45000"
+],
+"out": null
+},
+{
+"in": [
+"45000odometer"
+],
+"out": 45000
+},
+{
+"in": [
+"1,234,567 miles"
+],
+"out": 1234567
+},
+{
+"in": [
+"mileage unknown"
+],
+"out": null
+},
+{
+"in": [
+"12mi."
+],
+"out": null
+},
+{
+"in": [
+"12 mile"
+],
+"out": null
+},
+{
+"in": [
+"75K MILES"
+],
+"out": 75000
+},
+{
+"in": [
+"٣٤٥٠٠ miles"
+],
+"out": 34500
+},
+{
+"in": [
+"3.2 miles"
+],
+"out": 3200
+},
+{
+"in": [
+"1000.5 miles"
+],
+"out": 1000
+},
+{
+"in": [
+"40,000 mi"
+],
+"out": 40000
+},
+{
+"in": [
+"40000 mies"
+],
+"out": null
+}
+],
+"title_status": [
+{
+"in": [
+"Salvage title"
+],
+"out": "salvage"
+},
+{
+"in": [
+"REBUILT"
+],
+"out": "rebuilt"
+},
+{
+"in": [
+"rebuild title"
+],
+"out": "rebuilt"
+},
+{
+"in": [
+"branded title"
+],
+"out": "branded"
+},
+{
+"in": [
+"lemon law"
+],
+"out": "branded"
+},
+{
+"in": [
+"flood car"
+],
+"out": "salvage"
+},
+{
+"in": [
+"clean title"
+],
+"out": ""
+},
+{
+"in": [
+""
+],
+"out": ""
+},
+{
+"in": [
+"rebuilt salvage"
+],
+"out": "salvage"
+}
+],
+"check_vehicle": [
+{
+"in": [
+null,
+null,
+{}
+],
+"out": [
+false,
+"no model year"
+]
+},
+{
+"in": [
+2015,
+null,
+{
+"year_min": 2016
+}
+],
+"out": [
+false,
+"older than wanted"
+]
+},
+{
+"in": [
+2021,
+1000,
+{
+"year_max": 2020
+}
+],
+"out": [
+false,
+"newer than wanted"
+]
+},
+{
+"in": [
+2018,
+120000,
+{
+"max_miles": 100000
+}
+],
+"out": [
+false,
+"too many miles"
+]
+},
+{
+"in": [
+2018,
+null,
+{
+"max_miles": 100000
+}
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+2018,
+50000,
+{
+"year_min": 0
+}
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+2018,
+50000,
+{
+"year_min": 2016,
+"year_max": 2020,
+"max_miles": 90000
+}
+],
+"out": [
+true,
+""
+]
+}
+],
+"norm_size": [
+{
+"in": [
+"10 1/2"
+],
+"out": "10.5"
+},
+{
+"in": [
+"10½"
+],
+"out": "10.5"
+},
+{
+"in": [
+"medium"
+],
+"out": "M"
+},
+{
+"in": [
+"W32 L30"
+],
+"out": "32x30"
+},
+{
+"in": [
+"32x30"
+],
+"out": "32x30"
+},
+{
+"in": [
+"32/30"
+],
+"out": "32x30"
+},
+{
+"in": [
+"w32l30"
+],
+"out": "32x30"
+},
+{
+"in": [
+"M"
+],
+"out": "M"
+},
+{
+"in": [
+"xl"
+],
+"out": "XL"
+},
+{
+"in": [
+"x-large"
+],
+"out": "XL"
+},
+{
+"in": [
+"2XL"
+],
+"out": "XXL"
+},
+{
+"in": [
+"10.5M"
+],
+"out": "10.5"
+},
+{
+"in": [
+"10.0"
+],
+"out": "10"
+},
+{
+"in": [
+"10 US"
+],
+"out": "10"
+},
+{
+"in": [
+"9W"
+],
+"out": "9"
+},
+{
+"in": [
+""
+],
+"out": ""
+},
+{
+"in": [
+null
+],
+"out": ""
+},
+{
+"in": [
+"  extra   large "
+],
+"out": "XL"
+},
+{
+"in": [
+"eu 42"
+],
+"out": "EU 42"
+},
+{
+"in": [
+"one size"
+],
+"out": "ONE SIZE"
+},
+{
+"in": [
+"11.5 w"
+],
+"out": "11.5"
+},
+{
+"in": [
+"size 7"
+],
+"out": "SIZE 7"
+}
+],
+"title_size": [
+{
+"in": [
+"Nike Air Max size 10.5"
+],
+"out": "10.5"
+},
+{
+"in": [
+"Running shoes sz 10 1/2"
+],
+"out": "10.5"
+},
+{
+"in": [
+"Boots US 9"
+],
+"out": "9"
+},
+{
+"in": [
+"Jeans W32 L30"
+],
+"out": "32x30"
+},
+{
+"in": [
+"Levi's 32x30"
+],
+"out": "32x30"
+},
+{
+"in": [
+"Hoodie size M"
+],
+"out": "M"
+},
+{
+"in": [
+"Sneakers 10.5M"
+],
+"out": "10.5"
+},
+{
+"in": [
+"Women's 8 W heels"
+],
+"out": "8"
+},
+{
+"in": [
+"Shirt XL"
+],
+"out": ""
+},
+{
+"in": [
+"No size here"
+],
+"out": ""
+},
+{
+"in": [
+"size: xxl tee"
+],
+"out": "XXL"
+},
+{
+"in": [
+"Men's 11 men's"
+],
+"out": "11"
+},
+{
+"in": [
+"uk 7.5 trainers"
+],
+"out": "7.5"
+},
+{
+"in": [
+"Shoes 10½ US"
+],
+"out": ""
+},
+{
+"in": [
+"Jacket size large"
+],
+"out": ""
+},
+{
+"in": [
+"34 x 32 pants"
+],
+"out": "34x32"
+}
+],
+"check_size": [
+{
+"in": [
+"10.5",
+{
+"size": "10 1/2"
+}
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"11",
+{
+"size": "10.5"
+}
+],
+"out": [
+false,
+"size 11, not 10.5"
+]
+},
+{
+"in": [
+"",
+{
+"size": "M"
+}
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"M",
+{}
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"32x30",
+{
+"size": "W32 L30"
+}
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+null,
+{
+"size": null
+}
+],
+"out": [
+true,
+""
+]
+},
+{
+"in": [
+"medium",
+{
+"size": "M"
+}
+],
+"out": [
+true,
+""
+]
+}
+],
+"vehicle_history": [
+{
+"in": [
+2018,
+[
+[
+400.0,
+2018
+],
+[
+420.0,
+2019
+],
+[
+390.0,
+2017
+],
+[
+500.0,
+2010
+],
+[
+380.0,
+2020
+],
+[
+410.0,
+2016
+],
+[
+450.0,
+null
+]
+]
+],
+"out": [
+400.0,
+420.0,
+390.0,
+380.0,
+410.0
+]
+},
+{
+"in": [
+2010,
+[
+[
+400.0,
+2018
+],
+[
+420.0,
+2019
+],
+[
+390.0,
+2017
+],
+[
+500.0,
+2010
+],
+[
+380.0,
+2020
+],
+[
+410.0,
+2016
+],
+[
+450.0,
+null
+]
+]
+],
+"out": [
+400.0,
+420.0,
+390.0,
+500.0,
+380.0,
+410.0,
+450.0
+]
+},
+{
+"in": [
+null,
+[
+[
+400.0,
+2018
+],
+[
+420.0,
+2019
+],
+[
+390.0,
+2017
+],
+[
+500.0,
+2010
+],
+[
+380.0,
+2020
+],
+[
+410.0,
+2016
+],
+[
+450.0,
+null
+]
+]
+],
+"out": [
+400.0,
+420.0,
+390.0,
+500.0,
+380.0,
+410.0,
+450.0
+]
+},
+{
+"in": [
+2030,
+[
+[
+400.0,
+2018
+],
+[
+420.0,
+2019
+],
+[
+390.0,
+2017
+],
+[
+500.0,
+2010
+],
+[
+380.0,
+2020
+],
+[
+410.0,
+2016
+],
+[
+450.0,
+null
+]
+]
+],
+"out": [
+400.0,
+420.0,
+390.0,
+500.0,
+380.0,
+410.0,
+450.0
+]
+},
+{
+"in": [
+2018,
+[]
+],
+"out": []
+}
+],
+"typical_price": [
+{
+"in": [
+[]
+],
+"out": null
+},
+{
+"in": [
+[
+1,
+2,
+3,
+4
+]
+],
+"out": null
+},
+{
+"in": [
+[
+100,
+200,
+300,
+400,
+500
+]
+],
+"out": 300
+},
+{
+"in": [
+[
+100,
+200,
+300,
+400,
+500,
+600
+]
+],
+"out": 350.0
+},
+{
+"in": [
+[
+0,
+null,
+-5,
+100,
+200,
+300,
+400
+]
+],
+"out": null
+},
+{
+"in": [
+[
+1.0,
+400.0,
+400.0,
+400.0,
+400.0,
+400.0,
+400.0,
+400.0,
+400.0,
+400.0,
+9999.0
+]
+],
+"out": 400.0
+},
+{
+"in": [
+[
+399.99,
+401.25,
+405.5,
+410.0,
+389.0,
+420.0,
+999.0,
+1.0,
+400.0,
+402.0,
+404.0
+]
+],
+"out": 402.0
+},
+{
+"in": [
+[
+0.1,
+0.2,
+0.3,
+0.4,
+0.5
+]
+],
+"out": 0.3
+}
+],
+"deal_pct": [
+{
+"in": [
+null,
+[]
+],
+"out": null
+},
+{
+"in": [
+null,
+[
+1,
+2,
+3,
+4
+]
+],
+"out": null
+},
+{
+"in": [
+null,
+[
+100,
+200,
+300,
+400,
+500
+]
+],
+"out": null
+},
+{
+"in": [
+null,
+[
+100,
+200,
+300,
+400,
+500,
+600
+]
+],
+"out": null
+},
+{
+"in": [
+null,
+[
+0,
+null,
+-5,
+100,
+200,
+300,
+400
+]
+],
+"out": null
+},
+{
+"in": [
+null,
+[
+1.0,
+400.0,
+400.0,
+400.0,
+400.0,
+400.0,
+400.0,
+400.0,
+400.0,
+400.0,
+9999.0
+]
+],
+"out": null
+},
+{
+"in": [
+null,
+[
+399.99,
+401.25,
+405.5,
+410.0,
+389.0,
+420.0,
+999.0,
+1.0,
+400.0,
+402.0,
+404.0
+]
+],
+"out": null
+},
+{
+"in": [
+null,
+[
+0.1,
+0.2,
+0.3,
+0.4,
+0.5
+]
+],
+"out": null
+},
+{
+"in": [
+0.0,
+[]
+],
+"out": null
+},
+{
+"in": [
+0.0,
+[
+1,
+2,
+3,
+4
+]
+],
+"out": null
+},
+{
+"in": [
+0.0,
+[
+100,
+200,
+300,
+400,
+500
+]
+],
+"out": 1.0
+},
+{
+"in": [
+0.0,
+[
+100,
+200,
+300,
+400,
+500,
+600
+]
+],
+"out": 1.0
+},
+{
+"in": [
+0.0,
+[
+0,
+null,
+-5,
+100,
+200,
+300,
+400
+]
+],
+"out": null
+},
+{
+"in": [
+0.0,
+[
+1.0,
+400.0,
+400.0,
+400.0,
+400.0,
+400.0,
+400.0,
+400.0,
+400.0,
+400.0,
+9999.0
+]
+],
+"out": 1.0
+},
+{
+"in": [
+0.0,
+[
+399.99,
+401.25,
+405.5,
+410.0,
+389.0,
+420.0,
+999.0,
+1.0,
+400.0,
+402.0,
+404.0
+]
+],
+"out": 1.0
+},
+{
+"in": [
+0.0,
+[
+0.1,
+0.2,
+0.3,
+0.4,
+0.5
+]
+],
+"out": 1.0
+},
+{
+"in": [
+300.0,
+[]
+],
+"out": null
+},
+{
+"in": [
+300.0,
+[
+1,
+2,
+3,
+4
+]
+],
+"out": null
+},
+{
+"in": [
+300.0,
+[
+100,
+200,
+300,
+400,
+500
+]
+],
+"out": 0.0
+},
+{
+"in": [
+300.0,
+[
+100,
+200,
+300,
+400,
+500,
+600
+]
+],
+"out": 0.143
+},
+{
+"in": [
+300.0,
+[
+0,
+null,
+-5,
+100,
+200,
+300,
+400
+]
+],
+"out": null
+},
+{
+"in": [
+300.0,
+[
+1.0,
+400.0,
+400.0,
+400.0,
+400.0,
+400.0,
+400.0,
+400.0,
+400.0,
+400.0,
+9999.0
+]
+],
+"out": 0.25
+},
+{
+"in": [
+300.0,
+[
+399.99,
+401.25,
+405.5,
+410.0,
+389.0,
+420.0,
+999.0,
+1.0,
+400.0,
+402.0,
+404.0
+]
+],
+"out": 0.254
+},
+{
+"in": [
+300.0,
+[
+0.1,
+0.2,
+0.3,
+0.4,
+0.5
+]
+],
+"out": -999.0
+},
+{
+"in": [
+400.0,
+[]
+],
+"out": null
+},
+{
+"in": [
+400.0,
+[
+1,
+2,
+3,
+4
+]
+],
+"out": null
+},
+{
+"in": [
+400.0,
+[
+100,
+200,
+300,
+400,
+500
+]
+],
+"out": -0.333
+},
+{
+"in": [
+400.0,
+[
+100,
+200,
+300,
+400,
+500,
+600
+]
+],
+"out": -0.143
+},
+{
+"in": [
+400.0,
+[
+0,
+null,
+-5,
+100,
+200,
+300,
+400
+]
+],
+"out": null
+},
+{
+"in": [
+400.0,
+[
+1.0,
+400.0,
+400.0,
+400.0,
+400.0,
+400.0,
+400.0,
+400.0,
+400.0,
+400.0,
+9999.0
+]
+],
+"out": 0.0
+},
+{
+"in": [
+400.0,
+[
+399.99,
+401.25,
+405.5,
+410.0,
+389.0,
+420.0,
+999.0,
+1.0,
+400.0,
+402.0,
+404.0
+]
+],
+"out": 0.005
+},
+{
+"in": [
+400.0,
+[
+0.1,
+0.2,
+0.3,
+0.4,
+0.5
+]
+],
+"out": -1332.333
+},
+{
+"in": [
+450.0,
+[]
+],
+"out": null
+},
+{
+"in": [
+450.0,
+[
+1,
+2,
+3,
+4
+]
+],
+"out": null
+},
+{
+"in": [
+450.0,
+[
+100,
+200,
+300,
+400,
+500
+]
+],
+"out": -0.5
+},
+{
+"in": [
+450.0,
+[
+100,
+200,
+300,
+400,
+500,
+600
+]
+],
+"out": -0.286
+},
+{
+"in": [
+450.0,
+[
+0,
+null,
+-5,
+100,
+200,
+300,
+400
+]
+],
+"out": null
+},
+{
+"in": [
+450.0,
+[
+1.0,
+400.0,
+400.0,
+400.0,
+400.0,
+400.0,
+400.0,
+400.0,
+400.0,
+400.0,
+9999.0
+]
+],
+"out": -0.125
+},
+{
+"in": [
+450.0,
+[
+399.99,
+401.25,
+405.5,
+410.0,
+389.0,
+420.0,
+999.0,
+1.0,
+400.0,
+402.0,
+404.0
+]
+],
+"out": -0.119
+},
+{
+"in": [
+450.0,
+[
+0.1,
+0.2,
+0.3,
+0.4,
+0.5
+]
+],
+"out": -1499.0
+},
+{
+"in": [
+337.5,
+[]
+],
+"out": null
+},
+{
+"in": [
+337.5,
+[
+1,
+2,
+3,
+4
+]
+],
+"out": null
+},
+{
+"in": [
+337.5,
+[
+100,
+200,
+300,
+400,
+500
+]
+],
+"out": -0.125
+},
+{
+"in": [
+337.5,
+[
+100,
+200,
+300,
+400,
+500,
+600
+]
+],
+"out": 0.036
+},
+{
+"in": [
+337.5,
+[
+0,
+null,
+-5,
+100,
+200,
+300,
+400
+]
+],
+"out": null
+},
+{
+"in": [
+337.5,
+[
+1.0,
+400.0,
+400.0,
+400.0,
+400.0,
+400.0,
+400.0,
+400.0,
+400.0,
+400.0,
+9999.0
+]
+],
+"out": 0.156
+},
+{
+"in": [
+337.5,
+[
+399.99,
+401.25,
+405.5,
+410.0,
+389.0,
+420.0,
+999.0,
+1.0,
+400.0,
+402.0,
+404.0
+]
+],
+"out": 0.16
+},
+{
+"in": [
+337.5,
+[
+0.1,
+0.2,
+0.3,
+0.4,
+0.5
+]
+],
+"out": -1124.0
+},
+{
+"in": [
+1000.0,
+[]
+],
+"out": null
+},
+{
+"in": [
+1000.0,
+[
+1,
+2,
+3,
+4
+]
+],
+"out": null
+},
+{
+"in": [
+1000.0,
+[
+100,
+200,
+300,
+400,
+500
+]
+],
+"out": -2.333
+},
+{
+"in": [
+1000.0,
+[
+100,
+200,
+300,
+400,
+500,
+600
+]
+],
+"out": -1.857
+},
+{
+"in": [
+1000.0,
+[
+0,
+null,
+-5,
+100,
+200,
+300,
+400
+]
+],
+"out": null
+},
+{
+"in": [
+1000.0,
+[
+1.0,
+400.0,
+400.0,
+400.0,
+400.0,
+400.0,
+400.0,
+400.0,
+400.0,
+400.0,
+9999.0
+]
+],
+"out": -1.5
+},
+{
+"in": [
+1000.0,
+[
+399.99,
+401.25,
+405.5,
+410.0,
+389.0,
+420.0,
+999.0,
+1.0,
+400.0,
+402.0,
+404.0
+]
+],
+"out": -1.488
+},
+{
+"in": [
+1000.0,
+[
+0.1,
+0.2,
+0.3,
+0.4,
+0.5
+]
+],
+"out": -3332.333
+},
+{
+"in": [
+320.0,
+[
+400.0,
+400.0,
+400.0,
+400.0,
+400.0
+]
+],
+"out": 0.2
+},
+{
+"in": [
+400.25,
+[
+400.0,
+400.0,
+400.0,
+400.0,
+400.0
+]
+],
+"out": -0.001
+},
+{
+"in": [
+375.0,
+[
+400.0,
+400.0,
+400.0,
+400.0,
+400.0
+]
+],
+"out": 0.062
+},
+{
+"in": [
+0.0625,
+[
+1.0,
+1.0,
+1.0,
+1.0,
+1.0
+]
+],
+"out": 0.938
+}
+],
+"deal_label": [
+{
+"in": [
+null
+],
+"out": ""
+},
+{
+"in": [
+0.25
+],
+"out": "great"
+},
+{
+"in": [
+0.2499
+],
+"out": "good"
+},
+{
+"in": [
+0.1
+],
+"out": "good"
+},
+{
+"in": [
+0.0999
+],
+"out": ""
+},
+{
+"in": [
+-0.5
+],
+"out": ""
+},
+{
+"in": [
+0.0
+],
+"out": ""
+},
+{
+"in": [
+1.0
+],
+"out": "great"
+}
+],
+"cpu_socket": [
+{
+"in": [
+"Intel(R) Core(TM) i7-7800X CPU @ 3.50GHz"
+],
+"out": "LGA2066"
+},
+{
+"in": [
+"Intel Core i9-10980XE"
+],
+"out": "LGA2066"
+},
+{
+"in": [
+"i9-10900K"
+],
+"out": "LGA1200"
+},
+{
+"in": [
+"i5-11400"
+],
+"out": "LGA1200"
+},
+{
+"in": [
+"i7-12700K"
+],
+"out": "LGA1700"
+},
+{
+"in": [
+"i7-13700K"
+],
+"out": "LGA1700"
+},
+{
+"in": [
+"i9-14900KS"
+],
+"out": "LGA1700"
+},
+{
+"in": [
+"i7-15700"
+],
+"out": null
+},
+{
+"in": [
+"i7-4790K"
+],
+"out": "LGA1150"
+},
+{
+"in": [
+"i7-5775C"
+],
+"out": "LGA1150"
+},
+{
+"in": [
+"i7-5960X"
+],
+"out": "LGA2011-3"
+},
+{
+"in": [
+"i7-6950X"
+],
+"out": "LGA2011-3"
+},
+{
+"in": [
+"i7-3930K"
+],
+"out": null
+},
+{
+"in": [
+"i7-4960X"
+],
+"out": null
+},
+{
+"in": [
+"i5-2500K"
+],
+"out": "LGA1155"
+},
+{
+"in": [
+"i7-3770"
+],
+"out": "LGA1155"
+},
+{
+"in": [
+"i7-6700K"
+],
+"out": "LGA1151"
+},
+{
+"in": [
+"i7-7700"
+],
+"out": "LGA1151"
+},
+{
+"in": [
+"i9-7980XE"
+],
+"out": "LGA2066"
+},
+{
+"in": [
+"i9-9980XE"
+],
+"out": "LGA2066"
+},
+{
+"in": [
+"i7-8700K"
+],
+"out": "LGA1151v2"
+},
+{
+"in": [
+"i9-9900K"
+],
+"out": "LGA1151v2"
+},
+{
+"in": [
+"Core Ultra 9 285K"
+],
+"out": "LGA1851"
+},
+{
+"in": [
+"Core Ultra 7 265"
+],
+"out": "LGA1851"
+},
+{
+"in": [
+"AMD Ryzen 7 3700X 8-Core Processor"
+],
+"out": "AM4"
+},
+{
+"in": [
+"Ryzen 5 5600X"
+],
+"out": "AM4"
+},
+{
+"in": [
+"R5 1600"
+],
+"out": "AM4"
+},
+{
+"in": [
+"Ryzen 9 7950X3D"
+],
+"out": "AM5"
+},
+{
+"in": [
+"Ryzen 7 9800X3D"
+],
+"out": "AM5"
+},
+{
+"in": [
+"Ryzen 5 6600H"
+],
+"out": null
+},
+{
+"in": [
+"Threadripper 3970X"
+],
+"out": null
+},
+{
+"in": [
+"Xeon E5-2690 v4"
+],
+"out": null
+},
+{
+"in": [
+""
+],
+"out": null
+},
+{
+"in": [
+"i3-1005G1"
+],
+"out": null
+},
+{
+"in": [
+"Pentium G4560"
+],
+"out": null
+},
+{
+"in": [
+"i7 4770k"
+],
+"out": "LGA1150"
+},
+{
+"in": [
+"i7-4770 @ 3.4"
+],
+"out": "LGA1150"
+},
+{
+"in": [
+"Ryzen ٥ ٥٦٠٠X"
+],
+"out": "AM4"
+}
+],
+"detect_platform": [
+{
+"in": [
+[
+{
+"category": "motherboard",
+"model": "ASUS P8P67 Pro"
+}
+]
+],
+"out": [
+"LGA1155",
+"from motherboard 'ASUS P8P67 Pro'"
+]
+},
+{
+"in": [
+[
+{
+"category": "motherboard",
+"model": "Gigabyte B85M-D3H"
+}
+]
+],
+"out": [
+"LGA1150",
+"from motherboard 'Gigabyte B85M-D3H'"
+]
+},
+{
+"in": [
+[
+{
+"category": "motherboard",
+"model": "ASRock X299 Taichi"
+}
+]
+],
+"out": [
+"LGA2066",
+"from motherboard 'ASRock X299 Taichi'"
+]
+},
+{
+"in": [
+[
+{
+"category": "motherboard",
+"model": "MSI X99A SLI"
+}
+]
+],
+"out": [
+null,
+"couldn't recognise the motherboard chipset or CPU"
+]
+},
+{
+"in": [
+[
+{
+"category": "motherboard",
+"model": "ASUS Z170-A"
+}
+]
+],
+"out": [
+"LGA1151",
+"from motherboard 'ASUS Z170-A'"
+]
+},
+{
+"in": [
+[
+{
+"category": "motherboard",
+"model": "MSI Z390-A Pro"
+}
+]
+],
+"out": [
+"LGA1151v2",
+"from motherboard 'MSI Z390-A Pro'"
+]
+},
+{
+"in": [
+[
+{
+"category": "motherboard",
+"model": "Gigabyte Z490 Aorus"
+}
+]
+],
+"out": [
+"LGA1200",
+"from motherboard 'Gigabyte Z490 Aorus'"
+]
+},
+{
+"in": [
+[
+{
+"category": "motherboard",
+"model": "ASUS ROG Z690"
+}
+]
+],
+"out": [
+"LGA1700",
+"from motherboard 'ASUS ROG Z690'"
+]
+},
+{
+"in": [
+[
+{
+"category": "motherboard",
+"model": "MSI Z890 Tomahawk"
+}
+]
+],
+"out": [
+"LGA1851",
+"from motherboard 'MSI Z890 Tomahawk'"
+]
+},
+{
+"in": [
+[
+{
+"category": "motherboard",
+"model": "ASUS B550-F"
+}
+]
+],
+"out": [
+"AM4",
+"from motherboard 'ASUS B550-F'"
+]
+},
+{
+"in": [
+[
+{
+"category": "motherboard",
+"model": "Gigabyte X670E Aorus"
+}
+]
+],
+"out": [
+"AM5",
+"from motherboard 'Gigabyte X670E Aorus'"
+]
+},
+{
+"in": [
+[
+{
+"category": "motherboard",
+"model": "Dell 0XHGV1"
+}
+]
+],
+"out": [
+null,
+"couldn't recognise the motherboard chipset or CPU"
+]
+},
+{
+"in": [
+[
+{
+"category": "motherboard",
+"model": "ASUS Prime H310M"
+}
+]
+],
+"out": [
+null,
+"couldn't recognise the motherboard chipset or CPU"
+]
+},
+{
+"in": [
+[
+{
+"category": "motherboard",
+"model": "Gigabyte H97-D3H"
+}
+]
+],
+"out": [
+"LGA1150",
+"from motherboard 'Gigabyte H97-D3H'"
+]
+},
+{
+"in": [
+[
+{
+"category": "motherboard",
+"model": "ASRock Z97 Extreme4"
+}
+]
+],
+"out": [
+"LGA1150",
+"from motherboard 'ASRock Z97 Extreme4'"
+]
+},
+{
+"in": [
+[
+{
+"category": "motherboard",
+"model": "Q370M"
+}
+]
+],
+"out": [
+null,
+"couldn't recognise the motherboard chipset or CPU"
+]
+},
+{
+"in": [
+[
+{
+"category": "motherboard",
+"model": "W480 Pro"
+}
+]
+],
+"out": [
+"LGA1200",
+"from motherboard 'W480 Pro'"
+]
+},
+{
+"in": [
+[
+{
+"category": "motherboard",
+"model": "Unknown board"
+}
+]
+],
+"out": [
+null,
+"couldn't recognise the motherboard chipset or CPU"
+]
+},
+{
+"in": [
+[
+{
+"category": "motherboard",
+"model": "ASUS X99-A"
+}
+]
+],
+"out": [
+"LGA2011-3",
+"from motherboard 'ASUS X99-A'"
+]
+},
+{
+"in": [
+[
+{
+"category": "motherboard",
+"model": "ASRock H310 Pro"
+}
+]
+],
+"out": [
+"LGA1151v2",
+"from motherboard 'ASRock H310 Pro'"
+]
+},
+{
+"in": [
+[
+{
+"category": "motherboard",
+"model": "MSI Q170 Pro"
+}
+]
+],
+"out": [
+"LGA1151",
+"from motherboard 'MSI Q170 Pro'"
+]
+},
+{
+"in": [
+[
+{
+"category": "motherboard",
+"model": "ASUS P8Z77-V"
+}
+]
+],
+"out": [
+"LGA1155",
+"from motherboard 'ASUS P8Z77-V'"
+]
+},
+{
+"in": [
+[
+{
+"category": "motherboard",
+"model": "Gigabyte H61M-S1"
+}
+]
+],
+"out": [
+"LGA1155",
+"from motherboard 'Gigabyte H61M-S1'"
+]
+},
+{
+"in": [
+[
+{
+"category": "motherboard",
+"model": "Gigabyte B650 Aorus"
+}
+]
+],
+"out": [
+"AM5",
+"from motherboard 'Gigabyte B650 Aorus'"
+]
+},
+{
+"in": [
+[
+{
+"category": "motherboard",
+"model": "MSI B760 Gaming"
+}
+]
+],
+"out": [
+"LGA1700",
+"from motherboard 'MSI B760 Gaming'"
+]
+},
+{
+"in": [
+[
+{
+"category": "motherboard",
+"model": "ASUS B860-F"
+}
+]
+],
+"out": [
+"LGA1851",
+"from motherboard 'ASUS B860-F'"
+]
+},
+{
+"in": [
+[
+{
+"category": "motherboard",
+"model": "ASRock A520M"
+}
+]
+],
+"out": [
+null,
+"couldn't recognise the motherboard chipset or CPU"
+]
+},
+{
+"in": [
+[
+{
+"category": "motherboard",
+"model": "MSI H81M"
+}
+]
+],
+"out": [
+"LGA1150",
+"from motherboard 'MSI H81M'"
+]
+},
+{
+"in": [
+[
+{
+"category": "motherboard",
+"model": "Q85 board"
+}
+]
+],
+"out": [
+"LGA1150",
+"from motherboard 'Q85 board'"
+]
+},
+{
+"in": [
+[
+{
+"category": "motherboard",
+"model": "MSI Z87-G45"
+}
+]
+],
+"out": [
+"LGA1150",
+"from motherboard 'MSI Z87-G45'"
+]
+},
+{
+"in": [
+[
+{
+"category": "cpu",
+"model": "Intel(R) Core(TM) i7-7800X CPU @ 3.50GHz"
+}
+]
+],
+"out": [
+"LGA2066",
+"from CPU 'Intel(R) Core(TM) i7-7800X CPU @ 3.50GHz'"
+]
+},
+{
+"in": [
+[
+{
+"category": "cpu",
+"model": "Intel Core i9-10980XE"
+}
+]
+],
+"out": [
+"LGA2066",
+"from CPU 'Intel Core i9-10980XE'"
+]
+},
+{
+"in": [
+[
+{
+"category": "cpu",
+"model": "i9-10900K"
+}
+]
+],
+"out": [
+"LGA1200",
+"from CPU 'i9-10900K'"
+]
+},
+{
+"in": [
+[
+{
+"category": "cpu",
+"model": "i5-11400"
+}
+]
+],
+"out": [
+"LGA1200",
+"from CPU 'i5-11400'"
+]
+},
+{
+"in": [
+[
+{
+"category": "cpu",
+"model": "i7-12700K"
+}
+]
+],
+"out": [
+"LGA1700",
+"from CPU 'i7-12700K'"
+]
+},
+{
+"in": [
+[
+{
+"category": "cpu",
+"model": "i7-13700K"
+}
+]
+],
+"out": [
+"LGA1700",
+"from CPU 'i7-13700K'"
+]
+},
+{
+"in": [
+[
+{
+"category": "cpu",
+"model": "i9-14900KS"
+}
+]
+],
+"out": [
+"LGA1700",
+"from CPU 'i9-14900KS'"
+]
+},
+{
+"in": [
+[
+{
+"category": "cpu",
+"model": "i7-15700"
+}
+]
+],
+"out": [
+null,
+"couldn't recognise the motherboard chipset or CPU"
+]
+},
+{
+"in": [
+[
+{
+"category": "cpu",
+"model": "i7-4790K"
+}
+]
+],
+"out": [
+"LGA1150",
+"from CPU 'i7-4790K'"
+]
+},
+{
+"in": [
+[
+{
+"category": "cpu",
+"model": "i7-5775C"
+}
+]
+],
+"out": [
+"LGA1150",
+"from CPU 'i7-5775C'"
+]
+},
+{
+"in": [
+[
+{
+"category": "cpu",
+"model": "i7-5960X"
+}
+]
+],
+"out": [
+"LGA2011-3",
+"from CPU 'i7-5960X'"
+]
+},
+{
+"in": [
+[
+{
+"category": "cpu",
+"model": "i7-6950X"
+}
+]
+],
+"out": [
+"LGA2011-3",
+"from CPU 'i7-6950X'"
+]
+},
+{
+"in": [
+[
+{
+"category": "cpu",
+"model": "i7-3930K"
+}
+]
+],
+"out": [
+null,
+"couldn't recognise the motherboard chipset or CPU"
+]
+},
+{
+"in": [
+[
+{
+"category": "cpu",
+"model": "i7-4960X"
+}
+]
+],
+"out": [
+null,
+"couldn't recognise the motherboard chipset or CPU"
+]
+},
+{
+"in": [
+[
+{
+"category": "cpu",
+"model": "i5-2500K"
+}
+]
+],
+"out": [
+"LGA1155",
+"from CPU 'i5-2500K'"
+]
+},
+{
+"in": [
+[
+{
+"category": "cpu",
+"model": "i7-3770"
+}
+]
+],
+"out": [
+"LGA1155",
+"from CPU 'i7-3770'"
+]
+},
+{
+"in": [
+[
+{
+"category": "cpu",
+"model": "i7-6700K"
+}
+]
+],
+"out": [
+"LGA1151",
+"from CPU 'i7-6700K'"
+]
+},
+{
+"in": [
+[
+{
+"category": "cpu",
+"model": "i7-7700"
+}
+]
+],
+"out": [
+"LGA1151",
+"from CPU 'i7-7700'"
+]
+},
+{
+"in": [
+[
+{
+"category": "cpu",
+"model": "i9-7980XE"
+}
+]
+],
+"out": [
+"LGA2066",
+"from CPU 'i9-7980XE'"
+]
+},
+{
+"in": [
+[
+{
+"category": "cpu",
+"model": "i9-9980XE"
+}
+]
+],
+"out": [
+"LGA2066",
+"from CPU 'i9-9980XE'"
+]
+},
+{
+"in": [
+[
+{
+"category": "cpu",
+"model": "i7-8700K"
+}
+]
+],
+"out": [
+"LGA1151v2",
+"from CPU 'i7-8700K'"
+]
+},
+{
+"in": [
+[
+{
+"category": "cpu",
+"model": "i9-9900K"
+}
+]
+],
+"out": [
+"LGA1151v2",
+"from CPU 'i9-9900K'"
+]
+},
+{
+"in": [
+[
+{
+"category": "cpu",
+"model": "Core Ultra 9 285K"
+}
+]
+],
+"out": [
+"LGA1851",
+"from CPU 'Core Ultra 9 285K'"
+]
+},
+{
+"in": [
+[
+{
+"category": "cpu",
+"model": "Core Ultra 7 265"
+}
+]
+],
+"out": [
+"LGA1851",
+"from CPU 'Core Ultra 7 265'"
+]
+},
+{
+"in": [
+[
+{
+"category": "cpu",
+"model": "AMD Ryzen 7 3700X 8-Core Processor"
+}
+]
+],
+"out": [
+"AM4",
+"from CPU 'AMD Ryzen 7 3700X 8-Core Processor'"
+]
+},
+{
+"in": [
+[
+{
+"category": "cpu",
+"model": "Ryzen 5 5600X"
+}
+]
+],
+"out": [
+"AM4",
+"from CPU 'Ryzen 5 5600X'"
+]
+},
+{
+"in": [
+[
+{
+"category": "cpu",
+"model": "R5 1600"
+}
+]
+],
+"out": [
+"AM4",
+"from CPU 'R5 1600'"
+]
+},
+{
+"in": [
+[
+{
+"category": "cpu",
+"model": "Ryzen 9 7950X3D"
+}
+]
+],
+"out": [
+"AM5",
+"from CPU 'Ryzen 9 7950X3D'"
+]
+},
+{
+"in": [
+[
+{
+"category": "cpu",
+"model": "Ryzen 7 9800X3D"
+}
+]
+],
+"out": [
+"AM5",
+"from CPU 'Ryzen 7 9800X3D'"
+]
+},
+{
+"in": [
+[
+{
+"category": "cpu",
+"model": "Ryzen 5 6600H"
+}
+]
+],
+"out": [
+null,
+"couldn't recognise the motherboard chipset or CPU"
+]
+},
+{
+"in": [
+[
+{
+"category": "cpu",
+"model": "Threadripper 3970X"
+}
+]
+],
+"out": [
+null,
+"couldn't recognise the motherboard chipset or CPU"
+]
+},
+{
+"in": [
+[
+{
+"category": "cpu",
+"model": "Xeon E5-2690 v4"
+}
+]
+],
+"out": [
+null,
+"couldn't recognise the motherboard chipset or CPU"
+]
+},
+{
+"in": [
+[
+{
+"category": "cpu",
+"model": ""
+}
+]
+],
+"out": [
+null,
+"couldn't recognise the motherboard chipset or CPU"
+]
+},
+{
+"in": [
+[
+{
+"category": "cpu",
+"model": "i3-1005G1"
+}
+]
+],
+"out": [
+null,
+"couldn't recognise the motherboard chipset or CPU"
+]
+},
+{
+"in": [
+[
+{
+"category": "cpu",
+"model": "Pentium G4560"
+}
+]
+],
+"out": [
+null,
+"couldn't recognise the motherboard chipset or CPU"
+]
+},
+{
+"in": [
+[
+{
+"category": "cpu",
+"model": "i7 4770k"
+}
+]
+],
+"out": [
+"LGA1150",
+"from CPU 'i7 4770k'"
+]
+},
+{
+"in": [
+[
+{
+"category": "cpu",
+"model": "i7-4770 @ 3.4"
+}
+]
+],
+"out": [
+"LGA1150",
+"from CPU 'i7-4770 @ 3.4'"
+]
+},
+{
+"in": [
+[
+{
+"category": "cpu",
+"model": "Ryzen ٥ ٥٦٠٠X"
+}
+]
+],
+"out": [
+"AM4",
+"from CPU 'Ryzen ٥ ٥٦٠٠X'"
+]
+},
+{
+"in": [
+[]
+],
+"out": [
+null,
+"couldn't recognise the motherboard chipset or CPU"
+]
+},
+{
+"in": [
+[
+{
+"category": "cpu",
+"model": "i7-4790K"
+},
+{
+"category": "motherboard",
+"model": "ASUS Z97-A"
+}
+]
+],
+"out": [
+"LGA1150",
+"from motherboard 'ASUS Z97-A'"
+]
+}
+],
+"suggest": [
+{
+"in": [
+{
+"name": "Desk",
+"parts": [
+{
+"category": "cpu",
+"model": "Intel(R) Core(TM) i7-7800X CPU @ 3.50GHz"
+}
+]
+}
+],
+"out": {
+"platform": "Intel X299 (LGA2066)",
+"explanation": "from CPU 'Intel(R) Core(TM) i7-7800X CPU @ 3.50GHz'",
+"suggestions": [
+{
+"name": "i9-10980XE for Desk",
+"category": "cpu",
+"query": "10980xe",
+"exclude": [
+"xeon",
+"es",
+"qs"
+],
+"max_price": null,
+"reason": "Needs a BIOS with Cascade Lake-X support"
+},
+{
+"name": "i9-10940X for Desk",
+"category": "cpu",
+"query": "10940x",
+"exclude": [
+"xeon",
+"es",
+"qs"
+],
+"max_price": null,
+"reason": "Needs a BIOS with Cascade Lake-X support"
+},
+{
+"name": "i9-9980XE for Desk",
+"category": "cpu",
+"query": "9980xe",
+"exclude": [
+"xeon",
+"es",
+"qs"
+],
+"max_price": null,
+"reason": "Needs a BIOS with 9th-gen X support"
+},
+{
+"name": "i9-10920X for Desk",
+"category": "cpu",
+"query": "10920x",
+"exclude": [
+"xeon",
+"es",
+"qs"
+],
+"max_price": null,
+"reason": "Needs a BIOS with Cascade Lake-X support"
+},
+{
+"name": "i9-9960X for Desk",
+"category": "cpu",
+"query": "9960x",
+"exclude": [
+"xeon",
+"es",
+"qs"
+],
+"max_price": null,
+"reason": "Needs a BIOS with 9th-gen X support"
+},
+{
+"name": "i9-10900X for Desk",
+"category": "cpu",
+"query": "10900x",
+"exclude": [
+"xeon",
+"es",
+"qs"
+],
+"max_price": null,
+"reason": "Needs a BIOS with Cascade Lake-X support"
+},
+{
+"name": "i9-7980XE for Desk",
+"category": "cpu",
+"query": "7980xe",
+"exclude": [
+"xeon",
+"es",
+"qs"
+],
+"max_price": null,
+"reason": "Drop-in for Intel X299 (LGA2066)"
+},
+{
+"name": "i9-7960X for Desk",
+"category": "cpu",
+"query": "7960x",
+"exclude": [
+"xeon",
+"es",
+"qs"
+],
+"max_price": null,
+"reason": "Drop-in for Intel X299 (LGA2066)"
+},
+{
+"name": "i9-9940X for Desk",
+"category": "cpu",
+"query": "9940x",
+"exclude": [
+"xeon",
+"es",
+"qs"
+],
+"max_price": null,
+"reason": "Needs a BIOS with 9th-gen X support"
+},
+{
+"name": "i9-7940X for Desk",
+"category": "cpu",
+"query": "7940x",
+"exclude": [
+"xeon",
+"es",
+"qs"
+],
+"max_price": null,
+"reason": "Drop-in for Intel X299 (LGA2066)"
+},
+{
+"name": "i9-7920X for Desk",
+"category": "cpu",
+"query": "7920x",
+"exclude": [
+"xeon",
+"es",
+"qs"
+],
+"max_price": null,
+"reason": "Drop-in for Intel X299 (LGA2066)"
+},
+{
+"name": "i9-7900X for Desk",
+"category": "cpu",
+"query": "7900x",
+"exclude": [
+"xeon",
+"es",
+"qs"
+],
+"max_price": null,
+"reason": "Drop-in for Intel X299 (LGA2066)"
+},
+{
+"name": "DDR4 4X32GB kit for Desk",
+"category": "ram",
+"query": "ddr4 4x32gb|128gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "4-channel DDR4 desktop DIMMs. Check your board's max capacity and QVL."
+},
+{
+"name": "DDR4 4X16GB kit for Desk",
+"category": "ram",
+"query": "ddr4 4x16gb|64gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "4-channel DDR4 desktop DIMMs. Check your board's max capacity and QVL."
+}
+]
+}
+},
+{
+"in": [
+{
+"name": "Desk",
+"parts": [
+{
+"category": "cpu",
+"model": "Intel Core i9-10980XE"
+}
+]
+}
+],
+"out": {
+"platform": "Intel X299 (LGA2066)",
+"explanation": "from CPU 'Intel Core i9-10980XE'",
+"suggestions": [
+{
+"name": "DDR4 4X32GB kit for Desk",
+"category": "ram",
+"query": "ddr4 4x32gb|128gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "4-channel DDR4 desktop DIMMs. Check your board's max capacity and QVL."
+},
+{
+"name": "DDR4 4X16GB kit for Desk",
+"category": "ram",
+"query": "ddr4 4x16gb|64gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "4-channel DDR4 desktop DIMMs. Check your board's max capacity and QVL."
+}
+]
+}
+},
+{
+"in": [
+{
+"name": "Desk",
+"parts": [
+{
+"category": "cpu",
+"model": "i9-10900K"
+}
+]
+}
+],
+"out": {
+"platform": "Intel 400/500-series (LGA1200)",
+"explanation": "from CPU 'i9-10900K'",
+"suggestions": [
+{
+"name": "i9-11900K for Desk",
+"category": "cpu",
+"query": "11900k",
+"exclude": [],
+"max_price": null,
+"reason": "11th gen only works on Z490/H470 (with BIOS) and 500-series, not B460/H410"
+},
+{
+"name": "DDR4 2X32GB kit for Desk",
+"category": "ram",
+"query": "ddr4 2x32gb|64gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "2-channel DDR4 desktop DIMMs. Check your board's max capacity and QVL."
+},
+{
+"name": "DDR4 2X16GB kit for Desk",
+"category": "ram",
+"query": "ddr4 2x16gb|32gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "2-channel DDR4 desktop DIMMs. Check your board's max capacity and QVL."
+}
+]
+}
+},
+{
+"in": [
+{
+"name": "Desk",
+"parts": [
+{
+"category": "cpu",
+"model": "i5-11400"
+}
+]
+}
+],
+"out": {
+"platform": "Intel 400/500-series (LGA1200)",
+"explanation": "from CPU 'i5-11400'",
+"suggestions": [
+{
+"name": "i9-11900K for Desk",
+"category": "cpu",
+"query": "11900k",
+"exclude": [],
+"max_price": null,
+"reason": "11th gen only works on Z490/H470 (with BIOS) and 500-series, not B460/H410"
+},
+{
+"name": "i9-10900K for Desk",
+"category": "cpu",
+"query": "10900k",
+"exclude": [],
+"max_price": null,
+"reason": "Drop-in for Intel 400/500-series (LGA1200)"
+},
+{
+"name": "i9-10850K for Desk",
+"category": "cpu",
+"query": "10850k",
+"exclude": [],
+"max_price": null,
+"reason": "Drop-in for Intel 400/500-series (LGA1200)"
+},
+{
+"name": "i7-11700K for Desk",
+"category": "cpu",
+"query": "11700k",
+"exclude": [],
+"max_price": null,
+"reason": "11th gen only works on Z490/H470 (with BIOS) and 500-series, not B460/H410"
+},
+{
+"name": "i7-10700K for Desk",
+"category": "cpu",
+"query": "10700k",
+"exclude": [],
+"max_price": null,
+"reason": "Drop-in for Intel 400/500-series (LGA1200)"
+},
+{
+"name": "DDR4 2X32GB kit for Desk",
+"category": "ram",
+"query": "ddr4 2x32gb|64gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "2-channel DDR4 desktop DIMMs. Check your board's max capacity and QVL."
+},
+{
+"name": "DDR4 2X16GB kit for Desk",
+"category": "ram",
+"query": "ddr4 2x16gb|32gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "2-channel DDR4 desktop DIMMs. Check your board's max capacity and QVL."
+}
+]
+}
+},
+{
+"in": [
+{
+"name": "Desk",
+"parts": [
+{
+"category": "cpu",
+"model": "i7-12700K"
+}
+]
+}
+],
+"out": {
+"platform": "Intel 600/700-series (LGA1700)",
+"explanation": "from CPU 'i7-12700K'",
+"suggestions": [
+{
+"name": "i9-14900K for Desk",
+"category": "cpu",
+"query": "14900k",
+"exclude": [],
+"max_price": null,
+"reason": "600-series boards need a BIOS update. Check 13th/14th-gen i7/i9 microcode (stability issue)"
+},
+{
+"name": "i7-14700K for Desk",
+"category": "cpu",
+"query": "14700k",
+"exclude": [],
+"max_price": null,
+"reason": "600-series boards need a BIOS update. Check 13th/14th-gen i7/i9 microcode (stability issue)"
+},
+{
+"name": "i9-13900K for Desk",
+"category": "cpu",
+"query": "13900k",
+"exclude": [],
+"max_price": null,
+"reason": "600-series boards need a BIOS update. Check 13th/14th-gen i7/i9 microcode (stability issue)"
+},
+{
+"name": "i7-13700K for Desk",
+"category": "cpu",
+"query": "13700k",
+"exclude": [],
+"max_price": null,
+"reason": "600-series boards need a BIOS update. Check 13th/14th-gen i7/i9 microcode (stability issue)"
+},
+{
+"name": "i5-14600K for Desk",
+"category": "cpu",
+"query": "14600k",
+"exclude": [],
+"max_price": null,
+"reason": "600-series boards need a BIOS update"
+},
+{
+"name": "i5-13600K for Desk",
+"category": "cpu",
+"query": "13600k",
+"exclude": [],
+"max_price": null,
+"reason": "600-series boards need a BIOS update"
+},
+{
+"name": "RAM for Desk",
+"category": "ram",
+"query": "",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "This platform can be DDR4 or DDR5 (check your board); add the RAM watch yourself once you know which."
+}
+]
+}
+},
+{
+"in": [
+{
+"name": "Desk",
+"parts": [
+{
+"category": "cpu",
+"model": "i7-13700K"
+}
+]
+}
+],
+"out": {
+"platform": "Intel 600/700-series (LGA1700)",
+"explanation": "from CPU 'i7-13700K'",
+"suggestions": [
+{
+"name": "i9-14900K for Desk",
+"category": "cpu",
+"query": "14900k",
+"exclude": [],
+"max_price": null,
+"reason": "600-series boards need a BIOS update. Check 13th/14th-gen i7/i9 microcode (stability issue)"
+},
+{
+"name": "i7-14700K for Desk",
+"category": "cpu",
+"query": "14700k",
+"exclude": [],
+"max_price": null,
+"reason": "600-series boards need a BIOS update. Check 13th/14th-gen i7/i9 microcode (stability issue)"
+},
+{
+"name": "i9-13900K for Desk",
+"category": "cpu",
+"query": "13900k",
+"exclude": [],
+"max_price": null,
+"reason": "600-series boards need a BIOS update. Check 13th/14th-gen i7/i9 microcode (stability issue)"
+},
+{
+"name": "RAM for Desk",
+"category": "ram",
+"query": "",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "This platform can be DDR4 or DDR5 (check your board); add the RAM watch yourself once you know which."
+}
+]
+}
+},
+{
+"in": [
+{
+"name": "Desk",
+"parts": [
+{
+"category": "cpu",
+"model": "i9-14900KS"
+}
+]
+}
+],
+"out": {
+"platform": "Intel 600/700-series (LGA1700)",
+"explanation": "from CPU 'i9-14900KS'",
+"suggestions": [
+{
+"name": "RAM for Desk",
+"category": "ram",
+"query": "",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "This platform can be DDR4 or DDR5 (check your board); add the RAM watch yourself once you know which."
+}
+]
+}
+},
+{
+"in": [
+{
+"name": "Desk",
+"parts": [
+{
+"category": "cpu",
+"model": "i7-15700"
+}
+]
+}
+],
+"out": {
+"platform": null,
+"explanation": "couldn't recognise the motherboard chipset or CPU",
+"suggestions": []
+}
+},
+{
+"in": [
+{
+"name": "Desk",
+"parts": [
+{
+"category": "cpu",
+"model": "i7-4790K"
+}
+]
+}
+],
+"out": {
+"platform": "Intel 8/9-series (LGA1150)",
+"explanation": "from CPU 'i7-4790K'",
+"suggestions": [
+{
+"name": "DDR3 4X8GB kit for Desk",
+"category": "ram",
+"query": "ddr3 4x8gb|32gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "2-channel DDR3 desktop DIMMs. Check your board's max capacity and QVL."
+}
+]
+}
+},
+{
+"in": [
+{
+"name": "Desk",
+"parts": [
+{
+"category": "cpu",
+"model": "i7-5775C"
+}
+]
+}
+],
+"out": {
+"platform": "Intel 8/9-series (LGA1150)",
+"explanation": "from CPU 'i7-5775C'",
+"suggestions": [
+{
+"name": "i7-4790K for Desk",
+"category": "cpu",
+"query": "4790k",
+"exclude": [
+"xeon"
+],
+"max_price": null,
+"reason": "Made for 9-series (Z97/H97); only some Z87/H87 boards got a BIOS for it, so check your board's CPU support list"
+},
+{
+"name": "DDR3 4X8GB kit for Desk",
+"category": "ram",
+"query": "ddr3 4x8gb|32gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "2-channel DDR3 desktop DIMMs. Check your board's max capacity and QVL."
+}
+]
+}
+},
+{
+"in": [
+{
+"name": "Desk",
+"parts": [
+{
+"category": "cpu",
+"model": "i7-5960X"
+}
+]
+}
+],
+"out": {
+"platform": "Intel X99 (LGA2011-3)",
+"explanation": "from CPU 'i7-5960X'",
+"suggestions": [
+{
+"name": "i7-6950X for Desk",
+"category": "cpu",
+"query": "6950x",
+"exclude": [
+"es",
+"qs"
+],
+"max_price": null,
+"reason": "Needs a BIOS with Broadwell-E support"
+},
+{
+"name": "i7-6900K for Desk",
+"category": "cpu",
+"query": "6900k",
+"exclude": [
+"es",
+"qs"
+],
+"max_price": null,
+"reason": "Needs a BIOS with Broadwell-E support"
+},
+{
+"name": "DDR4 4X32GB kit for Desk",
+"category": "ram",
+"query": "ddr4 4x32gb|128gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "4-channel DDR4 desktop DIMMs. Check your board's max capacity and QVL."
+},
+{
+"name": "DDR4 4X16GB kit for Desk",
+"category": "ram",
+"query": "ddr4 4x16gb|64gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "4-channel DDR4 desktop DIMMs. Check your board's max capacity and QVL."
+}
+]
+}
+},
+{
+"in": [
+{
+"name": "Desk",
+"parts": [
+{
+"category": "cpu",
+"model": "i7-6950X"
+}
+]
+}
+],
+"out": {
+"platform": "Intel X99 (LGA2011-3)",
+"explanation": "from CPU 'i7-6950X'",
+"suggestions": [
+{
+"name": "DDR4 4X32GB kit for Desk",
+"category": "ram",
+"query": "ddr4 4x32gb|128gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "4-channel DDR4 desktop DIMMs. Check your board's max capacity and QVL."
+},
+{
+"name": "DDR4 4X16GB kit for Desk",
+"category": "ram",
+"query": "ddr4 4x16gb|64gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "4-channel DDR4 desktop DIMMs. Check your board's max capacity and QVL."
+}
+]
+}
+},
+{
+"in": [
+{
+"name": "Desk",
+"parts": [
+{
+"category": "cpu",
+"model": "i7-3930K"
+}
+]
+}
+],
+"out": {
+"platform": null,
+"explanation": "couldn't recognise the motherboard chipset or CPU",
+"suggestions": []
+}
+},
+{
+"in": [
+{
+"name": "Desk",
+"parts": [
+{
+"category": "cpu",
+"model": "i7-4960X"
+}
+]
+}
+],
+"out": {
+"platform": null,
+"explanation": "couldn't recognise the motherboard chipset or CPU",
+"suggestions": []
+}
+},
+{
+"in": [
+{
+"name": "Desk",
+"parts": [
+{
+"category": "cpu",
+"model": "i5-2500K"
+}
+]
+}
+],
+"out": {
+"platform": "Intel 6/7-series (LGA1155)",
+"explanation": "from CPU 'i5-2500K'",
+"suggestions": [
+{
+"name": "i7-3770K for Desk",
+"category": "cpu",
+"query": "3770k",
+"exclude": [
+"xeon"
+],
+"max_price": null,
+"reason": "6-series boards (Z68/P67/H67/H61) need a BIOS update for 3rd gen"
+},
+{
+"name": "i7-3770 for Desk",
+"category": "cpu",
+"query": "3770 -3770k -3770s -3770t",
+"exclude": [
+"xeon"
+],
+"max_price": null,
+"reason": "6-series boards (Z68/P67/H67/H61) need a BIOS update for 3rd gen"
+},
+{
+"name": "i7-2600K for Desk",
+"category": "cpu",
+"query": "2600k",
+"exclude": [
+"xeon"
+],
+"max_price": null,
+"reason": "Drop-in for Intel 6/7-series (LGA1155)"
+},
+{
+"name": "DDR3 4X8GB kit for Desk",
+"category": "ram",
+"query": "ddr3 4x8gb|32gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "2-channel DDR3 desktop DIMMs. Check your board's max capacity and QVL."
+}
+]
+}
+},
+{
+"in": [
+{
+"name": "Desk",
+"parts": [
+{
+"category": "cpu",
+"model": "i7-3770"
+}
+]
+}
+],
+"out": {
+"platform": "Intel 6/7-series (LGA1155)",
+"explanation": "from CPU 'i7-3770'",
+"suggestions": [
+{
+"name": "i7-3770K for Desk",
+"category": "cpu",
+"query": "3770k",
+"exclude": [
+"xeon"
+],
+"max_price": null,
+"reason": "6-series boards (Z68/P67/H67/H61) need a BIOS update for 3rd gen"
+},
+{
+"name": "DDR3 4X8GB kit for Desk",
+"category": "ram",
+"query": "ddr3 4x8gb|32gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "2-channel DDR3 desktop DIMMs. Check your board's max capacity and QVL."
+}
+]
+}
+},
+{
+"in": [
+{
+"name": "Desk",
+"parts": [
+{
+"category": "cpu",
+"model": "i7-6700K"
+}
+]
+}
+],
+"out": {
+"platform": "Intel 100/200-series (LGA1151)",
+"explanation": "from CPU 'i7-6700K'",
+"suggestions": [
+{
+"name": "i7-7700K for Desk",
+"category": "cpu",
+"query": "7700k",
+"exclude": [],
+"max_price": null,
+"reason": "100-series boards need a BIOS update for 7th gen"
+},
+{
+"name": "DDR4 2X32GB kit for Desk",
+"category": "ram",
+"query": "ddr4 2x32gb|64gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "2-channel DDR4 desktop DIMMs. Check your board's max capacity and QVL."
+},
+{
+"name": "DDR4 2X16GB kit for Desk",
+"category": "ram",
+"query": "ddr4 2x16gb|32gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "2-channel DDR4 desktop DIMMs. Check your board's max capacity and QVL."
+}
+]
+}
+},
+{
+"in": [
+{
+"name": "Desk",
+"parts": [
+{
+"category": "cpu",
+"model": "i7-7700"
+}
+]
+}
+],
+"out": {
+"platform": "Intel 100/200-series (LGA1151)",
+"explanation": "from CPU 'i7-7700'",
+"suggestions": [
+{
+"name": "i7-7700K for Desk",
+"category": "cpu",
+"query": "7700k",
+"exclude": [],
+"max_price": null,
+"reason": "100-series boards need a BIOS update for 7th gen"
+},
+{
+"name": "i7-6700K for Desk",
+"category": "cpu",
+"query": "6700k",
+"exclude": [],
+"max_price": null,
+"reason": "Drop-in for Intel 100/200-series (LGA1151)"
+},
+{
+"name": "DDR4 2X32GB kit for Desk",
+"category": "ram",
+"query": "ddr4 2x32gb|64gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "2-channel DDR4 desktop DIMMs. Check your board's max capacity and QVL."
+},
+{
+"name": "DDR4 2X16GB kit for Desk",
+"category": "ram",
+"query": "ddr4 2x16gb|32gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "2-channel DDR4 desktop DIMMs. Check your board's max capacity and QVL."
+}
+]
+}
+},
+{
+"in": [
+{
+"name": "Desk",
+"parts": [
+{
+"category": "cpu",
+"model": "i9-7980XE"
+}
+]
+}
+],
+"out": {
+"platform": "Intel X299 (LGA2066)",
+"explanation": "from CPU 'i9-7980XE'",
+"suggestions": [
+{
+"name": "i9-10980XE for Desk",
+"category": "cpu",
+"query": "10980xe",
+"exclude": [
+"xeon",
+"es",
+"qs"
+],
+"max_price": null,
+"reason": "Needs a BIOS with Cascade Lake-X support"
+},
+{
+"name": "i9-10940X for Desk",
+"category": "cpu",
+"query": "10940x",
+"exclude": [
+"xeon",
+"es",
+"qs"
+],
+"max_price": null,
+"reason": "Needs a BIOS with Cascade Lake-X support"
+},
+{
+"name": "i9-9980XE for Desk",
+"category": "cpu",
+"query": "9980xe",
+"exclude": [
+"xeon",
+"es",
+"qs"
+],
+"max_price": null,
+"reason": "Needs a BIOS with 9th-gen X support"
+},
+{
+"name": "i9-10920X for Desk",
+"category": "cpu",
+"query": "10920x",
+"exclude": [
+"xeon",
+"es",
+"qs"
+],
+"max_price": null,
+"reason": "Needs a BIOS with Cascade Lake-X support"
+},
+{
+"name": "i9-9960X for Desk",
+"category": "cpu",
+"query": "9960x",
+"exclude": [
+"xeon",
+"es",
+"qs"
+],
+"max_price": null,
+"reason": "Needs a BIOS with 9th-gen X support"
+},
+{
+"name": "i9-10900X for Desk",
+"category": "cpu",
+"query": "10900x",
+"exclude": [
+"xeon",
+"es",
+"qs"
+],
+"max_price": null,
+"reason": "Needs a BIOS with Cascade Lake-X support"
+},
+{
+"name": "DDR4 4X32GB kit for Desk",
+"category": "ram",
+"query": "ddr4 4x32gb|128gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "4-channel DDR4 desktop DIMMs. Check your board's max capacity and QVL."
+},
+{
+"name": "DDR4 4X16GB kit for Desk",
+"category": "ram",
+"query": "ddr4 4x16gb|64gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "4-channel DDR4 desktop DIMMs. Check your board's max capacity and QVL."
+}
+]
+}
+},
+{
+"in": [
+{
+"name": "Desk",
+"parts": [
+{
+"category": "cpu",
+"model": "i9-9980XE"
+}
+]
+}
+],
+"out": {
+"platform": "Intel X299 (LGA2066)",
+"explanation": "from CPU 'i9-9980XE'",
+"suggestions": [
+{
+"name": "i9-10980XE for Desk",
+"category": "cpu",
+"query": "10980xe",
+"exclude": [
+"xeon",
+"es",
+"qs"
+],
+"max_price": null,
+"reason": "Needs a BIOS with Cascade Lake-X support"
+},
+{
+"name": "i9-10940X for Desk",
+"category": "cpu",
+"query": "10940x",
+"exclude": [
+"xeon",
+"es",
+"qs"
+],
+"max_price": null,
+"reason": "Needs a BIOS with Cascade Lake-X support"
+},
+{
+"name": "DDR4 4X32GB kit for Desk",
+"category": "ram",
+"query": "ddr4 4x32gb|128gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "4-channel DDR4 desktop DIMMs. Check your board's max capacity and QVL."
+},
+{
+"name": "DDR4 4X16GB kit for Desk",
+"category": "ram",
+"query": "ddr4 4x16gb|64gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "4-channel DDR4 desktop DIMMs. Check your board's max capacity and QVL."
+}
+]
+}
+},
+{
+"in": [
+{
+"name": "Desk",
+"parts": [
+{
+"category": "cpu",
+"model": "i7-8700K"
+}
+]
+}
+],
+"out": {
+"platform": "Intel 300-series (LGA1151 v2)",
+"explanation": "from CPU 'i7-8700K'",
+"suggestions": [
+{
+"name": "i9-9900KS for Desk",
+"category": "cpu",
+"query": "9900ks",
+"exclude": [],
+"max_price": null,
+"reason": "Z370/B360/H370 need a BIOS update for 9th gen"
+},
+{
+"name": "i9-9900K for Desk",
+"category": "cpu",
+"query": "9900k -9900ks",
+"exclude": [],
+"max_price": null,
+"reason": "Z370/B360/H370 need a BIOS update for 9th gen"
+},
+{
+"name": "i9-9900 for Desk",
+"category": "cpu",
+"query": "9900 -9900k -9900ks -9900kf -9900x",
+"exclude": [],
+"max_price": null,
+"reason": "Z370/B360/H370 need a BIOS update for 9th gen"
+},
+{
+"name": "i7-9700K for Desk",
+"category": "cpu",
+"query": "9700k",
+"exclude": [],
+"max_price": null,
+"reason": "Z370/B360/H370 need a BIOS update for 9th gen"
+},
+{
+"name": "DDR4 2X32GB kit for Desk",
+"category": "ram",
+"query": "ddr4 2x32gb|64gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "2-channel DDR4 desktop DIMMs. Check your board's max capacity and QVL."
+},
+{
+"name": "DDR4 2X16GB kit for Desk",
+"category": "ram",
+"query": "ddr4 2x16gb|32gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "2-channel DDR4 desktop DIMMs. Check your board's max capacity and QVL."
+}
+]
+}
+},
+{
+"in": [
+{
+"name": "Desk",
+"parts": [
+{
+"category": "cpu",
+"model": "i9-9900K"
+}
+]
+}
+],
+"out": {
+"platform": "Intel 300-series (LGA1151 v2)",
+"explanation": "from CPU 'i9-9900K'",
+"suggestions": [
+{
+"name": "i9-9900KS for Desk",
+"category": "cpu",
+"query": "9900ks",
+"exclude": [],
+"max_price": null,
+"reason": "Z370/B360/H370 need a BIOS update for 9th gen"
+},
+{
+"name": "DDR4 2X32GB kit for Desk",
+"category": "ram",
+"query": "ddr4 2x32gb|64gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "2-channel DDR4 desktop DIMMs. Check your board's max capacity and QVL."
+},
+{
+"name": "DDR4 2X16GB kit for Desk",
+"category": "ram",
+"query": "ddr4 2x16gb|32gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "2-channel DDR4 desktop DIMMs. Check your board's max capacity and QVL."
+}
+]
+}
+},
+{
+"in": [
+{
+"name": "Desk",
+"parts": [
+{
+"category": "cpu",
+"model": "Core Ultra 9 285K"
+}
+]
+}
+],
+"out": {
+"platform": "Intel 800-series (LGA1851)",
+"explanation": "from CPU 'Core Ultra 9 285K'",
+"suggestions": [
+{
+"name": "DDR5 2X32GB kit for Desk",
+"category": "ram",
+"query": "ddr5 2x32gb|64gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "2-channel DDR5 desktop DIMMs. Check your board's max capacity and QVL."
+},
+{
+"name": "DDR5 2X16GB kit for Desk",
+"category": "ram",
+"query": "ddr5 2x16gb|32gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "2-channel DDR5 desktop DIMMs. Check your board's max capacity and QVL."
+}
+]
+}
+},
+{
+"in": [
+{
+"name": "Desk",
+"parts": [
+{
+"category": "cpu",
+"model": "Core Ultra 7 265"
+}
+]
+}
+],
+"out": {
+"platform": "Intel 800-series (LGA1851)",
+"explanation": "from CPU 'Core Ultra 7 265'",
+"suggestions": [
+{
+"name": "Core Ultra 9 285K for Desk",
+"category": "cpu",
+"query": "285k",
+"exclude": [
+"laptop"
+],
+"max_price": null,
+"reason": "Drop-in for Intel 800-series (LGA1851)"
+},
+{
+"name": "Core Ultra 7 265K for Desk",
+"category": "cpu",
+"query": "265k",
+"exclude": [
+"laptop"
+],
+"max_price": null,
+"reason": "Drop-in for Intel 800-series (LGA1851)"
+},
+{
+"name": "Core Ultra 5 245K for Desk",
+"category": "cpu",
+"query": "245k",
+"exclude": [
+"laptop"
+],
+"max_price": null,
+"reason": "Drop-in for Intel 800-series (LGA1851)"
+},
+{
+"name": "DDR5 2X32GB kit for Desk",
+"category": "ram",
+"query": "ddr5 2x32gb|64gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "2-channel DDR5 desktop DIMMs. Check your board's max capacity and QVL."
+},
+{
+"name": "DDR5 2X16GB kit for Desk",
+"category": "ram",
+"query": "ddr5 2x16gb|32gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "2-channel DDR5 desktop DIMMs. Check your board's max capacity and QVL."
+}
+]
+}
+},
+{
+"in": [
+{
+"name": "Desk",
+"parts": [
+{
+"category": "cpu",
+"model": "AMD Ryzen 7 3700X 8-Core Processor"
+}
+]
+}
+],
+"out": {
+"platform": "AMD AM4",
+"explanation": "from CPU 'AMD Ryzen 7 3700X 8-Core Processor'",
+"suggestions": [
+{
+"name": "Ryzen 7 5800X3D for Desk",
+"category": "cpu",
+"query": "5800x3d",
+"exclude": [],
+"max_price": null,
+"reason": "300/400-series boards need a BIOS with Ryzen 5000 support"
+},
+{
+"name": "Ryzen 9 5950X for Desk",
+"category": "cpu",
+"query": "5950x",
+"exclude": [],
+"max_price": null,
+"reason": "300/400-series boards need a BIOS with Ryzen 5000 support"
+},
+{
+"name": "Ryzen 9 5900X for Desk",
+"category": "cpu",
+"query": "5900x",
+"exclude": [],
+"max_price": null,
+"reason": "300/400-series boards need a BIOS with Ryzen 5000 support"
+},
+{
+"name": "Ryzen 7 5700X3D for Desk",
+"category": "cpu",
+"query": "5700x3d",
+"exclude": [],
+"max_price": null,
+"reason": "300/400-series boards need a BIOS with Ryzen 5000 support"
+},
+{
+"name": "Ryzen 7 5700X for Desk",
+"category": "cpu",
+"query": "5700x -5700x3d",
+"exclude": [],
+"max_price": null,
+"reason": "300/400-series boards need a BIOS with Ryzen 5000 support"
+},
+{
+"name": "DDR4 2X32GB kit for Desk",
+"category": "ram",
+"query": "ddr4 2x32gb|64gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "2-channel DDR4 desktop DIMMs. Check your board's max capacity and QVL."
+},
+{
+"name": "DDR4 2X16GB kit for Desk",
+"category": "ram",
+"query": "ddr4 2x16gb|32gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "2-channel DDR4 desktop DIMMs. Check your board's max capacity and QVL."
+}
+]
+}
+},
+{
+"in": [
+{
+"name": "Desk",
+"parts": [
+{
+"category": "cpu",
+"model": "Ryzen 5 5600X"
+}
+]
+}
+],
+"out": {
+"platform": "AMD AM4",
+"explanation": "from CPU 'Ryzen 5 5600X'",
+"suggestions": [
+{
+"name": "Ryzen 7 5800X3D for Desk",
+"category": "cpu",
+"query": "5800x3d",
+"exclude": [],
+"max_price": null,
+"reason": "300/400-series boards need a BIOS with Ryzen 5000 support"
+},
+{
+"name": "Ryzen 9 5950X for Desk",
+"category": "cpu",
+"query": "5950x",
+"exclude": [],
+"max_price": null,
+"reason": "300/400-series boards need a BIOS with Ryzen 5000 support"
+},
+{
+"name": "Ryzen 9 5900X for Desk",
+"category": "cpu",
+"query": "5900x",
+"exclude": [],
+"max_price": null,
+"reason": "300/400-series boards need a BIOS with Ryzen 5000 support"
+},
+{
+"name": "Ryzen 7 5700X3D for Desk",
+"category": "cpu",
+"query": "5700x3d",
+"exclude": [],
+"max_price": null,
+"reason": "300/400-series boards need a BIOS with Ryzen 5000 support"
+},
+{
+"name": "Ryzen 7 5700X for Desk",
+"category": "cpu",
+"query": "5700x -5700x3d",
+"exclude": [],
+"max_price": null,
+"reason": "300/400-series boards need a BIOS with Ryzen 5000 support"
+},
+{
+"name": "DDR4 2X32GB kit for Desk",
+"category": "ram",
+"query": "ddr4 2x32gb|64gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "2-channel DDR4 desktop DIMMs. Check your board's max capacity and QVL."
+},
+{
+"name": "DDR4 2X16GB kit for Desk",
+"category": "ram",
+"query": "ddr4 2x16gb|32gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "2-channel DDR4 desktop DIMMs. Check your board's max capacity and QVL."
+}
+]
+}
+},
+{
+"in": [
+{
+"name": "Desk",
+"parts": [
+{
+"category": "cpu",
+"model": "R5 1600"
+}
+]
+}
+],
+"out": {
+"platform": "AMD AM4",
+"explanation": "from CPU 'R5 1600'",
+"suggestions": [
+{
+"name": "Ryzen 7 5800X3D for Desk",
+"category": "cpu",
+"query": "5800x3d",
+"exclude": [],
+"max_price": null,
+"reason": "300/400-series boards need a BIOS with Ryzen 5000 support"
+},
+{
+"name": "Ryzen 9 5950X for Desk",
+"category": "cpu",
+"query": "5950x",
+"exclude": [],
+"max_price": null,
+"reason": "300/400-series boards need a BIOS with Ryzen 5000 support"
+},
+{
+"name": "Ryzen 9 5900X for Desk",
+"category": "cpu",
+"query": "5900x",
+"exclude": [],
+"max_price": null,
+"reason": "300/400-series boards need a BIOS with Ryzen 5000 support"
+},
+{
+"name": "Ryzen 7 5700X3D for Desk",
+"category": "cpu",
+"query": "5700x3d",
+"exclude": [],
+"max_price": null,
+"reason": "300/400-series boards need a BIOS with Ryzen 5000 support"
+},
+{
+"name": "Ryzen 7 5700X for Desk",
+"category": "cpu",
+"query": "5700x -5700x3d",
+"exclude": [],
+"max_price": null,
+"reason": "300/400-series boards need a BIOS with Ryzen 5000 support"
+},
+{
+"name": "DDR4 2X32GB kit for Desk",
+"category": "ram",
+"query": "ddr4 2x32gb|64gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "2-channel DDR4 desktop DIMMs. Check your board's max capacity and QVL."
+},
+{
+"name": "DDR4 2X16GB kit for Desk",
+"category": "ram",
+"query": "ddr4 2x16gb|32gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "2-channel DDR4 desktop DIMMs. Check your board's max capacity and QVL."
+}
+]
+}
+},
+{
+"in": [
+{
+"name": "Desk",
+"parts": [
+{
+"category": "cpu",
+"model": "Ryzen 9 7950X3D"
+}
+]
+}
+],
+"out": {
+"platform": "AMD AM5",
+"explanation": "from CPU 'Ryzen 9 7950X3D'",
+"suggestions": [
+{
+"name": "Ryzen 9 9950X3D for Desk",
+"category": "cpu",
+"query": "9950x3d",
+"exclude": [],
+"max_price": null,
+"reason": "Needs a BIOS with Ryzen 9000 support"
+},
+{
+"name": "Ryzen 7 9800X3D for Desk",
+"category": "cpu",
+"query": "9800x3d",
+"exclude": [],
+"max_price": null,
+"reason": "Needs a BIOS with Ryzen 9000 support"
+},
+{
+"name": "Ryzen 9 9950X for Desk",
+"category": "cpu",
+"query": "9950x -9950x3d",
+"exclude": [],
+"max_price": null,
+"reason": "Needs a BIOS with Ryzen 9000 support"
+},
+{
+"name": "Ryzen 7 7800X3D for Desk",
+"category": "cpu",
+"query": "7800x3d",
+"exclude": [],
+"max_price": null,
+"reason": "Drop-in for AMD AM5"
+},
+{
+"name": "DDR5 2X32GB kit for Desk",
+"category": "ram",
+"query": "ddr5 2x32gb|64gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "2-channel DDR5 desktop DIMMs. Check your board's max capacity and QVL."
+},
+{
+"name": "DDR5 2X16GB kit for Desk",
+"category": "ram",
+"query": "ddr5 2x16gb|32gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "2-channel DDR5 desktop DIMMs. Check your board's max capacity and QVL."
+}
+]
+}
+},
+{
+"in": [
+{
+"name": "Desk",
+"parts": [
+{
+"category": "cpu",
+"model": "Ryzen 7 9800X3D"
+}
+]
+}
+],
+"out": {
+"platform": "AMD AM5",
+"explanation": "from CPU 'Ryzen 7 9800X3D'",
+"suggestions": [
+{
+"name": "Ryzen 9 9950X3D for Desk",
+"category": "cpu",
+"query": "9950x3d",
+"exclude": [],
+"max_price": null,
+"reason": "Needs a BIOS with Ryzen 9000 support"
+},
+{
+"name": "DDR5 2X32GB kit for Desk",
+"category": "ram",
+"query": "ddr5 2x32gb|64gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "2-channel DDR5 desktop DIMMs. Check your board's max capacity and QVL."
+},
+{
+"name": "DDR5 2X16GB kit for Desk",
+"category": "ram",
+"query": "ddr5 2x16gb|32gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "2-channel DDR5 desktop DIMMs. Check your board's max capacity and QVL."
+}
+]
+}
+},
+{
+"in": [
+{
+"name": "Desk",
+"parts": [
+{
+"category": "cpu",
+"model": "Ryzen 5 6600H"
+}
+]
+}
+],
+"out": {
+"platform": null,
+"explanation": "couldn't recognise the motherboard chipset or CPU",
+"suggestions": []
+}
+},
+{
+"in": [
+{
+"name": "Desk",
+"parts": [
+{
+"category": "cpu",
+"model": "Threadripper 3970X"
+}
+]
+}
+],
+"out": {
+"platform": null,
+"explanation": "couldn't recognise the motherboard chipset or CPU",
+"suggestions": []
+}
+},
+{
+"in": [
+{
+"name": "Desk",
+"parts": [
+{
+"category": "cpu",
+"model": "Xeon E5-2690 v4"
+}
+]
+}
+],
+"out": {
+"platform": null,
+"explanation": "couldn't recognise the motherboard chipset or CPU",
+"suggestions": []
+}
+},
+{
+"in": [
+{
+"name": "Desk",
+"parts": [
+{
+"category": "cpu",
+"model": ""
+}
+]
+}
+],
+"out": {
+"platform": null,
+"explanation": "couldn't recognise the motherboard chipset or CPU",
+"suggestions": []
+}
+},
+{
+"in": [
+{
+"name": "Desk",
+"parts": [
+{
+"category": "cpu",
+"model": "i3-1005G1"
+}
+]
+}
+],
+"out": {
+"platform": null,
+"explanation": "couldn't recognise the motherboard chipset or CPU",
+"suggestions": []
+}
+},
+{
+"in": [
+{
+"name": "Desk",
+"parts": [
+{
+"category": "cpu",
+"model": "Pentium G4560"
+}
+]
+}
+],
+"out": {
+"platform": null,
+"explanation": "couldn't recognise the motherboard chipset or CPU",
+"suggestions": []
+}
+},
+{
+"in": [
+{
+"name": "Desk",
+"parts": [
+{
+"category": "cpu",
+"model": "i7 4770k"
+}
+]
+}
+],
+"out": {
+"platform": "Intel 8/9-series (LGA1150)",
+"explanation": "from CPU 'i7 4770k'",
+"suggestions": [
+{
+"name": "i7-4790K for Desk",
+"category": "cpu",
+"query": "4790k",
+"exclude": [
+"xeon"
+],
+"max_price": null,
+"reason": "Made for 9-series (Z97/H97); only some Z87/H87 boards got a BIOS for it, so check your board's CPU support list"
+},
+{
+"name": "i7-5775C for Desk",
+"category": "cpu",
+"query": "5775c",
+"exclude": [
+"xeon"
+],
+"max_price": null,
+"reason": "Broadwell: Z97/H97 only, with a BIOS update"
+},
+{
+"name": "i7-4790 for Desk",
+"category": "cpu",
+"query": "4790 -4790k -4790s -4790t",
+"exclude": [
+"xeon"
+],
+"max_price": null,
+"reason": "Z87/H87/B85 need a BIOS update for the 4790"
+},
+{
+"name": "DDR3 4X8GB kit for Desk",
+"category": "ram",
+"query": "ddr3 4x8gb|32gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "2-channel DDR3 desktop DIMMs. Check your board's max capacity and QVL."
+}
+]
+}
+},
+{
+"in": [
+{
+"name": "Desk",
+"parts": [
+{
+"category": "cpu",
+"model": "i7-4770 @ 3.4"
+}
+]
+}
+],
+"out": {
+"platform": "Intel 8/9-series (LGA1150)",
+"explanation": "from CPU 'i7-4770 @ 3.4'",
+"suggestions": [
+{
+"name": "i7-4790K for Desk",
+"category": "cpu",
+"query": "4790k",
+"exclude": [
+"xeon"
+],
+"max_price": null,
+"reason": "Made for 9-series (Z97/H97); only some Z87/H87 boards got a BIOS for it, so check your board's CPU support list"
+},
+{
+"name": "i7-5775C for Desk",
+"category": "cpu",
+"query": "5775c",
+"exclude": [
+"xeon"
+],
+"max_price": null,
+"reason": "Broadwell: Z97/H97 only, with a BIOS update"
+},
+{
+"name": "i7-4790 for Desk",
+"category": "cpu",
+"query": "4790 -4790k -4790s -4790t",
+"exclude": [
+"xeon"
+],
+"max_price": null,
+"reason": "Z87/H87/B85 need a BIOS update for the 4790"
+},
+{
+"name": "i7-4770K for Desk",
+"category": "cpu",
+"query": "4770k",
+"exclude": [
+"xeon"
+],
+"max_price": null,
+"reason": "Drop-in for Intel 8/9-series (LGA1150)"
+},
+{
+"name": "DDR3 4X8GB kit for Desk",
+"category": "ram",
+"query": "ddr3 4x8gb|32gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "2-channel DDR3 desktop DIMMs. Check your board's max capacity and QVL."
+}
+]
+}
+},
+{
+"in": [
+{
+"name": "Desk",
+"parts": [
+{
+"category": "cpu",
+"model": "Ryzen ٥ ٥٦٠٠X"
+}
+]
+}
+],
+"out": {
+"platform": "AMD AM4",
+"explanation": "from CPU 'Ryzen ٥ ٥٦٠٠X'",
+"suggestions": [
+{
+"name": "Ryzen 7 5800X3D for Desk",
+"category": "cpu",
+"query": "5800x3d",
+"exclude": [],
+"max_price": null,
+"reason": "300/400-series boards need a BIOS with Ryzen 5000 support"
+},
+{
+"name": "Ryzen 9 5950X for Desk",
+"category": "cpu",
+"query": "5950x",
+"exclude": [],
+"max_price": null,
+"reason": "300/400-series boards need a BIOS with Ryzen 5000 support"
+},
+{
+"name": "Ryzen 9 5900X for Desk",
+"category": "cpu",
+"query": "5900x",
+"exclude": [],
+"max_price": null,
+"reason": "300/400-series boards need a BIOS with Ryzen 5000 support"
+},
+{
+"name": "Ryzen 7 5700X3D for Desk",
+"category": "cpu",
+"query": "5700x3d",
+"exclude": [],
+"max_price": null,
+"reason": "300/400-series boards need a BIOS with Ryzen 5000 support"
+},
+{
+"name": "Ryzen 7 5700X for Desk",
+"category": "cpu",
+"query": "5700x -5700x3d",
+"exclude": [],
+"max_price": null,
+"reason": "300/400-series boards need a BIOS with Ryzen 5000 support"
+},
+{
+"name": "DDR4 2X32GB kit for Desk",
+"category": "ram",
+"query": "ddr4 2x32gb|64gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "2-channel DDR4 desktop DIMMs. Check your board's max capacity and QVL."
+},
+{
+"name": "DDR4 2X16GB kit for Desk",
+"category": "ram",
+"query": "ddr4 2x16gb|32gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "2-channel DDR4 desktop DIMMs. Check your board's max capacity and QVL."
+}
+]
+}
+},
+{
+"in": [
+{
+"name": "Old",
+"parts": [
+{
+"category": "cpu",
+"model": "i7-4770K"
+},
+{
+"category": "motherboard",
+"model": "ASUS Z87-A"
+}
+]
+}
+],
+"out": {
+"platform": "Intel 8/9-series (LGA1150)",
+"explanation": "from motherboard 'ASUS Z87-A'",
+"suggestions": [
+{
+"name": "i7-4790K for Old",
+"category": "cpu",
+"query": "4790k",
+"exclude": [
+"xeon"
+],
+"max_price": null,
+"reason": "Made for 9-series (Z97/H97); only some Z87/H87 boards got a BIOS for it, so check your board's CPU support list"
+},
+{
+"name": "i7-4790 for Old",
+"category": "cpu",
+"query": "4790 -4790k -4790s -4790t",
+"exclude": [
+"xeon"
+],
+"max_price": null,
+"reason": "Z87/H87/B85 need a BIOS update for the 4790"
+},
+{
+"name": "DDR3 4X8GB kit for Old",
+"category": "ram",
+"query": "ddr3 4x8gb|32gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "2-channel DDR3 desktop DIMMs. Check your board's max capacity and QVL."
+}
+]
+}
+},
+{
+"in": [
+{
+"name": "Old 97",
+"parts": [
+{
+"category": "cpu",
+"model": "i7-4770K"
+},
+{
+"category": "motherboard",
+"model": "ASUS Z97-A"
+}
+]
+}
+],
+"out": {
+"platform": "Intel 8/9-series (LGA1150)",
+"explanation": "from motherboard 'ASUS Z97-A'",
+"suggestions": [
+{
+"name": "i7-4790K for Old 97",
+"category": "cpu",
+"query": "4790k",
+"exclude": [
+"xeon"
+],
+"max_price": null,
+"reason": "Made for 9-series (Z97/H97); only some Z87/H87 boards got a BIOS for it, so check your board's CPU support list"
+},
+{
+"name": "i7-5775C for Old 97",
+"category": "cpu",
+"query": "5775c",
+"exclude": [
+"xeon"
+],
+"max_price": null,
+"reason": "Broadwell: Z97/H97 only, with a BIOS update"
+},
+{
+"name": "i7-4790 for Old 97",
+"category": "cpu",
+"query": "4790 -4790k -4790s -4790t",
+"exclude": [
+"xeon"
+],
+"max_price": null,
+"reason": "Z87/H87/B85 need a BIOS update for the 4790"
+},
+{
+"name": "DDR3 4X8GB kit for Old 97",
+"category": "ram",
+"query": "ddr3 4x8gb|32gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "2-channel DDR3 desktop DIMMs. Check your board's max capacity and QVL."
+}
+]
+}
+},
+{
+"in": [
+{
+"name": "Twelve",
+"parts": [
+{
+"category": "motherboard",
+"model": "MSI Z690 Pro"
+}
+]
+}
+],
+"out": {
+"platform": "Intel 600/700-series (LGA1700)",
+"explanation": "from motherboard 'MSI Z690 Pro'",
+"suggestions": [
+{
+"name": "i9-14900K for Twelve",
+"category": "cpu",
+"query": "14900k",
+"exclude": [],
+"max_price": null,
+"reason": "600-series boards need a BIOS update. Check 13th/14th-gen i7/i9 microcode (stability issue)"
+},
+{
+"name": "i7-14700K for Twelve",
+"category": "cpu",
+"query": "14700k",
+"exclude": [],
+"max_price": null,
+"reason": "600-series boards need a BIOS update. Check 13th/14th-gen i7/i9 microcode (stability issue)"
+},
+{
+"name": "i9-13900K for Twelve",
+"category": "cpu",
+"query": "13900k",
+"exclude": [],
+"max_price": null,
+"reason": "600-series boards need a BIOS update. Check 13th/14th-gen i7/i9 microcode (stability issue)"
+},
+{
+"name": "i7-13700K for Twelve",
+"category": "cpu",
+"query": "13700k",
+"exclude": [],
+"max_price": null,
+"reason": "600-series boards need a BIOS update. Check 13th/14th-gen i7/i9 microcode (stability issue)"
+},
+{
+"name": "i5-14600K for Twelve",
+"category": "cpu",
+"query": "14600k",
+"exclude": [],
+"max_price": null,
+"reason": "600-series boards need a BIOS update"
+},
+{
+"name": "i5-13600K for Twelve",
+"category": "cpu",
+"query": "13600k",
+"exclude": [],
+"max_price": null,
+"reason": "600-series boards need a BIOS update"
+},
+{
+"name": "RAM for Twelve",
+"category": "ram",
+"query": "",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "This platform can be DDR4 or DDR5 (check your board); add the RAM watch yourself once you know which."
+}
+]
+}
+},
+{
+"in": [
+{
+"name": "Server",
+"parts": [
+{
+"category": "motherboard",
+"model": "Supermicro X11"
+}
+]
+}
+],
+"out": {
+"platform": null,
+"explanation": "couldn't recognise the motherboard chipset or CPU",
+"suggestions": []
+}
+},
+{
+"in": [
+{
+"name": "Top",
+"parts": [
+{
+"category": "cpu",
+"model": "i9-10980XE"
+},
+{
+"category": "motherboard",
+"model": "X299"
+}
+]
+}
+],
+"out": {
+"platform": "Intel X299 (LGA2066)",
+"explanation": "from motherboard 'X299'",
+"suggestions": [
+{
+"name": "DDR4 4X32GB kit for Top",
+"category": "ram",
+"query": "ddr4 4x32gb|128gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "4-channel DDR4 desktop DIMMs. Check your board's max capacity and QVL."
+},
+{
+"name": "DDR4 4X16GB kit for Top",
+"category": "ram",
+"query": "ddr4 4x16gb|64gb",
+"exclude": [
+"ecc",
+"rdimm",
+"lrdimm",
+"registered",
+"server",
+"sodimm",
+"so dimm",
+"laptop"
+],
+"max_price": null,
+"reason": "4-channel DDR4 desktop DIMMs. Check your board's max capacity and QVL."
+}
+]
+}
+},
+{
+"in": [
+{
+"name": "Empty",
+"parts": []
+}
+],
+"out": {
+"platform": null,
+"explanation": "couldn't recognise the motherboard chipset or CPU",
+"suggestions": []
+}
+},
+{
+"in": [
+{
+"name": "Nothing"
+}
+],
+"out": {
+"platform": null,
+"explanation": "couldn't recognise the motherboard chipset or CPU",
+"suggestions": []
+}
+}
+],
+"looks_like_report": [
+{
+"in": [
+"cpu: Intel(R) Core(TM) i5-7500 CPU @ 3.40GHz\nboard: Micro-Star International Co., Ltd. B250M PRO-VDH (MS-7A70)\nsystem: Micro-Star International Co., Ltd. MS-7A70\nram: 8GB DDR4 2400 CMK16GX4M2A2400C14\nram: 8GB DDR4 2400 CMK16GX4M2A2400C14\ngpu: NVIDIA GeForce GTX 1060 6GB\ngpu: Microsoft Basic Display Adapter\ndisk: 466GB Samsung SSD 860 EVO 500GB SSD\ndisk: 1863GB ST2000DM008-2FR102 HDD\ndisk: 932GB WDC WD10EZEX 3\n"
+],
+"out": true
+},
+{
+"in": [
+"cpu: AMD Ryzen 7 3700X 8-Core Processor\nboard: ASUSTeK COMPUTER INC. TUF GAMING X570-PLUS\nsystem: System manufacturer System Product Name\nram: 16GB DDR4 3200 F4-3200C16-16GVK\nram: 8GB DDR4 3200 X\ngpu: NVIDIA TU116 [GeForce GTX 1660 SUPER] (rev a1)\ngpu: AMD [AMD/ATI] Navi 48 [Radeon RX 9070 XT]\ngpu: NVIDIA TU116 [GeForce GTX 1660 SUPER] (rev a1)\ndisk: 1.8T Samsung SSD 970\ndisk: 931.5G WDC\r\n"
+],
+"out": true
+},
+{
+"in": [
+"cpu: 12th Gen Intel(R) Core(TM) i7-12700K\nboard: Dell Inc. 0XHGV1\nsystem: Dell Inc. OptiPlex 7090\nram: 31GB total\ngpu: Intel Corporation UHD Graphics 770\ndisk: 512G KXG60ZNV512G Unspecified\n"
+],
+"out": true
+},
+{
+"in": [
+"CPU : Intel Core i3\nBOARD: To be filled by O.E.M. To be filled by O.E.M.\nsystem: To Be Filled By O.E.M.\n"
+],
+"out": true
+},
+{
+"in": [
+"board: Gigabyte Technology Co., Ltd. Z390 AORUS PRO\nsystem: Gigabyte Technology Co., Ltd. Z390 AORUS PRO\n"
+],
+"out": false
+},
+{
+"in": [
+"cpu: AMD Ryzen 5 5600X 6-Core Processor             \nram: 16GB 3600 X\nram: 16GB  3600 X\ngpu: Parsec Virtual Display\ngpu: Meta Quest Virtual Monitor\ndisk: 2T Seagate\n"
+],
+"out": true
+},
+{
+"in": [
+"notes from a receipt: bought a PC"
+],
+"out": false
+},
+{
+"in": [
+""
+],
+"out": false
+},
+{
+"in": [
+"cpu:\nboard:   \ncpu: second\nram: 4GB DDR3 1600 A\nram: 8GB DDR3 1600 B\n"
+],
+"out": true
+},
+{
+"in": [
+"cpu: Intel Core i7 CPU 920 board: ASRock X58 Extreme ram: 6.5 GB DDR3gpu: x"
+],
+"out": true
+}
+],
+"parse_report": [
+{
+"in": [
+"cpu: Intel(R) Core(TM) i5-7500 CPU @ 3.40GHz\nboard: Micro-Star International Co., Ltd. B250M PRO-VDH (MS-7A70)\nsystem: Micro-Star International Co., Ltd. MS-7A70\nram: 8GB DDR4 2400 CMK16GX4M2A2400C14\nram: 8GB DDR4 2400 CMK16GX4M2A2400C14\ngpu: NVIDIA GeForce GTX 1060 6GB\ngpu: Microsoft Basic Display Adapter\ndisk: 466GB Samsung SSD 860 EVO 500GB SSD\ndisk: 1863GB ST2000DM008-2FR102 HDD\ndisk: 932GB WDC WD10EZEX 3\n"
+],
+"out": [
+{
+"category": "cpu",
+"model": "Intel Core i5-7500"
+},
+{
+"category": "motherboard",
+"model": "MSI B250M PRO-VDH (MS-7A70)"
+},
+{
+"category": "ram",
+"model": "16GB (2x8GB) DDR4-2400 CMK16GX4M2A2400C14"
+},
+{
+"category": "gpu",
+"model": "NVIDIA GeForce GTX 1060 6GB"
+},
+{
+"category": "storage",
+"model": "466GB Samsung SSD 860 EVO 500GB SSD"
+},
+{
+"category": "storage",
+"model": "1863GB ST2000DM008-2FR102 HDD"
+},
+{
+"category": "storage",
+"model": "932GB WDC WD10EZEX HDD"
+}
+]
+},
+{
+"in": [
+"cpu: AMD Ryzen 7 3700X 8-Core Processor\nboard: ASUSTeK COMPUTER INC. TUF GAMING X570-PLUS\nsystem: System manufacturer System Product Name\nram: 16GB DDR4 3200 F4-3200C16-16GVK\nram: 8GB DDR4 3200 X\ngpu: NVIDIA TU116 [GeForce GTX 1660 SUPER] (rev a1)\ngpu: AMD [AMD/ATI] Navi 48 [Radeon RX 9070 XT]\ngpu: NVIDIA TU116 [GeForce GTX 1660 SUPER] (rev a1)\ndisk: 1.8T Samsung SSD 970\ndisk: 931.5G WDC\r\n"
+],
+"out": [
+{
+"category": "cpu",
+"model": "AMD Ryzen 7 3700X"
+},
+{
+"category": "motherboard",
+"model": "ASUS TUF GAMING X570-PLUS"
+},
+{
+"category": "ram",
+"model": "24GB (1x16GB + 1x8GB) DDR4-3200"
+},
+{
+"category": "gpu",
+"model": "NVIDIA GeForce GTX 1660 SUPER"
+},
+{
+"category": "gpu",
+"model": "AMD Radeon RX 9070 XT"
+},
+{
+"category": "storage",
+"model": "1.8TB Samsung SSD 970"
+},
+{
+"category": "storage",
+"model": "931.5GB WDC"
+}
+]
+},
+{
+"in": [
+"cpu: 12th Gen Intel(R) Core(TM) i7-12700K\nboard: Dell Inc. 0XHGV1\nsystem: Dell Inc. OptiPlex 7090\nram: 31GB total\ngpu: Intel Corporation UHD Graphics 770\ndisk: 512G KXG60ZNV512G Unspecified\n"
+],
+"out": [
+{
+"category": "cpu",
+"model": "Intel Core i7-12700K"
+},
+{
+"category": "motherboard",
+"model": "Dell OptiPlex 7090 (board 0XHGV1)"
+},
+{
+"category": "ram",
+"model": "31GB"
+},
+{
+"category": "gpu",
+"model": "Intel UHD Graphics 770"
+},
+{
+"category": "storage",
+"model": "512GB KXG60ZNV512G"
+}
+]
+},
+{
+"in": [
+"CPU : Intel Core i3\nBOARD: To be filled by O.E.M. To be filled by O.E.M.\nsystem: To Be Filled By O.E.M.\n"
+],
+"out": [
+{
+"category": "cpu",
+"model": "Intel Core i3"
+}
+]
+},
+{
+"in": [
+"board: Gigabyte Technology Co., Ltd. Z390 AORUS PRO\nsystem: Gigabyte Technology Co., Ltd. Z390 AORUS PRO\n"
+],
+"out": [
+{
+"category": "motherboard",
+"model": "Gigabyte Z390 AORUS PRO"
+}
+]
+},
+{
+"in": [
+"cpu: AMD Ryzen 5 5600X 6-Core Processor             \nram: 16GB 3600 X\nram: 16GB  3600 X\ngpu: Parsec Virtual Display\ngpu: Meta Quest Virtual Monitor\ndisk: 2T Seagate\n"
+],
+"out": [
+{
+"category": "cpu",
+"model": "AMD Ryzen 5 5600X"
+},
+{
+"category": "ram",
+"model": "32GB (2x16GB) 3600 MT/s X"
+},
+{
+"category": "storage",
+"model": "2TB Seagate"
+}
+]
+},
+{
+"in": [
+"notes from a receipt: bought a PC"
+],
+"out": []
+},
+{
+"in": [
+""
+],
+"out": []
+},
+{
+"in": [
+"cpu:\nboard:   \ncpu: second\nram: 4GB DDR3 1600 A\nram: 8GB DDR3 1600 B\n"
+],
+"out": [
+{
+"category": "cpu",
+"model": "second"
+},
+{
+"category": "ram",
+"model": "12GB (1x8GB + 1x4GB) DDR3-1600"
+}
+]
+},
+{
+"in": [
+"cpu: Intel Core i7 CPU 920 board: ASRock X58 Extreme ram: 6.5 GB DDR3gpu: x"
+],
+"out": [
+{
+"category": "cpu",
+"model": "Intel Core i7 920"
+},
+{
+"category": "motherboard",
+"model": "ASRock"
+},
+{
+"category": "ram",
+"model": "6GB (1x6GB) DDR3"
+},
+{
+"category": "gpu",
+"model": "x"
+}
+]
+}
+],
+"tidy_cpu": [
+{
+"in": [
+"Intel(R) Core(TM) i7-7800X CPU @ 3.50GHz"
+],
+"out": "Intel Core i7-7800X"
+},
+{
+"in": [
+"Intel Core i9-10980XE"
+],
+"out": "Intel Core i9-10980XE"
+},
+{
+"in": [
+"i9-10900K"
+],
+"out": "i9-10900K"
+},
+{
+"in": [
+"i5-11400"
+],
+"out": "i5-11400"
+},
+{
+"in": [
+"i7-12700K"
+],
+"out": "i7-12700K"
+},
+{
+"in": [
+"i7-13700K"
+],
+"out": "i7-13700K"
+},
+{
+"in": [
+"i9-14900KS"
+],
+"out": "i9-14900KS"
+},
+{
+"in": [
+"i7-15700"
+],
+"out": "i7-15700"
+},
+{
+"in": [
+"i7-4790K"
+],
+"out": "i7-4790K"
+},
+{
+"in": [
+"i7-5775C"
+],
+"out": "i7-5775C"
+},
+{
+"in": [
+"i7-5960X"
+],
+"out": "i7-5960X"
+},
+{
+"in": [
+"i7-6950X"
+],
+"out": "i7-6950X"
+},
+{
+"in": [
+"i7-3930K"
+],
+"out": "i7-3930K"
+},
+{
+"in": [
+"i7-4960X"
+],
+"out": "i7-4960X"
+},
+{
+"in": [
+"i5-2500K"
+],
+"out": "i5-2500K"
+},
+{
+"in": [
+"i7-3770"
+],
+"out": "i7-3770"
+},
+{
+"in": [
+"i7-6700K"
+],
+"out": "i7-6700K"
+},
+{
+"in": [
+"i7-7700"
+],
+"out": "i7-7700"
+},
+{
+"in": [
+"i9-7980XE"
+],
+"out": "i9-7980XE"
+},
+{
+"in": [
+"i9-9980XE"
+],
+"out": "i9-9980XE"
+},
+{
+"in": [
+"i7-8700K"
+],
+"out": "i7-8700K"
+},
+{
+"in": [
+"i9-9900K"
+],
+"out": "i9-9900K"
+},
+{
+"in": [
+"Core Ultra 9 285K"
+],
+"out": "Core Ultra 9 285K"
+},
+{
+"in": [
+"Core Ultra 7 265"
+],
+"out": "Core Ultra 7 265"
+},
+{
+"in": [
+"AMD Ryzen 7 3700X 8-Core Processor"
+],
+"out": "AMD Ryzen 7 3700X"
+},
+{
+"in": [
+"Ryzen 5 5600X"
+],
+"out": "Ryzen 5 5600X"
+},
+{
+"in": [
+"R5 1600"
+],
+"out": "R5 1600"
+},
+{
+"in": [
+"Ryzen 9 7950X3D"
+],
+"out": "Ryzen 9 7950X3D"
+},
+{
+"in": [
+"Ryzen 7 9800X3D"
+],
+"out": "Ryzen 7 9800X3D"
+},
+{
+"in": [
+"Ryzen 5 6600H"
+],
+"out": "Ryzen 5 6600H"
+},
+{
+"in": [
+"Threadripper 3970X"
+],
+"out": "Threadripper 3970X"
+},
+{
+"in": [
+"Xeon E5-2690 v4"
+],
+"out": "Xeon E5-2690 v4"
+},
+{
+"in": [
+""
+],
+"out": ""
+},
+{
+"in": [
+"i3-1005G1"
+],
+"out": "i3-1005G1"
+},
+{
+"in": [
+"Pentium G4560"
+],
+"out": "Pentium G4560"
+},
+{
+"in": [
+"i7 4770k"
+],
+"out": "i7 4770k"
+},
+{
+"in": [
+"i7-4770 @ 3.4"
+],
+"out": "i7-4770"
+},
+{
+"in": [
+"Ryzen ٥ ٥٦٠٠X"
+],
+"out": "Ryzen ٥ ٥٦٠٠X"
+},
+{
+"in": [
+"Intel(R) Xeon(R) CPU E5-2690 v4 @ 2.60GHz"
+],
+"out": "Intel Xeon E5-2690 v4"
+},
+{
+"in": [
+"AMD EPYC 7302 16-Core Processor"
+],
+"out": "AMD EPYC 7302"
+},
+{
+"in": [
+"  Intel® Core™ i7 CPU  "
+],
+"out": "Intel Core i7"
+},
+{
+"in": [
+"13th gen Intel Core i5-13600K Processor"
+],
+"out": "Intel Core i5-13600K"
+}
+],
+"merge_parts": [
+{
+"in": [
+[
+{
+"category": "cpu",
+"model": "old"
+},
+{
+"category": "network",
+"model": "nic"
+}
+],
+[
+{
+"category": "cpu",
+"model": "new"
+},
+{
+"category": "ram",
+"model": "16GB"
+}
+]
+],
+"out": [
+{
+"category": "cpu",
+"model": "new"
+},
+{
+"category": "ram",
+"model": "16GB"
+},
+{
+"category": "network",
+"model": "nic"
+}
+]
+},
+{
+"in": [
+[],
+[]
+],
+"out": []
+},
+{
+"in": [
+[
+{
+"model": "no category"
+}
+],
+[
+{
+"category": "gpu",
+"model": "g"
+}
+]
+],
+"out": [
+{
+"category": "gpu",
+"model": "g"
+},
+{
+"model": "no category"
+}
+]
+}
+],
+"commands": [
+{
+"in": [],
+"out": [
+"$c=Get-CimInstance Win32_Processor|Select -First 1;$b=Get-CimInstance Win32_BaseBoard;$s=Get-CimInstance Win32_ComputerSystem;\"cpu: $($c.Name.Trim())\";\"board: $($b.Manufacturer) $($b.Product)\";\"system: $($s.Manufacturer) $($s.Model)\";$t=@{20='DDR';21='DDR2';24='DDR3';26='DDR4';34='DDR5'};Get-CimInstance Win32_PhysicalMemory|%{\"ram: $($_.Capacity/1GB)GB $($t[[int]$_.SMBIOSMemoryType]) $($_.ConfiguredClockSpeed) $($_.PartNumber.Trim())\"};Get-CimInstance Win32_VideoController|%{\"gpu: $($_.Name)\"};Get-PhysicalDisk|%{\"disk: $([math]::Round($_.Size/1GB))GB $($_.FriendlyName) $($_.MediaType)\"}",
+"sh -c 'd=/sys/class/dmi/id; echo \"cpu: $(grep -m1 \"model name\" /proc/cpuinfo | cut -d: -f2 | sed \"s/^ //\")\"; echo \"board: $(cat $d/board_vendor 2>/dev/null) $(cat $d/board_name 2>/dev/null)\"; echo \"system: $(cat $d/sys_vendor 2>/dev/null) $(cat $d/product_name 2>/dev/null)\"; echo \"ram: $(free -g | awk \"/Mem:/{print \\$2+1}\")GB total\"; lspci 2>/dev/null | grep -iE \"vga|3d controller|display controller\" | sed -E \"s/^[^:]*:[^:]*: /gpu: /\"; lsblk -dn -o NAME,TYPE,SIZE,MODEL | awk \"\\$2==\\\"disk\\\" && \\$1 !~ /^(zram|loop)/ {\\$1=\\$2=\\\"\\\"; sub(/^ +/,\\\"\\\"); print \\\"disk: \\\" \\$0}\"'"
+]
+}
+],
+"clean_vin": [
+{
+"in": [
+"1abcd23efgh456789"
+],
+"out": "1ABCD23EFGH456789"
+},
+{
+"in": [
+"1ABCD-23EFG H456789"
+],
+"out": "1ABCD23EFGH456789"
+},
+{
+"in": [
+"1ABCD23EFGH45678"
+],
+"error": "LookupFailed",
+"message": "A VIN is 17 letters and digits (no I, O or Q)"
+},
+{
+"in": [
+"1ABCD23EFGH45678O"
+],
+"error": "LookupFailed",
+"message": "A VIN is 17 letters and digits (no I, O or Q)"
+},
+{
+"in": [
+""
+],
+"error": "LookupFailed",
+"message": "A VIN is 17 letters and digits (no I, O or Q)"
+},
+{
+"in": [
+null
+],
+"error": "LookupFailed",
+"message": "A VIN is 17 letters and digits (no I, O or Q)"
+},
+{
+"in": [
+"1abcd23efgh456789\n"
+],
+"out": "1ABCD23EFGH456789"
+},
+{
+"in": [
+"1ABCD23EFGH4567899"
+],
+"error": "LookupFailed",
+"message": "A VIN is 17 letters and digits (no I, O or Q)"
+}
+],
+"decode_vin": [
+{
+"in": [
+"1abcd23efgh456789",
+{
+"Make": "TOYOTA",
+"Model": "Tacoma",
+"ModelYear": "2018",
+"Trim": "TRD",
+"BodyClass": "Pickup",
+"DriveType": "4WD",
+"DisplacementL": "3.5",
+"EngineCylinders": "6",
+"FuelTypePrimary": "Gasoline",
+"ErrorCode": "0",
+"ErrorText": "0 - clean"
+}
+],
+"out": {
+"vin": "1ABCD23EFGH456789",
+"make": "Toyota",
+"model": "Tacoma",
+"year": 2018,
+"trim": "TRD",
+"body": "Pickup",
+"drive": "4WD",
+"engine": "3.5L V6",
+"warning": ""
+}
+},
+{
+"in": [
+"1abcd23efgh456789",
+{
+"Make": "MERCEDES-BENZ",
+"Model": "C300",
+"ModelYear": "",
+"DisplacementL": "2.25",
+"EngineCylinders": "",
+"FuelTypePrimary": "Diesel",
+"ErrorCode": "1,11",
+"ErrorText": "1 - Check digit incorrect"
+}
+],
+"out": {
+"vin": "1ABCD23EFGH456789",
+"make": "Mercedes-Benz",
+"model": "C300",
+"year": null,
+"trim": "",
+"body": "",
+"drive": "",
+"engine": "2.2L Diesel",
+"warning": "1 - Check digit incorrect"
+}
+},
+{
+"in": [
+"1abcd23efgh456789",
+{
+"Make": "ford",
+"Model": null,
+"ModelYear": "2008",
+"DisplacementL": "4.6.1",
+"FuelTypePrimary": null
+}
+],
+"out": {
+"vin": "1ABCD23EFGH456789",
+"make": "Ford",
+"model": "",
+"year": 2008,
+"trim": "",
+"body": "",
+"drive": "",
+"engine": "",
+"warning": ""
+}
+},
+{
+"in": [
+"1abcd23efgh456789",
+{
+"Make": "",
+"Model": "x"
+}
+],
+"error": "LookupFailed",
+"message": "NHTSA doesn't know this VIN; check it for typos"
+},
+{
+"in": [
+"1abcd23efgh456789",
+{
+"Make": "TESLA",
+"Model": "Model 3",
+"ModelYear": "2020",
+"DisplacementL": "",
+"FuelTypePrimary": "Electric",
+"ErrorCode": null,
+"ErrorText": null
+}
+],
+"out": {
+"vin": "1ABCD23EFGH456789",
+"make": "Tesla",
+"model": "Model 3",
+"year": 2020,
+"trim": "",
+"body": "",
+"drive": "",
+"engine": "Electric",
+"warning": ""
+}
+},
+{
+"in": [
+"1abcd23efgh456789",
+{
+"Make": "HONDA",
+"DisplacementL": "2.35",
+"ModelYear": 2019,
+"EngineCylinders": 4
+}
+],
+"out": {
+"vin": "1ABCD23EFGH456789",
+"make": "Honda",
+"model": "",
+"year": 2019,
+"trim": "",
+"body": "",
+"drive": "",
+"engine": "2.4L V4",
+"warning": ""
+}
+},
+{
+"in": [
+"1ABCD23EFGH45678",
+{
+"Make": "TOYOTA",
+"Model": "Tacoma",
+"ModelYear": "2018",
+"Trim": "TRD",
+"BodyClass": "Pickup",
+"DriveType": "4WD",
+"DisplacementL": "3.5",
+"EngineCylinders": "6",
+"FuelTypePrimary": "Gasoline",
+"ErrorCode": "0",
+"ErrorText": "0 - clean"
+}
+],
+"error": "LookupFailed",
+"message": "A VIN is 17 letters and digits (no I, O or Q)"
+},
+{
+"in": [
+"1abcd23efgh456789",
+null
+],
+"error": "LookupFailed",
+"message": "NHTSA doesn't know this VIN; check it for typos"
+}
+],
+"decode_vin_url": [
+{
+"in": [
+" 1abcd-23efgh456789 "
+],
+"out": "https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/1ABCD23EFGH456789?format=json"
+}
+],
+"recalls": [
+{
+"in": [
+"Toyota",
+"Tacoma",
+2018,
+{
+"Tacoma": [
+{
+"NHTSACampaignNumber": "18V123000",
+"ReportReceivedDate": "01/02/2018",
+"Component": "AIR BAGS",
+"Summary": "Made-up summary.",
+"Consequence": "Made-up consequence.",
+"Remedy": "Made-up remedy.",
+"parkIt": true
+},
+{
+"NHTSACampaignNumber": "19V/1 2",
+"parkIt": "false"
+}
+]
+}
+],
+"out": {
+"recalls": [
+{
+"campaign": "18V123000",
+"date": "01/02/2018",
+"component": "AIR BAGS",
+"summary": "Made-up summary.",
+"consequence": "Made-up consequence.",
+"remedy": "Made-up remedy.",
+"park_it": true,
+"url": "https://www.nhtsa.gov/recalls?nhtsaId=18V123000"
+},
+{
+"campaign": "19V/1 2",
+"date": "",
+"component": "",
+"summary": "",
+"consequence": "",
+"remedy": "",
+"park_it": false,
+"url": "https://www.nhtsa.gov/recalls?nhtsaId=19V/1%202"
+}
+],
+"asked": [
+"https://api.nhtsa.gov/recalls/recallsByVehicle?make=Toyota&model=Tacoma&modelYear=2018"
+]
+}
+},
+{
+"in": [
+"Toyota",
+"Tacoma TRD Off-Road",
+2018,
+{
+"Tacoma TRD Off-Road": "fail",
+"Tacoma": [
+{
+"NHTSACampaignNumber": "18V123000",
+"ReportReceivedDate": "01/02/2018",
+"Component": "AIR BAGS",
+"Summary": "Made-up summary.",
+"Consequence": "Made-up consequence.",
+"Remedy": "Made-up remedy.",
+"parkIt": true
+}
+]
+}
+],
+"out": {
+"recalls": [
+{
+"campaign": "18V123000",
+"date": "01/02/2018",
+"component": "AIR BAGS",
+"summary": "Made-up summary.",
+"consequence": "Made-up consequence.",
+"remedy": "Made-up remedy.",
+"park_it": true,
+"url": "https://www.nhtsa.gov/recalls?nhtsaId=18V123000"
+}
+],
+"asked": [
+"https://api.nhtsa.gov/recalls/recallsByVehicle?make=Toyota&model=Tacoma+TRD+Off-Road&modelYear=2018",
+"https://api.nhtsa.gov/recalls/recallsByVehicle?make=Toyota&model=Tacoma&modelYear=2018"
+]
+}
+},
+{
+"in": [
+"Toyota",
+"Tacoma TRD",
+2018,
+{
+"Tacoma TRD": [],
+"Tacoma": []
+}
+],
+"out": {
+"recalls": [],
+"asked": [
+"https://api.nhtsa.gov/recalls/recallsByVehicle?make=Toyota&model=Tacoma+TRD&modelYear=2018",
+"https://api.nhtsa.gov/recalls/recallsByVehicle?make=Toyota&model=Tacoma&modelYear=2018"
+]
+}
+},
+{
+"in": [
+"Toyota",
+"Tacomaa",
+2018,
+{
+"Tacomaa": "fail"
+}
+],
+"out": {
+"error": "NHTSA doesn't know the model 'Tacomaa'",
+"asked": [
+"https://api.nhtsa.gov/recalls/recallsByVehicle?make=Toyota&model=Tacomaa&modelYear=2018"
+]
+}
+},
+{
+"in": [
+"Toyota",
+"Tacoma TRD",
+2018,
+{
+"Tacoma TRD": "fail",
+"Tacoma": "fail"
+}
+],
+"out": {
+"error": "NHTSA answered HTTP 400",
+"asked": [
+"https://api.nhtsa.gov/recalls/recallsByVehicle?make=Toyota&model=Tacoma+TRD&modelYear=2018",
+"https://api.nhtsa.gov/recalls/recallsByVehicle?make=Toyota&model=Tacoma&modelYear=2018"
+]
+}
+},
+{
+"in": [
+"Land Rover",
+"Range Rover Sport",
+2010.0,
+{
+"Range Rover Sport": [
+{
+"Summary": null,
+"parkIt": null,
+"NHTSACampaignNumber": "10V~1*"
+}
+]
+}
+],
+"out": {
+"recalls": [
+{
+"campaign": "10V~1*",
+"date": "",
+"component": "",
+"summary": null,
+"consequence": "",
+"remedy": "",
+"park_it": false,
+"url": "https://www.nhtsa.gov/recalls?nhtsaId=10V~1%2A"
+}
+],
+"asked": [
+"https://api.nhtsa.gov/recalls/recallsByVehicle?make=Land+Rover&model=Range+Rover+Sport&modelYear=2010"
+]
+}
+},
+{
+"in": [
+"",
+"Tacoma",
+2018,
+{}
+],
+"out": {
+"error": "needs the make, model and year (look up the VIN, or fill them in)",
+"asked": []
+}
+},
+{
+"in": [
+"Toyota",
+"Tacoma",
+null,
+{}
+],
+"out": {
+"error": "needs the make, model and year (look up the VIN, or fill them in)",
+"asked": []
+}
+},
+{
+"in": [
+"Toyota",
+"Tacoma",
+0,
+{}
+],
+"out": {
+"error": "needs the make, model and year (look up the VIN, or fill them in)",
+"asked": []
+}
+},
+{
+"in": [
+"Ford",
+"F-150 & co",
+2008,
+{
+"F-150 & co": []
+}
+],
+"out": {
+"recalls": [],
+"asked": [
+"https://api.nhtsa.gov/recalls/recallsByVehicle?make=Ford&model=F-150+%26+co&modelYear=2008",
+"https://api.nhtsa.gov/recalls/recallsByVehicle?make=Ford&model=F-150&modelYear=2008"
+]
+}
+}
+],
+"round3": [
+{
+"in": [
+0.0625,
+3
+],
+"out": 0.062
+},
+{
+"in": [
+-0.0625,
+3
+],
+"out": -0.062
+},
+{
+"in": [
+0.0005,
+3
+],
+"out": 0.001
+},
+{
+"in": [
+0.0015,
+3
+],
+"out": 0.002
+},
+{
+"in": [
+0.0025,
+3
+],
+"out": 0.003
+},
+{
+"in": [
+2.675,
+3
+],
+"out": 2.675
+},
+{
+"in": [
+1.0005,
+3
+],
+"out": 1.0
+},
+{
+"in": [
+-0.0001,
+3
+],
+"out": -0.0
+},
+{
+"in": [
+0.12345,
+3
+],
+"out": 0.123
+},
+{
+"in": [
+1e-09,
+3
+],
+"out": 0.0
+},
+{
+"in": [
+0.30000000000000004,
+3
+],
+"out": 0.3
+},
+{
+"in": [
+2.25,
+3
+],
+"out": 2.25
+},
+{
+"in": [
+2.35,
+3
+],
+"out": 2.35
+},
+{
+"in": [
+3.45,
+3
+],
+"out": 3.45
+},
+{
+"in": [
+0.05,
+3
+],
+"out": 0.05
+},
+{
+"in": [
+-2.5,
+3
+],
+"out": -2.5
+}
+],
+"fixed1": [
+{
+"in": [
+0.0625
+],
+"out": "0.1"
+},
+{
+"in": [
+-0.0625
+],
+"out": "-0.1"
+},
+{
+"in": [
+0.0005
+],
+"out": "0.0"
+},
+{
+"in": [
+0.0015
+],
+"out": "0.0"
+},
+{
+"in": [
+0.0025
+],
+"out": "0.0"
+},
+{
+"in": [
+2.675
+],
+"out": "2.7"
+},
+{
+"in": [
+1.0005
+],
+"out": "1.0"
+},
+{
+"in": [
+-0.0001
+],
+"out": "-0.0"
+},
+{
+"in": [
+0.12345
+],
+"out": "0.1"
+},
+{
+"in": [
+1e-09
+],
+"out": "0.0"
+},
+{
+"in": [
+0.30000000000000004
+],
+"out": "0.3"
+},
+{
+"in": [
+2.25
+],
+"out": "2.2"
+},
+{
+"in": [
+2.35
+],
+"out": "2.4"
+},
+{
+"in": [
+3.45
+],
+"out": "3.5"
+},
+{
+"in": [
+0.05
+],
+"out": "0.1"
+},
+{
+"in": [
+-2.5
+],
+"out": "-2.5"
+}
+],
+"shlex": [
+{
+"in": [
+"rtx 3080"
+],
+"out": [
+"rtx",
+"3080"
+]
+},
+{
+"in": [
+"9980xe|10980xe"
+],
+"out": [
+"9980xe|10980xe"
+]
+},
+{
+"in": [
+"\"ddr4 32gb\""
+],
+"out": [
+"ddr4 32gb"
+]
+},
+{
+"in": [
+"-ecc ddr4"
+],
+"out": [
+"-ecc",
+"ddr4"
+]
+},
+{
+"in": [
+"10980xe"
+],
+"out": [
+"10980xe"
+]
+},
+{
+"in": [
+"rtx -ti"
+],
+"out": [
+"rtx",
+"-ti"
+]
+},
+{
+"in": [
+"unclosed \"quote"
+],
+"error": "ValueError",
+"message": "No closing quotation"
+},
+{
+"in": [
+"a|b|c d"
+],
+"out": [
+"a|b|c",
+"d"
+]
+},
+{
+"in": [
+"-"
+],
+"out": [
+"-"
+]
+},
+{
+"in": [
+"--x"
+],
+"out": [
+"--x"
+]
+},
+{
+"in": [
+"'single quoted' x"
+],
+"out": [
+"single quoted",
+"x"
+]
+},
+{
+"in": [
+"say \"a\\\"b\" c"
+],
+"out": [
+"say",
+"a\"b",
+"c"
+]
+},
+{
+"in": [
+"back\\ slash"
+],
+"out": [
+"back slash"
+]
+},
+{
+"in": [
+""
+],
+"out": []
+},
+{
+"in": [
+"   "
+],
+"out": []
+},
+{
+"in": [
+"x|"
+],
+"out": [
+"x|"
+]
+},
+{
+"in": [
+"|y"
+],
+"out": [
+"|y"
+]
+},
+{
+"in": [
+"mid\"dle word\"s"
+],
+"out": [
+"middle words"
+]
+},
+{
+"in": [
+"4x32gb"
+],
+"out": [
+"4x32gb"
+]
+},
+{
+"in": [
+"5700x"
+],
+"out": [
+"5700x"
+]
+},
+{
+"in": [
+"rx 5700 xt"
+],
+"out": [
+"rx",
+"5700",
+"xt"
+]
+},
+{
+"in": [
+"3080 -mining -lhr"
+],
+"out": [
+"3080",
+"-mining",
+"-lhr"
+]
+},
+{
+"in": [
+"ram|memory 32gb"
+],
+"out": [
+"ram|memory",
+"32gb"
+]
+},
+{
+"in": [
+"a\\"
+],
+"error": "ValueError",
+"message": "No escaped character"
+},
+{
+"in": [
+"\"a\\"
+],
+"error": "ValueError",
+"message": "No escaped character"
+},
+{
+"in": [
+"'a"
+],
+"error": "ValueError",
+"message": "No closing quotation"
+},
+{
+"in": [
+"x \"a\\\\b\" y"
+],
+"out": [
+"x",
+"a\\b",
+"y"
+]
+},
+{
+"in": [
+"x \"a\\$b\""
+],
+"out": [
+"x",
+"a\\$b"
+]
+},
+{
+"in": [
+"a\\ b\tc\nd"
+],
+"out": [
+"a b",
+"c",
+"d"
+]
+},
+{
+"in": [
+"\"\""
+],
+"out": [
+""
+]
+},
+{
+"in": [
+"''"
+],
+"out": [
+""
+]
+},
+{
+"in": [
+"a\"\"b"
+],
+"out": [
+"ab"
+]
+},
+{
+"in": [
+"é \"ü ö\""
+],
+"out": [
+"é",
+"ü ö"
+]
+}
+],
+"title": [
+{
+"in": [
+"land rover"
+],
+"out": "Land Rover"
+},
+{
+"in": [
+"o'neil mcdonald"
+],
+"out": "O'Neil Mcdonald"
+},
+{
+"in": [
+"3xl"
+],
+"out": "3Xl"
+},
+{
+"in": [
+"école MIXÉ"
+],
+"out": "École Mixé"
+},
+{
+"in": [
+"a-b c_d"
+],
+"out": "A-B C_D"
+},
+{
+"in": [
+"ßtraße"
+],
+"out": "Sstraße"
+},
+{
+"in": [
+""
+],
+"out": ""
+},
+{
+"in": [
+"ǅungla"
+],
+"out": "ǅungla"
+}
+],
+"capitalize": [
+{
+"in": [
+"land rover"
+],
+"out": "Land rover"
+},
+{
+"in": [
+"o'neil mcdonald"
+],
+"out": "O'neil mcdonald"
+},
+{
+"in": [
+"3xl"
+],
+"out": "3xl"
+},
+{
+"in": [
+"école MIXÉ"
+],
+"out": "École mixé"
+},
+{
+"in": [
+"a-b c_d"
+],
+"out": "A-b c_d"
+},
+{
+"in": [
+"ßtraße"
+],
+"out": "Sstraße"
+},
+{
+"in": [
+""
+],
+"out": ""
+},
+{
+"in": [
+"ǅungla"
+],
+"out": "ǅungla"
+}
+],
+"splitlines": [
+{
+"in": [
+"a\nb"
+],
+"out": [
+"a",
+"b"
+]
+},
+{
+"in": [
+"a\r\nb\r"
+],
+"out": [
+"a",
+"b"
+]
+},
+{
+"in": [
+"a\n\nb\n"
+],
+"out": [
+"a",
+"",
+"b"
+]
+},
+{
+"in": [
+""
+],
+"out": []
+},
+{
+"in": [
+"\n"
+],
+"out": [
+""
+]
+},
+{
+"in": [
+"a\u000bb\fc\u001cde f g"
+],
+"out": [
+"a",
+"b",
+"c",
+"d",
+"e",
+"f",
+"g"
+]
+},
+{
+"in": [
+"a\rb\n\n"
+],
+"out": [
+"a",
+"b",
+""
+]
+}
+],
+"quote": [
+{
+"in": [
+"18V123000"
+],
+"out": "18V123000"
+},
+{
+"in": [
+"19V/1 2"
+],
+"out": "19V/1%202"
+},
+{
+"in": [
+"a~b*c(d)'e!"
+],
+"out": "a~b%2Ac%28d%29%27e%21"
+},
+{
+"in": [
+"é & ü"
+],
+"out": "%C3%A9%20%26%20%C3%BC"
+},
+{
+"in": [
+""
+],
+"out": ""
+}
+],
+"urlencode": [
+{
+"in": [
+{
+"make": "Land Rover",
+"model": "F-150 & co/x~y*",
+"modelYear": 2008
+}
+],
+"out": "make=Land+Rover&model=F-150+%26+co%2Fx~y%2A&modelYear=2008"
+},
+{
+"in": [
+{
+"make": "é",
+"model": "F-150 & co/x~y*",
+"modelYear": 2008
+}
+],
+"out": "make=%C3%A9&model=F-150+%26+co%2Fx~y%2A&modelYear=2008"
+}
+]
+}

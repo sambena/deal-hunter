@@ -8,7 +8,8 @@ API and tables.
 
 It is being moved here from the Python app at the top of this repository in steps: the plan is
 `../docs/work/457-deal-hunter-on-the-framework-and-cave-db.md`. So far: the app and its tables (`src/db/schema.ts`),
-which keep the Python app's rows column for column, and the one-time copy of its data. Until the cutover, the Python
+which keep the Python app's rows column for column, the one-time copy of its data, and the rules that decide
+which listings match and how good a deal is (`src/logic/`: matching, hardware upgrades, pasted specs, VIN and recalls). Until the cutover, the Python
 app is what runs.
 
 ## Run it
@@ -33,6 +34,9 @@ Open http://127.0.0.1:8780 and sign in with the dev login (local only).
   the app applies it when it starts. Locally (no `DATABASE_URL`) the data is in `data/pg`.
 - **Tests:** `npm test` (Vitest). Add one beside every route and component. They run on an in-memory database.
   The copy's tests build an old database with the real Python code, so they need `python` on the path.
+  `test/logic.test.ts` compares the rules with the Python app's own answers, recorded in `test/fixtures/logic-python.json`
+  by `test/fixtures/make_logic.py` (run it from the repository root when the cases change); with Python on the path,
+  a test also checks the recording is current.
 - **Checks before a PR:** `npm run typecheck && npm test && npm run build`.
 
 ## The one-time copy
