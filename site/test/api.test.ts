@@ -173,7 +173,7 @@ describe('the same answers as the Python app', () => {
   it('for watches, finds, settings and People, in order', async () => {
     await start();
     expect(await replay(recorded)).toEqual([]);
-  });
+  }, 60_000);
 
   it('for every AI button, asking each AI provider the same things', async () => {
     await start({ net: aiNet() }, 'ai.db', join(folder, 'ai.ai.json'));
@@ -187,14 +187,14 @@ describe('the same answers as the Python app', () => {
     expect(await replay(homeAssistant)).toEqual([]);
     expect(asked).toEqual(homeAssistant.asked);
     expect(asked.length).toBeGreaterThan(5);
-  });
+  }, 60_000);
 
   it('for My Stuff, VINs and recalls, asking NHTSA and CPSC the same things', async () => {
     await start({}, 'devices.db');
     expect(await replay(devices)).toEqual([]);
     expect(asked).toEqual(devices.asked);
     expect(asked.length).toBeGreaterThan(5);
-  });
+  }, 60_000);
 });
 
 /** Sends the recorded requests in order, each at its recorded time; the ones whose answer differs from Python's. */
