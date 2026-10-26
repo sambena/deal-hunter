@@ -487,24 +487,6 @@ Leave blank and the AI does its best."></textarea></label>
         <p>Without billing turned on, the key uses Google's free tier: limited requests per day, and Google may use the prompts to improve its products. Turning on billing in Google Cloud lifts the limits and the cost is shown above.</p>
       </details>
       </div>
-      <div data-provider="ollama">
-      <div class="grid">
-        <label>Ollama URL <input name="ollama_url"></label>
-        <label>Ollama model <input name="ollama_model"></label>
-      </div>
-      <details class="help guide">
-        <summary>How to set up Ollama (free, runs on your own computer)</summary>
-        <ol>
-          <li>Install Ollama from <a href="https://ollama.com/download" target="_blank" rel="noopener">ollama.com</a> on a computer with a decent graphics card.</li>
-          <li>In a terminal there, run <code>ollama pull qwen3.5:4b</code> (about 3.4 GB, fits a 6 GB graphics card).</li>
-          <li>Put that computer's address in <b>Ollama URL</b>, e.g. <code>http://192.168.1.50:11434</code>. To reach it from another machine, set <code>OLLAMA_HOST=0.0.0.0</code> on the Ollama computer.</li>
-          <li>Type the model name (<code>qwen3.5:4b</code>) in <b>Ollama model</b> and save.</li>
-        </ol>
-        <p>It costs nothing, but without a graphics card each answer can take a minute or more. Small local models
-          are quick but make more mistakes about hardware than the paid models.</p>
-        <p>If this install already has a shared Ollama, its address is filled in for you.</p>
-      </details>
-      </div>
       <p class="muted" id="ai-price-note"></p>
       </div>
       <div class="row"><button type="submit" class="primary">Save settings</button></div>

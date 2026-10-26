@@ -83,30 +83,36 @@ class DbTest(unittest.TestCase):
 class MemberAddressTest(DbTest):
     def test_members_cant_save_private_addresses(self):
         with db.as_user(self.sis), mock.patch.object(socket, "getaddrinfo", resolves_to("192.168.1.20")):
-            for key in ("ha_url", "ollama_url"):
-                with self.assertRaises(self.s.HTTPError) as cm:
-                    self.s.put_settings({key: "http://nas.lan:5000/api/restart?"}, {})
-                self.assertEqual(cm.exception.status, 400)
+            with self.assertRaises(self.s.HTTPError) as cm:
+                self.s.put_settings({"ha_url": "http://nas.lan:5000/api/restart?"}, {})
+            self.assertEqual(cm.exception.status, 400)
             with self.assertRaises(self.s.HTTPError):
                 self.s.put_settings({"discord_webhook": "http://192.168.1.20:5000/api/restart"}, {})
-            # Saving the form with the unchanged default Ollama address still works.
-            self.s.put_settings({"ollama_url": db.DEFAULT_SETTINGS["ollama_url"], "zip_code": "84057"}, {})
+            self.s.put_settings({"zip_code": "84057"}, {})
         with mock.patch.object(socket, "getaddrinfo", resolves_to("192.168.1.30")):
             self.s.put_settings({"ha_url": "http://192.168.1.30"}, {})  # the admin's home network is fine
 
-    def test_members_own_ollama_cant_reach_the_home_network(self):
+    def test_saved_ollama_settings_mean_ai_off(self):
+        # Ollama was retired (2026-10). A person who had picked it, with its old address rows still saved, has the
+        # AI off, sees no Ollama settings, can't pick it again, and nothing is fetched.
         with db.as_user(self.sis):
-            db.update_settings({"ai_source": "own", "ai_provider": "ollama", "ollama_model": "qwen3.5:4b",
-                                "ollama_url": "http://127.0.0.1:5000/api/restart?"})
+            for key, value in (("ai_source", "own"), ("ai_provider", "ollama"), ("ollama_model", "qwen3.5:4b"),
+                               ("ollama_url", "http://127.0.0.1:5000")):
+                db.execute("INSERT OR REPLACE INTO user_settings (user_id, key, value) VALUES (?, ?, ?)",
+                           (self.sis, key, __import__("json").dumps(value)))
+            s = db.get_settings()
+            self.assertEqual(s["ai_provider"], "off")
+            self.assertNotIn("ollama_url", s)
+            self.assertNotIn("ollama_model", db.public_settings(admin=False))
             with mock.patch.object(urllib.request, "urlopen") as raw:
                 with self.assertRaises(ai.AIError) as cm:
                     ai.run(ai.settings_for(), "judge", *ai.judge_prompt({"title": "x", "source": "ebay"}, {"name": "x", "query": "x"}, None))
             raw.assert_not_called()
-            self.assertIn("?", str(cm.exception))
-            db.update_settings({"ollama_url": "http://127.0.0.1:5000"})
-            with self.assertRaises(ai.AIError) as cm:
-                ai.run(ai.settings_for(), "judge", *ai.judge_prompt({"title": "x", "source": "ebay"}, {"name": "x", "query": "x"}, None))
-            self.assertIn("public internet address", str(cm.exception))
+            self.assertIn("AI is off", str(cm.exception))
+            self.s.put_settings({"ai_provider": "ollama", "ollama_url": "http://127.0.0.1:5000"}, {})
+            self.assertEqual(db.get_settings()["ai_provider"], "off")
+            self.assertEqual(db.query("SELECT value FROM user_settings WHERE user_id = ? AND key = 'ai_provider'",
+                                      (self.sis,))[0]["value"], '"ollama"', "the refused value isn't saved over it")
 
     def test_member_errors_dont_echo_upstream_text(self):
         def refused(req, timeout):

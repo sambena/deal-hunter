@@ -69,15 +69,18 @@ class BudgetTest(unittest.TestCase):
         self.assertIn("Monthly AI limit", str(cm.exception))
         self.assertEqual(fake.calls, 0)  # never reached the provider
 
-    def test_zero_limit_blocks_paid_but_not_ollama(self):
+    def test_zero_limit_blocks_paid(self):
+        fake = FakeClaude()
         with self.assertRaises(ai.AIError):
-            self.run_with(FakeClaude(), settings(ai_monthly_limit=0))
-        fake_ollama = FakeClaude()
-        with mock.patch.dict(ai.CALLERS, {"ollama": fake_ollama}):
-            ai.run(settings(ai_provider="ollama", ollama_model="qwen3:8b", ai_monthly_limit=0),
-                   "judge", PROMPT, SCHEMA)
-        self.assertEqual(fake_ollama.calls, 1)
-        self.assertEqual(db.query("SELECT cost FROM ai_usage")[0]["cost"], 0)
+            self.run_with(fake, settings(ai_monthly_limit=0))
+        self.assertEqual(fake.calls, 0)
+
+    def test_ollama_is_no_longer_a_provider(self):
+        fake = FakeClaude()
+        with mock.patch.dict(ai.CALLERS, {"ollama": fake}), self.assertRaises(ai.AIError) as cm:
+            ai.run(settings(ai_provider="ollama", ai_monthly_limit=0), "judge", PROMPT, SCHEMA)
+        self.assertIn("AI is off", str(cm.exception))
+        self.assertEqual(fake.calls, 0)
 
     def test_last_month_does_not_count(self):
         self.spend(5.0, at=ai.month_start() - 3600)

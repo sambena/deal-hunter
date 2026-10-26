@@ -681,6 +681,8 @@ def put_settings(body, params):
         changes["check_times"] = poller.clean_times(changes["check_times"])
     if "check_mode" in changes and changes["check_mode"] not in ("interval", "times"):
         changes.pop("check_mode")
+    if "ai_provider" in changes and changes["ai_provider"] not in db.AI_PROVIDERS:
+        changes.pop("ai_provider")
     if "sizes" in changes:  # {"department", "shoe", "top", "pants"}: short strings only
         sizes = changes["sizes"] if isinstance(changes["sizes"], dict) else {}
         changes["sizes"] = {k: " ".join(str(sizes.get(k) or "").split())[:20]
@@ -690,7 +692,7 @@ def put_settings(body, params):
     try:
         if changes.get("discord_webhook") and changes["discord_webhook"] != current["discord_webhook"]:
             netguard.check_discord(changes["discord_webhook"])
-        for key, what in (("ollama_url", "Ollama address"), ("ha_url", "Home Assistant address")):
+        for key, what in (("ha_url", "Home Assistant address"),):
             if changes.get(key) and changes[key] != current[key]:
                 netguard.check(changes[key], local_ok=is_admin(), what=what)
     except netguard.BlockedURL as e:
@@ -1472,8 +1474,6 @@ def main() -> None:
     if oidc.enabled():
         print("Cougar Cave sign-in is on (config \"oidc\")")
     DOWNLOADS["dir"] = config.get("downloads_dir")
-    if config.get("ollama_url"):  # this install's Ollama address, kept out of the public code
-        db.DEFAULT_SETTINGS["ollama_url"] = config["ollama_url"]
     if "--no-poll" not in sys.argv:
         poller.start()
     if config.get("api_port"):

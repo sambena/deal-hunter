@@ -102,31 +102,10 @@ class PriceTest(unittest.TestCase):
             self.assertEqual(ai._price_today(m), {"in": 1.50, "out": 7.50})
 
     def test_every_paid_provider_has_models(self):
+        self.assertEqual(list(ai.PROVIDERS), ["claude", "openai", "gemini"])
         for p in ai.PROVIDERS:
-            if p != "ollama":
-                self.assertTrue(any(m["provider"] == p for m in ai.MODELS), p)
+            self.assertTrue(any(m["provider"] == p for m in ai.MODELS), p)
 
 
 if __name__ == "__main__":
     unittest.main()
-
-
-class OllamaTest(unittest.TestCase):
-    def test_thinking_off_and_cap_sent(self):
-        sent = {}
-
-        class Resp:
-            def __enter__(self): return self
-            def __exit__(self, *a): pass
-            def read(self): return b'{"message": {"content": "{}"}, "prompt_eval_count": 5, "eval_count": 7}'
-
-        def fake_urlopen(req, timeout):
-            sent.update(__import__("json").loads(req.data))
-            return Resp()
-        s = {**db.DEFAULT_SETTINGS, "ai_provider": "ollama"}
-        with mock.patch.object(ai.urllib.request, "urlopen", fake_urlopen):
-            text, tin, tout, problem = ai._ollama(s, ai.model_info(s), "p", SCHEMA, 3000)
-        self.assertIs(sent["think"], False)
-        self.assertEqual(sent["options"]["num_predict"], 3000)
-        self.assertEqual(sent["model"], "qwen3.5:4b")
-        self.assertEqual((tin, tout), (5, 7))

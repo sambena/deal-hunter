@@ -41,9 +41,7 @@ DEFAULT_SETTINGS = {
     "discord_enabled": False,
     "discord_webhook": "",
     "discord_deals_only": True,
-    "ai_provider": "off",  # off | ollama | claude
-    "ollama_url": "http://localhost:11434",  # Ollama's own default; config.json "ollama_url" sets an install's own
-    "ollama_model": "qwen3.5:4b",
+    "ai_provider": "off",  # one of AI_PROVIDERS
     "api_key": "",  # for other apps calling the API port; made in Admin > API
     "ha_url": "",  # Home Assistant, for importing devices into My Stuff
     "ha_token": "",
@@ -61,21 +59,25 @@ DEFAULT_SETTINGS = {
     "claude_model": "claude-opus-5-5",
 }
 
+# The AI providers a setting may name ("off" included), and settings rows left from retired features.
+AI_PROVIDERS = ("off", "claude", "openai", "gemini")
+RETIRED_KEYS = ("ollama_url", "ollama_model")
+
 SECRET_KEYS = {"ebay_client_secret", "bestbuy_api_key", "discord_webhook", "anthropic_api_key",
                "openai_api_key", "gemini_api_key", "ha_token", "api_key"}
 
 # Each person's own settings. Everything else (source keys, check interval, Reddit subs...) is shared and
 # only the admin can change it.
 USER_KEYS = {"zip_code", "local_radius_miles", "junk_terms", "discord_enabled", "discord_webhook",
-             "discord_deals_only", "ai_provider", "ollama_url", "ollama_model", "anthropic_api_key", "claude_model",
-             "openai_api_key", "openai_model", "gemini_api_key", "gemini_model", "gemini_free_tier",
+             "discord_deals_only", "ai_provider", "anthropic_api_key", "claude_model", "openai_api_key",
+             "openai_model", "gemini_api_key", "gemini_model", "gemini_free_tier",
              "ai_monthly_limit", "ai_confirm", "ai_source", "ha_url", "ha_token", "focus", "sizes"}
 
 # What a member (not the admin) may see and change: their area, junk words, Discord and their own AI.
 # Everything else, including their Home Assistant link, is the admin's (Sam, 2026-10-04).
 MEMBER_KEYS = {"zip_code", "local_radius_miles", "junk_terms", "discord_enabled", "discord_webhook",
-               "discord_deals_only", "ai_source", "ai_provider", "ollama_url", "ollama_model", "anthropic_api_key",
-               "claude_model", "openai_api_key", "openai_model", "gemini_api_key", "gemini_model",
+               "discord_deals_only", "ai_source", "ai_provider", "anthropic_api_key", "claude_model",
+               "openai_api_key", "openai_model", "gemini_api_key", "gemini_model",
                "gemini_free_tier", "ai_monthly_limit", "ai_confirm", "focus", "sizes"}
 # Shared settings a member's pages still need to read (which sources are switched on, how often checks run).
 MEMBER_READS = {"sources_enabled", "poll_minutes", "check_mode", "check_times", "check_timezone"}
@@ -474,6 +476,11 @@ def get_settings(user_id: int | None = None) -> dict:
     merged = {**DEFAULT_SETTINGS, **{k: v for k, v in shared.items() if k not in USER_KEYS}, **mine}
     # Sources added after the settings were saved start at their default on/off.
     merged["sources_enabled"] = {**DEFAULT_SETTINGS["sources_enabled"], **shared.get("sources_enabled", {})}
+    # A provider that is gone (Ollama, retired 2026-10) means AI off; its old settings rows are ignored.
+    if merged.get("ai_provider") not in AI_PROVIDERS:
+        merged["ai_provider"] = "off"
+    for key in RETIRED_KEYS:
+        merged.pop(key, None)
     return merged
 
 

@@ -1473,7 +1473,7 @@ function showAiProvider() {
   });
   $("#ai-price-note").textContent = p === "off"
     ? "Pick a mode above to see where its API key and model go, with setup steps."
-    : p === "ollama" ? "" :
+    :
     "Prices are per million tokens (about 750,000 words). Thinking counts as output. " +
     "Estimates run a little high on purpose; you're charged what the provider reports.";
 }

@@ -16,7 +16,6 @@ Providers:
   claude  Anthropic API, needs `pip install anthropic` and an API key
   openai  OpenAI API key
   gemini  Google Gemini API key
-  ollama  free, local (https://ollama.com)
 """
 
 from __future__ import annotations
@@ -29,7 +28,6 @@ import urllib.error
 import urllib.request
 
 import db
-import netguard
 import shared_ai
 
 
@@ -62,7 +60,6 @@ PROVIDERS = {
     "claude": {"label": "Claude (Anthropic)", "key": "anthropic_api_key", "model": "claude_model"},
     "openai": {"label": "OpenAI (ChatGPT)", "key": "openai_api_key", "model": "openai_model"},
     "gemini": {"label": "Google Gemini", "key": "gemini_api_key", "model": "gemini_model"},
-    "ollama": {"label": "Ollama (free, local)", "key": None, "model": "ollama_model"},
 }
 
 # Token allowances per button. `max_out` is a hard cap sent to the provider, so it also caps the cost.
@@ -82,8 +79,8 @@ REVIEW_MAX = 40
 
 # ---- whose AI ---------------------------------------------------------------------
 
-AI_KEYS = ("ai_provider", "ollama_url", "ollama_model", "anthropic_api_key", "claude_model", "openai_api_key",
-           "openai_model", "gemini_api_key", "gemini_model", "gemini_free_tier")
+AI_KEYS = ("ai_provider", "anthropic_api_key", "claude_model", "openai_api_key", "openai_model", "gemini_api_key",
+           "gemini_model", "gemini_free_tier")
 # Which family the console's "balanced" and "best" tiers mean (the rule agreed with the owner console). OpenAI's
 # mini and plain GPT models aren't in MODELS, so for OpenAI those tiers fall back to cheapest.
 TIERS = {"claude": {"balanced": "sonnet", "best": "opus"}, "openai": {"balanced": "mini", "best": "plain"},
@@ -184,12 +181,6 @@ def choices(settings: dict) -> list[dict]:
     out = []
     current = (settings.get("ai_provider"), settings.get(PROVIDERS.get(settings.get("ai_provider"), {}).get("model", "")))
     for provider, p in PROVIDERS.items():
-        if provider == "ollama":
-            if settings.get("ollama_url") and settings.get("ollama_model"):
-                out.append({"provider": "ollama", "model": settings["ollama_model"], "free": True,
-                            "label": f"Ollama {settings['ollama_model']} (free)",
-                            "current": current == ("ollama", settings["ollama_model"])})
-            continue
         if not (settings.get(p["key"]) or (provider == "claude" and _env_key_ok(settings))):
             continue
         for m in MODELS:
@@ -244,9 +235,6 @@ def model_info(settings: dict) -> dict:
     if provider not in PROVIDERS:
         raise AIError(_scope(settings).get("blocked") or "AI is off. Turn it on in Settings.")
     model = (settings.get(PROVIDERS[provider]["model"]) or "").strip()
-    if provider == "ollama":
-        return {"provider": provider, "id": model, "label": f"Ollama {model}", "in": 0.0, "out": 0.0,
-                "effort": False, "free": True}
     for m in MODELS:
         if m["provider"] == provider and m["id"] == model:
             if provider == "gemini" and settings.get("gemini_free_tier"):
@@ -430,38 +418,6 @@ def _claude(settings: dict, info: dict, prompt: str, schema: dict, max_out: int)
     return text, tokens_in, u.output_tokens, problem
 
 
-def _ollama(settings: dict, info: dict, prompt: str, schema: dict, max_out: int):
-    body = json.dumps({
-        "model": info["id"],
-        "messages": [{"role": "user", "content": prompt}],
-        "format": schema,
-        "stream": False,
-        # Thinking models (qwen3.5) otherwise spend the whole allowance thinking and return no answer.
-        "think": False,
-        "options": {"num_predict": max_out},
-    }).encode()
-    base = settings["ollama_url"].strip()
-    if "?" in base or "#" in base:
-        raise AIError("The Ollama address can't contain ? or #")
-    trusted = _scope(settings).get("trusted", False)
-    req = urllib.request.Request(base.rstrip("/") + "/api/chat", data=body, headers={"Content-Type": "application/json"})
-    try:
-        with netguard.urlopen(req, 300, local_ok=trusted, what="Ollama address") as resp:
-            data = json.loads(resp.read())
-    except netguard.BlockedURL as e:
-        raise AIError(str(e)) from e
-    except urllib.error.HTTPError as e:
-        detail = f": {e.read().decode('utf-8', 'replace')[:200]}" if trusted else ""
-        raise AIError(f"Ollama returned HTTP {e.code}{detail}") from e
-    except (urllib.error.URLError, OSError) as e:
-        raise AIError(f"Can't reach Ollama at {base} ({getattr(e, 'reason', e)}). Is it running?" if trusted
-                      else "Can't reach Ollama at that address") from e
-    except ValueError as e:
-        raise AIError("Ollama's answer wasn't readable") from e
-    text = (data.get("message") or {}).get("content", "")
-    return text, data.get("prompt_eval_count", 0), data.get("eval_count", 0), None
-
-
 def _post_json(url: str, headers: dict, body: dict, name: str) -> dict:
     req = urllib.request.Request(url, data=json.dumps(body).encode(),
                                  headers={"Content-Type": "application/json", **headers})
@@ -546,7 +502,7 @@ def _gemini(settings: dict, info: dict, prompt: str, schema: dict, max_out: int)
     return text, tokens_in, tokens_out, problem
 
 
-CALLERS = {"claude": _claude, "openai": _openai, "gemini": _gemini, "ollama": _ollama}
+CALLERS = {"claude": _claude, "openai": _openai, "gemini": _gemini}
 
 
 # ---- prompts ----------------------------------------------------------------------

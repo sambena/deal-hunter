@@ -1,6 +1,6 @@
-"""Addresses that come from people's settings (Ollama, Home Assistant, Discord) are fetched by the server,
-so a member could point them at the home network. The admin's own settings may be local (the home Ollama
-and Home Assistant are); everyone else's must be public internet addresses, and their requests don't
+"""Addresses that come from people's settings (Home Assistant, Discord) are fetched by the server,
+so a member could point them at the home network. The admin's own settings may be local (Home Assistant
+at home is); everyone else's must be public internet addresses, and their requests don't
 follow redirects (a public address could otherwise bounce the request inside)."""
 
 from __future__ import annotations
