@@ -101,7 +101,7 @@ def cookie_value(header: str | None, name: str) -> str | None:
 def user_for_token(token: str | None) -> dict | None:
     if not token or not token.startswith("dht_"):
         return None
-    rows = db.query("""SELECT u.*, t.id AS token_id, t.via, t.auth_time, t.amr, c.status AS identity_status
+    rows = db.query("""SELECT u.*, t.id AS token_id, t.via, t.auth_time, t.amr, t.identity_id, c.status AS identity_status
                        FROM tokens t JOIN users u ON u.id = t.user_id
                        LEFT JOIN central_identities c ON c.id = t.identity_id AND c.user_id = t.user_id
                        WHERE t.token_hash = ?""", (_hash(token),))

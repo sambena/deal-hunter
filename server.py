@@ -14,7 +14,7 @@ import sys
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urlencode, urlparse
 
 import ai
 import auth
@@ -25,6 +25,7 @@ import homeassistant
 import central
 import netguard
 import oidc
+import pairing
 import poller
 import product_recalls
 import specs
@@ -1135,6 +1136,10 @@ class Handler(BaseHTTPRequestHandler):
         old single API key (which acts as the first admin until apps move to their own sign-in)."""
         auth_header = self.headers.get("Authorization") or ""
         bearer = auth_header[7:].strip() if auth_header.lower().startswith("bearer ") else             (self.headers.get("X-API-Key") or "").strip()
+        if bearer.startswith(pairing.PREFIX):  # a phone paired through central login (#541)
+            if not self.api_only and auth.cookie_value(self.headers.get("Cookie"), COOKIE):
+                raise pairing.PairError(400, "cookie_and_bearer", "Send the session cookie or a device credential, not both.")
+            return pairing.device(bearer), None
         if bearer:
             user = auth.user_for_token(bearer)
             if user:
@@ -1181,7 +1186,59 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _json(self, status: int, payload, headers: list[tuple[str, str]] = ()) -> None:
+        if getattr(self, "_rotate_due", False):  # a phone whose credential is a day old: time to rotate (#541)
+            headers = [*headers, (pairing.ROTATE_HEADER, "due")]
         self._send(status, json.dumps(payload).encode(), "application/json", headers)
+
+    def _devices(self, method: str, path: str) -> None:
+        """The pairing API contract v1 (#541): Add a phone from a central browser sign-in, pair with the PIN, rotate,
+        list and remove. Every unsafe request needs X-Cave-Request: 1, and every error is {error, message}."""
+        fail = lambda e: self._json(e.status, {"error": e.code, "message": e.message})
+        routes = {("POST", "/auth/devices/code"), ("POST", "/auth/devices/pair"), ("POST", "/auth/devices/rotate"),
+                  ("GET", "/auth/devices")}
+        target = path[len("/auth/devices/"):] if path.startswith("/auth/devices/") else ""
+        removing = method == "DELETE" and (target == "current" or re.fullmatch(r"[0-9a-f]{24}", target or ""))
+        if (method, path) not in routes and not removing:
+            return self._json(405 if path in {p for _, p in routes} or target else 404, {"error": "not_found", "message": "Not found."})
+        if method != "GET" and self.headers.get("X-Cave-Request") != "1":
+            return self._json(403, {"error": "csrf", "message": "This request needs the X-Cave-Request: 1 header."})
+        try:
+            if path == "/auth/devices/pair":
+                pairing.throttle(self._address())
+            user, _ = self._identify()
+            self._rotate_due = bool(user and user.get("rotate_due"))
+            if path == "/auth/devices/code":
+                pin, seconds = pairing.pair_code(user)
+                cb = urlparse(oidc.LOGIN["central"].provider.callback) if oidc.enabled() and oidc.LOGIN.get("central") else None
+                origin = f"{cb.scheme}://{cb.netloc}" if cb else f"{'https' if self._https() else 'http'}://{self.headers.get('Host', '')}"
+                qr = "cougarcave-pair:v1?" + urlencode({"server": origin, "pin": pin})
+                return self._json(201, {"pin": pin, "expires_in": seconds, "qr": qr})
+            if path == "/auth/devices/pair":
+                if user and user.get("device"):
+                    return self._json(400, {"error": "bad_request", "message": "This phone is already paired."})
+                length = int(self.headers.get("Content-Length") or 0)
+                try:
+                    body = json.loads(self.rfile.read(min(length, 4096)) or b"{}") if length else {}
+                    if not isinstance(body, dict):
+                        raise ValueError
+                except (ValueError, UnicodeError):
+                    return self._json(400, {"error": "bad_request", "message": 'Send {"pin": "123456", "name": "the phone"} as JSON.'})
+                return self._json(200, pairing.pair(body.get("pin"), body.get("name"), user))
+            if path == "/auth/devices/rotate":
+                presented = (self.headers.get("Authorization") or "")[7:].strip()
+                return self._json(200, pairing.rotate(user, presented))
+            if not user:
+                return self._json(401, {"error": "signed_out", "message": "Sign in first."})
+            if method == "GET":
+                return self._json(200, {"devices": pairing.devices(user)})
+            if target == "current":
+                if not user.get("device"):
+                    return self._json(404, {"error": "not_found", "message": "Only a paired phone can remove itself."})
+                target = user["device"]
+            pairing.revoke(user, target)
+            return self._send(204, b"", "text/plain")
+        except pairing.PairError as e:
+            return fail(e)
 
     def _cookie(self, value: str, max_age: int, name: str = COOKIE) -> tuple[str, str]:
         secure = "; Secure" if self._https() else ""
@@ -1194,6 +1251,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def _dispatch(self, method: str) -> None:
         url = urlparse(self.path)
+        self._rotate_due = False
+        if not self.api_only and (url.path == "/auth/devices" or url.path.startswith("/auth/devices/")):
+            return self._devices(method, url.path)
         if self.api_only:
             if not url.path.startswith("/api/"):
                 return self._json(404, {"error": "API only on this port; see /api.html on the web address"})
@@ -1201,7 +1261,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(403, {"error": "not available through the API port"})
         elif url.path in oidc.ROUTES and oidc.enabled():
             return self._central(method, url)
-        user, token = self._identify()
+        try:
+            user, token = self._identify()
+        except pairing.PairError as e:  # a phone's credential that doesn't work: the contract's code, so it knows what to do
+            return self._json(e.status, {"error": e.code, "message": e.message})
+        self._rotate_due = bool(user and user.get("rotate_due"))
         if method == "GET" and url.path == "/download/android" and not self.api_only:
             return self._download(user, parse_qs(url.query).get("code", [""])[0])
         if method == "GET" and not url.path.startswith("/api/"):

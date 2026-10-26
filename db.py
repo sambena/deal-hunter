@@ -215,6 +215,26 @@ CREATE TABLE IF NOT EXISTS central_identities (  -- a Cougar Cave login linked t
     created_at REAL NOT NULL,
     UNIQUE (issuer, subject)
 );
+CREATE TABLE IF NOT EXISTS pair_codes (    -- #541: a 6-digit PIN for pairing a phone; only its hash is kept
+    id TEXT PRIMARY KEY,
+    pin_hash TEXT NOT NULL,
+    identity_id INTEGER NOT NULL REFERENCES central_identities(id) ON DELETE CASCADE,
+    expires REAL NOT NULL,
+    wrong INTEGER NOT NULL DEFAULT 0,
+    used INTEGER NOT NULL DEFAULT 0       -- 0 open | 1 used | 2 cancelled by a newer PIN
+);
+CREATE TABLE IF NOT EXISTS paired_devices ( -- #541: a phone paired through central login; only credential hashes
+    id TEXT PRIMARY KEY,
+    identity_id INTEGER NOT NULL REFERENCES central_identities(id) ON DELETE CASCADE,
+    role TEXT NOT NULL,                   -- the account's role when paired; a change ends the phone
+    name TEXT NOT NULL,
+    cred_hash TEXT NOT NULL UNIQUE,
+    old_hash TEXT,                        -- the credential before the last rotation, for the grace window
+    old_until REAL NOT NULL DEFAULT 0,
+    created REAL NOT NULL, rotated REAL NOT NULL, seen REAL NOT NULL, expires REAL NOT NULL,
+    revoked INTEGER NOT NULL DEFAULT 0,
+    why TEXT NOT NULL DEFAULT ''
+);
 CREATE TABLE IF NOT EXISTS central_state (key TEXT PRIMARY KEY, value TEXT NOT NULL);  -- the on/off switch
 CREATE TABLE IF NOT EXISTS central_logout_jti (jti TEXT PRIMARY KEY, seen REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS central_logout_attempts (key TEXT PRIMARY KEY, count INTEGER NOT NULL, until REAL NOT NULL);
