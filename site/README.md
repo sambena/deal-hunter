@@ -12,8 +12,10 @@ which keep the Python app's rows column for column, the one-time copy of its dat
 which listings match and how good a deal is (`src/logic/`: matching, hardware upgrades, pasted specs, VIN and recalls).
 The API (`src/api.ts`): watches, finds, settings, People, My Stuff (devices, VINs, recalls from NHTSA and CPSC, upgrade
 rules, pasted specs, the deal radar) and the Android download, with the same answers as the Python app, on the web port
-and on the API port (`src/api-port.ts`, paired phones only). The AI, checking watches now, the Discord test and the Home
-Assistant import follow in their own PRs. Until the cutover, the Python
+and on the API port (`src/api-port.ts`, paired phones only). The sources (`src/logic/sources.ts`: eBay, eBay local
+pickup, KSL, KSL Cars, Craigslist, OfferUp, Poshmark, Reddit, r/buildapcsales, Slickdeals, Best Buy), with the Python
+app's rate gaps, caches and retries. The schedule that runs them, the AI, the Discord test and the Home Assistant
+import follow in their own PRs. Until the cutover, the Python
 app is what runs.
 
 ## Run it
@@ -43,6 +45,8 @@ Open http://127.0.0.1:8780 and sign in with the dev login (local only).
   a test also checks the recording is current.
   `test/api.test.ts` replays requests through the Python app's own routes (`test/fixtures/make_api.py`, needs `python`)
   and compares every answer, then checks each sign-in rule beside a working control.
+  `test/sources.test.ts` runs every source on made-up pages and compares its listings, errors, requests and waits with
+  the Python app's (`test/fixtures/make_sources.py` records them, with a fake network and clock; nothing is fetched).
 - **Checks before a PR:** `npm run typecheck && npm test && npm run build`.
 
 ## The one-time copy
