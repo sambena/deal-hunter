@@ -161,7 +161,8 @@ class CentralLogin:
         session = None
         try:
             claims = complete_cached_callback(query, browser, self.provider, self.transactions, self.cache, self.exchange)
-            user, token = central.sign_in(claims["iss"], claims["sub"], claims["auth_time"], claims.get("amr"))
+            user, token = central.sign_in(claims["iss"], claims["sub"], claims["auth_time"], claims.get("amr"),
+                                          claims.get("sid") if isinstance(claims.get("sid"), str) else None)
         except LoginRejected:
             status, headers, body = page("Sign-in could not be completed. Start again.", 400)
         except central.NotLinked:
@@ -255,7 +256,8 @@ class CentralLogin:
         if len(token) != 1 or not token[0]:
             raise LoginRejected('form')
         claims = self.validate_logout_token(token[0])
-        central.backchannel_logout(claims['iss'], claims['sub'], claims['jti'])
+        sid = claims.get('sid') if isinstance(claims.get('sid'), str) and claims.get('sid') else None
+        central.backchannel_logout(claims['iss'], claims['sub'], claims['jti'], sid)  # with a sid: that sign-in only
 
 
 # Any /auth/... URL with a query, wherever it sits in a log line: a request line (even a malformed one, or one

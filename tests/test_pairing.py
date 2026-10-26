@@ -200,6 +200,28 @@ class PairingTest(unittest.TestCase):
         self.refused(phone.call("GET", "/api/state"), 401, "device_revoked")
         self.assertEqual(other.call("GET", "/api/state")[0], 200)
 
+    def test_a_sid_logout_ends_only_the_phones_made_from_that_sign_in(self):
+        """#551: a phone keeps the sid of the browser session that made its PIN; a logout for that sid ends it, and
+        a phone paired from the person's other sign-in keeps working (the control). Sub-only still ends both."""
+        a, b = self.owner(extra={"sid": "sid-A"}), self.owner(extra={"sid": "sid-B"})
+        phone_a, reply_a = self.paired(a)
+        phone_b, _ = self.paired(b)
+        self.assertEqual(db.query("SELECT sid FROM paired_devices WHERE id = ?", (reply_a["device_id"],))[0]["sid"], "sid-A")
+
+        def logout(**claims):
+            conn = http.client.HTTPConnection("127.0.0.1", self.ui.server_port, timeout=10)
+            conn.request("POST", "/auth/backchannel", urllib.parse.urlencode({"logout_token": logout_token(**claims)}),
+                         {"Content-Type": "application/x-www-form-urlencoded"})
+            status = conn.getresponse().status
+            conn.close()
+            return status
+
+        self.assertEqual(logout(sid="sid-A"), 200)
+        self.refused(phone_a.call("GET", "/api/state"), 401, "device_revoked")
+        self.assertEqual(phone_b.call("GET", "/api/state")[0], 200)
+        self.assertEqual(logout(), 200)                            # sub only
+        self.refused(phone_b.call("GET", "/api/state"), 401, "device_revoked")
+
     def test_remove_and_unpair(self):
         b = self.owner()
         phone, reply = self.paired(b)

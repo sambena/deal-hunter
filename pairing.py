@@ -92,8 +92,8 @@ def pair_code(user: dict | None) -> tuple[str, int]:
                              (_digest(pin), now)).fetchone():
                 break
         code_id = secrets.token_hex(8)
-        c.execute("INSERT INTO pair_codes (id, pin_hash, identity_id, expires) VALUES (?, ?, ?, ?)",
-                  (code_id, _digest(pin), user["identity_id"], now + PAIR_SECONDS))
+        c.execute("INSERT INTO pair_codes (id, pin_hash, identity_id, expires, sid) VALUES (?, ?, ?, ?, ?)",
+                  (code_id, _digest(pin), user["identity_id"], now + PAIR_SECONDS, user.get("sid")))
         central.audit("pair_code", f"code {code_id} identity {user['identity_id']}", c)
     return pin, PAIR_SECONDS
 
@@ -133,9 +133,11 @@ def pair(pin, name, user: dict | None = None) -> dict:
         else:
             c.execute("UPDATE pair_codes SET used = 1 WHERE id = ?", (row["id"],))
             credential, device = PREFIX + secrets.token_urlsafe(32), secrets.token_hex(12)
-            c.execute("INSERT INTO paired_devices (id, identity_id, role, name, cred_hash, created, rotated, seen, expires) "
-                      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (device, person["id"], person["role"], name,
-                                                             _digest(credential), now, now, now, now + DEVICE_SECONDS))
+            # The phone keeps the central login session (sid) of the browser that made the PIN (#551).
+            c.execute("INSERT INTO paired_devices (id, identity_id, role, name, cred_hash, created, rotated, seen, expires, sid) "
+                      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (device, person["id"], person["role"], name,
+                                                                _digest(credential), now, now, now, now + DEVICE_SECONDS,
+                                                                row["sid"]))
             central.audit("pair", f"device {device} identity {person['id']} {person['role']}", c)
     if refusal:
         raise refusal
@@ -227,6 +229,12 @@ def revoke(user: dict, device_id: str) -> None:
         if not n:
             raise PairError(404, "not_found", "No such phone.")
         central.audit("device_revoke", f"device {device_id}", c)
+
+
+def revoke_session(identity_id: int, sid: str, why: str, c) -> int:
+    """End the phones paired from one central login session (sid), and that person's phones that carry no sid (#551)."""
+    return c.execute("UPDATE paired_devices SET revoked = 1, why = ? WHERE identity_id = ? AND revoked = 0 "
+                     "AND (sid = ? OR sid IS NULL)", (why, identity_id, sid)).rowcount
 
 
 def revoke_identity(identity_id: int, why: str, c) -> int:

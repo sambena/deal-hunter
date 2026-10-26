@@ -54,12 +54,13 @@ def _hash(token: str) -> str:
 
 
 def create_token(user_id: int, kind: str, name: str, via: str | None = None, auth_time: float | None = None,
-                 identity_id: int | None = None, conn=None, amr: str | None = None) -> str:
-    """`conn`: insert inside the caller's open transaction instead of committing on its own."""
+                 identity_id: int | None = None, conn=None, amr: str | None = None, sid: str | None = None) -> str:
+    """`conn`: insert inside the caller's open transaction instead of committing on its own. `sid`: the central
+    login session a Cougar Cave sign-in came from (the ID token's sid), so its logout ends only this (#551)."""
     token = "dht_" + secrets.token_urlsafe(32)
-    sql = """INSERT INTO tokens (user_id, token_hash, kind, name, created_at, via, auth_time, identity_id, amr)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"""
-    args = (user_id, _hash(token), kind, (name or kind)[:60], time.time(), via, auth_time, identity_id, amr)
+    sql = """INSERT INTO tokens (user_id, token_hash, kind, name, created_at, via, auth_time, identity_id, amr, sid)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+    args = (user_id, _hash(token), kind, (name or kind)[:60], time.time(), via, auth_time, identity_id, amr, sid)
     if conn is not None:
         conn.execute(sql, args)
     else:
@@ -101,7 +102,7 @@ def cookie_value(header: str | None, name: str) -> str | None:
 def user_for_token(token: str | None) -> dict | None:
     if not token or not token.startswith("dht_"):
         return None
-    rows = db.query("""SELECT u.*, t.id AS token_id, t.via, t.auth_time, t.amr, t.identity_id, c.status AS identity_status
+    rows = db.query("""SELECT u.*, t.id AS token_id, t.via, t.auth_time, t.amr, t.identity_id, t.sid, c.status AS identity_status
                        FROM tokens t JOIN users u ON u.id = t.user_id
                        LEFT JOIN central_identities c ON c.id = t.identity_id AND c.user_id = t.user_id
                        WHERE t.token_hash = ?""", (_hash(token),))

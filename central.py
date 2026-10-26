@@ -60,11 +60,14 @@ def audit_log(limit: int = 50) -> list[dict]:
     return db.query("SELECT at, action, detail FROM central_audit ORDER BY id DESC LIMIT ?", (int(limit),))
 
 
-def backchannel_logout(issuer: str, subject: str, jti: str) -> int:
+def backchannel_logout(issuer: str, subject: str, jti: str, sid: str | None = None) -> int:
     """Relay's one-use logout: revoke the sessions attached to this exact linked identity, atomically. Each token id
     works once, recorded before the lookup, so a replay is refused either way. A subject Deal Hunter never linked is
     accepted with no change and an audit row (#528): the login service sends the logout to every app, and a 400 would
-    make it retry a logout that has nothing to end (OIDC Back-Channel Logout 1.0, section 2.8)."""
+    make it retry a logout that has nothing to end (OIDC Back-Channel Logout 1.0, section 2.8).
+    With a sid (#551), only that central login session ends here: the Cougar Cave sessions and paired phones made
+    from it, plus that person's central ones that carry no sid (made before sids were kept, or by linking). Other
+    browsers and phones of theirs stay signed in. Without a sid, every session and phone of that person ends."""
     with _write() as c:
         c.execute("DELETE FROM central_logout_jti WHERE seen < ?", (time.time() - 3600,))
         try:
@@ -76,10 +79,16 @@ def backchannel_logout(issuer: str, subject: str, jti: str) -> int:
         if row is None:
             audit("logout_backchannel", "a subject not linked here: nothing to end", c)
             return 0
-        n = c.execute("DELETE FROM tokens WHERE identity_id = ?", (row['id'],)).rowcount
         import pairing  # late: pairing imports this module
-        d = pairing.revoke_identity(row['id'], 'logout', c)
-        audit("logout_backchannel", f"identity {row['id']}: {n} sessions ended" + (f", {d} phones" if d else ""), c)
+        if sid:
+            n = c.execute("DELETE FROM tokens WHERE identity_id = ? AND via = 'central' AND (sid = ? OR sid IS NULL)",
+                          (row['id'], sid)).rowcount
+            d = pairing.revoke_session(row['id'], sid, 'logout', c)
+        else:
+            n = c.execute("DELETE FROM tokens WHERE identity_id = ?", (row['id'],)).rowcount
+            d = pairing.revoke_identity(row['id'], 'logout', c)
+        audit("logout_backchannel", f"identity {row['id']}" + (" (one sign-in)" if sid else "") + f": {n} sessions ended"
+              + (f", {d} phones" if d else ""), c)
         return n
 
 
@@ -170,7 +179,7 @@ def set_own_login(state: str) -> None:
 
 # ---- turning a validated login into a session --------------------------------------
 
-def sign_in(issuer: str, subject: str, auth_time: float, amr) -> tuple[dict, str]:
+def sign_in(issuer: str, subject: str, auth_time: float, amr, sid: str | None = None) -> tuple[dict, str]:
     """Mint a browser session for a validated central login. Refuses anyone not linked and active. The checks
     and the new session are one transaction, so a disable or switch-off can't land between them."""
     with _write() as c:
@@ -189,15 +198,16 @@ def sign_in(issuer: str, subject: str, auth_time: float, amr) -> tuple[dict, str
         both = isinstance(amr, list) and "pwd" in amr and "mfa" in amr
         if user["role"] == "admin" and not both:
             raise CentralError(OWNER_FACTORS)
-        token = _mint(c, user, float(auth_time), amr)
+        token = _mint(c, user, float(auth_time), amr, sid)
         audit("sign_in", f"account {user['id']} ({user['role']}) via identity {user['identity_id']}", c)
     return user, token
 
 
-def _mint(conn, user: dict, auth_time: float, amr=None) -> str:
+def _mint(conn, user: dict, auth_time: float, amr=None, sid: str | None = None) -> str:
     methods = json.dumps([m for m in amr if isinstance(m, str)]) if isinstance(amr, list) else "[]"
+    sid = sid[:200] if isinstance(sid, str) and sid else None
     return auth.create_token(user["id"], "web", "Cougar Cave sign-in", via="central", auth_time=auth_time,
-                             identity_id=user["identity_id"], conn=conn, amr=methods)
+                             identity_id=user["identity_id"], conn=conn, amr=methods, sid=sid)
 
 
 # ---- self-service linking (#323) ---------------------------------------------------------
