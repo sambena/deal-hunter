@@ -1,32 +1,344 @@
 {
-  "_": "Made-up answers from NHTSA (by URL) and CPSC (by the brand searched), for make_api.py and api.test.ts. Nothing here came from the real services.",
-  "nhtsa": {
-    "https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/1ABCD23EFGH456789?format=json": {
-      "Results": [{"Make": "TOYOTA", "Model": "Tacoma", "ModelYear": "2018", "Trim": "TRD Off-Road", "BodyClass": "Pickup",
-                   "DriveType": "4WD", "DisplacementL": "3.5", "EngineCylinders": "6", "FuelTypePrimary": "Gasoline",
-                   "ErrorCode": "0", "ErrorText": "0 - clean"}]
-    },
-    "https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/1ABCD23EFGH000000?format=json": {"Results": [{"Make": ""}]},
-    "https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/1ABCD23EFGH999999?format=json": {"http": 500},
-    "https://api.nhtsa.gov/recalls/recallsByVehicle?make=Toyota&model=Tacoma+TRD&modelYear=2018": {"http": 400},
-    "https://api.nhtsa.gov/recalls/recallsByVehicle?make=Toyota&model=Tacoma&modelYear=2018": {
-      "results": [{"NHTSACampaignNumber": "18V000000", "ReportReceivedDate": "01/02/2018", "Component": "AIR BAGS",
-                   "Summary": "Made-up summary.", "Consequence": "Made-up consequence.", "Remedy": "Made-up remedy.", "parkIt": false},
-                  {"NHTSACampaignNumber": "19V000001", "parkIt": "true"}]
+ "_": "Made-up answers from NHTSA (by URL) and CPSC (by the brand searched), for make_api.py and api.test.ts. Nothing here came from the real services.",
+ "nhtsa": {
+  "https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/1ABCD23EFGH456789?format=json": {
+   "Results": [
+    {
+     "Make": "TOYOTA",
+     "Model": "Tacoma",
+     "ModelYear": "2018",
+     "Trim": "TRD Off-Road",
+     "BodyClass": "Pickup",
+     "DriveType": "4WD",
+     "DisplacementL": "3.5",
+     "EngineCylinders": "6",
+     "FuelTypePrimary": "Gasoline",
+     "ErrorCode": "0",
+     "ErrorText": "0 - clean"
     }
+   ]
   },
-  "cpsc": {
-    "Samsung": [
-      {"RecallNumber": "20-001", "RecallDate": "2020-05-01T00:00:00", "Title": "Made-up Brand Recalls Refrigerators",
-       "Description": "A range of models.", "URL": "https://cpsc.example.test/20-001",
-       "Products": [{"Name": "Refrigerators", "Model": "RF28R7351SG/AA", "Description": ""}],
-       "Hazards": [{"Name": "Fire hazard."}], "Remedies": [{"Name": "Stop using and unplug."}]},
-      {"RecallNumber": "22-002", "RecallDate": "2022-01-15T00:00:00", "Title": "Made-up Brand Recalls Ranges",
-       "Products": [{"Name": "Electric ranges", "Model": "NE59"}], "Hazards": [], "Remedies": [{"Name": "Repair."}]},
-      {"RecallNumber": "23-003", "RecallDate": "2023-03-03T00:00:00", "Title": "Made-up Brand Recalls Fridge Water Filters",
-       "Products": [{"Name": "Fridge filters", "Model": "DA29"}], "Remedies": [{"Name": "Refund."}]},
-      {"RecallNumber": "19-004", "RecallDate": "2019-01-01T00:00:00", "Title": "Made-up Brand Recalls Phones", "Products": []}
-    ],
-    "LG": {"http": 503}
+  "https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/1ABCD23EFGH000000?format=json": {
+   "Results": [
+    {
+     "Make": ""
+    }
+   ]
+  },
+  "https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/1ABCD23EFGH999999?format=json": {
+   "http": 500
+  },
+  "https://api.nhtsa.gov/recalls/recallsByVehicle?make=Toyota&model=Tacoma+TRD&modelYear=2018": {
+   "http": 400
+  },
+  "https://api.nhtsa.gov/recalls/recallsByVehicle?make=Toyota&model=Tacoma&modelYear=2018": {
+   "results": [
+    {
+     "NHTSACampaignNumber": "18V000000",
+     "ReportReceivedDate": "01/02/2018",
+     "Component": "AIR BAGS",
+     "Summary": "Made-up summary.",
+     "Consequence": "Made-up consequence.",
+     "Remedy": "Made-up remedy.",
+     "parkIt": false
+    },
+    {
+     "NHTSACampaignNumber": "19V000001",
+     "parkIt": "true"
+    }
+   ]
   }
+ },
+ "cpsc": {
+  "Samsung": [
+   {
+    "RecallNumber": "20-001",
+    "RecallDate": "2020-05-01T00:00:00",
+    "Title": "Made-up Brand Recalls Refrigerators",
+    "Description": "A range of models.",
+    "URL": "https://cpsc.example.test/20-001",
+    "Products": [
+     {
+      "Name": "Refrigerators",
+      "Model": "RF28R7351SG/AA",
+      "Description": ""
+     }
+    ],
+    "Hazards": [
+     {
+      "Name": "Fire hazard."
+     }
+    ],
+    "Remedies": [
+     {
+      "Name": "Stop using and unplug."
+     }
+    ]
+   },
+   {
+    "RecallNumber": "22-002",
+    "RecallDate": "2022-01-15T00:00:00",
+    "Title": "Made-up Brand Recalls Ranges",
+    "Products": [
+     {
+      "Name": "Electric ranges",
+      "Model": "NE59"
+     }
+    ],
+    "Hazards": [],
+    "Remedies": [
+     {
+      "Name": "Repair."
+     }
+    ]
+   },
+   {
+    "RecallNumber": "23-003",
+    "RecallDate": "2023-03-03T00:00:00",
+    "Title": "Made-up Brand Recalls Fridge Water Filters",
+    "Products": [
+     {
+      "Name": "Fridge filters",
+      "Model": "DA29"
+     }
+    ],
+    "Remedies": [
+     {
+      "Name": "Refund."
+     }
+    ]
+   },
+   {
+    "RecallNumber": "19-004",
+    "RecallDate": "2019-01-01T00:00:00",
+    "Title": "Made-up Brand Recalls Phones",
+    "Products": []
+   }
+  ],
+  "LG": {
+   "http": 503
+  }
+ },
+ "ha": {
+  "8123": {
+   "json": [
+    {
+     "id": "dev-tv",
+     "name": "Den TV",
+     "make": "LGE",
+     "model": "OLED65B2AUA",
+     "area": "Den",
+     "integrations": [
+      "webostv"
+     ],
+     "domains": [
+      "media_player"
+     ],
+     "entry_type": null
+    },
+    {
+     "id": "dev-hub",
+     "name": "Kitchen display",
+     "make": "Google Inc.",
+     "model": "Google Nest Hub",
+     "area": "Kitchen",
+     "integrations": [
+      "cast"
+     ],
+     "domains": [
+      "media_player"
+     ]
+    },
+    {
+     "id": "dev-phone",
+     "name": "Made-up iPhone",
+     "make": "Apple",
+     "model": "iPhone 15",
+     "integrations": [
+      "mobile_app"
+     ],
+     "domains": [
+      "sensor",
+      "device_tracker"
+     ]
+    },
+    {
+     "id": "dev-ipad",
+     "name": "iPad",
+     "make": "",
+     "model": "",
+     "integrations": [
+      "mobile_app"
+     ]
+    },
+    {
+     "id": "dev-plug",
+     "name": "Microwave",
+     "make": "TP-Link",
+     "model": "KP115",
+     "integrations": [
+      "tplink"
+     ],
+     "domains": [
+      "switch"
+     ]
+    },
+    {
+     "id": "dev-washer",
+     "name": "Washer",
+     "make": "LG",
+     "model": "T1789EFH_F (DEVICE_WASHER)",
+     "integrations": [
+      "smartthinq"
+     ]
+    },
+    {
+     "id": "dev-sun",
+     "name": "Sun",
+     "integrations": [
+      "sun"
+     ],
+     "entry_type": "service"
+    },
+    {
+     "id": "dev-mac",
+     "name": "aa:bb:cc:dd:ee:ff",
+     "make": "Lite-On",
+     "model": null,
+     "integrations": [
+      "unifi"
+     ],
+     "domains": [
+      "device_tracker"
+     ]
+    },
+    {
+     "id": "dev-pc-nic",
+     "name": "desk pc",
+     "make": "Intel Corporate",
+     "model": null,
+     "integrations": [
+      "unifi"
+     ],
+     "domains": [
+      "device_tracker"
+     ]
+    },
+    {
+     "id": "dev-pc-ping",
+     "name": "Desk PC",
+     "make": null,
+     "model": null,
+     "integrations": [
+      "ping"
+     ],
+     "domains": [
+      "binary_sensor"
+     ]
+    },
+    {
+     "id": "dev-pc-wake",
+     "name": "Desk  PC",
+     "make": null,
+     "model": null,
+     "integrations": [
+      "wake_on_lan"
+     ],
+     "domains": [
+      "button"
+     ]
+    },
+    {
+     "id": "dev-client",
+     "name": "Thermostat",
+     "make": "Some Vendor",
+     "model": null,
+     "integrations": [
+      "unifi"
+     ],
+     "domains": [
+      "device_tracker"
+     ]
+    },
+    {
+     "id": "dev-pi-nic",
+     "name": "homeassistant",
+     "make": "Raspberry Pi Trading Ltd",
+     "model": null,
+     "integrations": [
+      "unifi"
+     ],
+     "domains": [
+      "device_tracker"
+     ]
+    },
+    {
+     "id": "dev-pi",
+     "name": "Raspberry Pi",
+     "make": "Raspberry Pi",
+     "model": "4 Model B",
+     "integrations": [
+      "raspberry_pi"
+     ]
+    },
+    {
+     "id": "dev-dup1",
+     "name": "Gateway",
+     "make": "Philips",
+     "model": "Hue Bridge",
+     "integrations": [
+      "hue"
+     ]
+    },
+    {
+     "id": "dev-dup2",
+     "name": "Gateway",
+     "make": "Philips",
+     "model": "Hue Bridge",
+     "integrations": [
+      "homekit"
+     ]
+    },
+    {
+     "id": "dev-car",
+     "name": "Model Y",
+     "make": "Tesla",
+     "model": "Model Y",
+     "integrations": [
+      "tesla"
+     ]
+    },
+    {
+     "id": "dev-fridge",
+     "name": "Ünïcode fridge",
+     "make": "Samsung",
+     "model": "RF28",
+     "integrations": [
+      "smartthings"
+     ]
+    },
+    {
+     "id": "dev-proxmox",
+     "name": "VM",
+     "make": "Proxmox Server Solutions GmbH",
+     "model": "VM"
+    }
+   ]
+  },
+  "8124": {
+   "http": 401
+  },
+  "8125": {
+   "http": 403
+  },
+  "8126": {
+   "network": "[Errno 10061] made-up refusal"
+  },
+  "8127": {
+   "body": "<html>not a list</html>"
+  },
+  "8128": {
+   "http": 500
+  }
+ }
 }
