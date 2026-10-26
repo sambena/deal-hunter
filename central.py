@@ -150,6 +150,22 @@ def set_switch(state: str) -> None:
         audit("central_" + state, "central sign-in " + state, c)
 
 
+def own_login_on() -> bool:
+    """Deal Hunter's own sign-in (email and password, invites and resets, the old API key, and the sessions and
+    device tokens they made): on until the owner switches to central login only (#322). Off refuses all of it but
+    deletes nothing, so turning it back on is the rollback for the restorable week."""
+    rows = db.query("SELECT value FROM central_state WHERE key = 'own_login'")
+    return not rows or rows[0]["value"] == "on"
+
+
+def set_own_login(state: str) -> None:
+    if state not in ("on", "off"):
+        raise CentralError("State must be on or off.", 400)
+    with _write() as c:
+        c.execute("INSERT OR REPLACE INTO central_state (key, value) VALUES ('own_login', ?)", (state,))
+        audit("own_login_" + state, "Deal Hunter's own sign-in " + state, c)
+
+
 # ---- turning a validated login into a session --------------------------------------
 
 def sign_in(issuer: str, subject: str, auth_time: float, amr) -> tuple[dict, str]:
