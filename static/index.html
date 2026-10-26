@@ -12,10 +12,14 @@
   <script type="module" src="/cave/webawesome/webawesome.loader.js" data-webawesome="/cave/webawesome"></script>
   <script type="module" src="/cave/cave-icons.js"></script>
   <script type="module" src="/cave/cave-ui.js"></script>
+  <script type="module" src="https://cougarcave.dev/cave/v1/cave-bar.js"></script>
 </head>
 <body>
 <wa-page mobile-breakpoint="700px">
-  <header slot="header" class="cave-bar cave-brand wa-dark wa-cluster wa-gap-s wa-align-items-center">
+  <!-- The shared Cougar Cave bar (#540, https://cougarcave.dev/cave/v1/cave-bar.js): its app menu comes from
+       cougarcave.dev. What is inside is drawn until it loads, and stays if cougarcave.dev can't be reached. -->
+  <cave-bar slot="header" id="cave-bar" class="cave-bar cave-brand wa-dark wa-cluster wa-gap-s wa-align-items-center"
+            app="deals" name="Deal Hunter" icon="tag" home="/" no-signin>
     <a class="cave-home wa-cluster wa-gap-2xs wa-align-items-center" href="https://cougarcave.dev">
       <img src="/cave/icons/cougar.svg" alt="" width="24" height="24"><span>Cougar Cave</span>
     </a>
@@ -27,19 +31,8 @@
       <wa-button slot="trigger" appearance="plain" size="s">
         <wa-icon src="/cave/icons/layout-grid.svg" label="Cougar Cave apps"></wa-icon>
       </wa-button>
-      <wa-dropdown-item href="https://cougarcave.dev"><wa-icon slot="icon" src="/cave/icons/home.svg"></wa-icon>Hub</wa-dropdown-item>
-      <wa-dropdown-item href="https://lab.cougarcave.dev"><wa-icon slot="icon" src="/cave/icons/flask.svg"></wa-icon>Lab</wa-dropdown-item>
-      <wa-dropdown-item href="https://music.cougarcave.dev"><wa-icon slot="icon" src="/cave/icons/music.svg"></wa-icon>Player</wa-dropdown-item>
-      <wa-dropdown-item type="checkbox" checked><wa-icon slot="icon" src="/cave/icons/tag.svg"></wa-icon>Deal Hunter</wa-dropdown-item>
-      <wa-dropdown-item href="https://raidroster.cougarcave.dev"><wa-icon slot="icon" src="/cave/icons/pokeball.svg"></wa-icon>RaidRoster</wa-dropdown-item>
-      <wa-dropdown-item href="https://relay.cougarcave.dev"><wa-icon slot="icon" src="/cave/icons/messages.svg"></wa-icon>Relay</wa-dropdown-item>
-      <wa-divider data-cave-owner hidden></wa-divider>
-      <wa-dropdown-item data-cave-owner hidden href="https://auth.cougarcave.dev/owner/"><wa-icon slot="icon" src="/cave/icons/shield-lock.svg"></wa-icon>Owner console<wa-badge slot="details" variant="brand">Owner</wa-badge></wa-dropdown-item>
     </wa-dropdown>
-    <div class="cave-end">
-      <cave-account data-cave-signed-in hidden></cave-account>
-    </div>
-  </header>
+  </cave-bar>
 
   <nav slot="subheader" class="dh-nav wa-cluster wa-gap-m wa-align-items-center" aria-label="Deal Hunter sections">
     <a href="#finds" data-tab="finds" class="active">Finds <span id="new-badge" class="badge" hidden></span></a>

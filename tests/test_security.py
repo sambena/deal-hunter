@@ -158,11 +158,11 @@ class HeadersTest(unittest.TestCase):
     def test_csp_allows_only_our_scripts(self):
         import server
         csp = dict(server.SECURITY_HEADERS)["Content-Security-Policy"]
-        self.assertIn("script-src 'self'", csp)
-        self.assertNotIn("unsafe-inline';", csp.split("script-src")[1].split(";")[0])
+        self.assertEqual(csp.split("script-src")[1].split(";")[0].split(), ["'self'", "https://cougarcave.dev"])
         self.assertNotIn("<script>", (server.STATIC_DIR / "login.html").read_text())
-        # Web Awesome's icons come from this site too (cave/cave-icons.js); nothing else may be fetched.
-        self.assertEqual(csp.split("connect-src")[1].split(";")[0].split(), ["'self'"])
+        # Web Awesome's icons come from this site too (cave/cave-icons.js); only the shared bar (#540) fetches from
+        # cougarcave.dev (its app list and icons). Nothing else may be fetched.
+        self.assertEqual(csp.split("connect-src")[1].split(";")[0].split(), ["'self'", "https://cougarcave.dev"])
 
 
 if __name__ == "__main__":

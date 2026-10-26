@@ -1112,9 +1112,11 @@ SECURITY_HEADERS = [  # for when the site faces the internet
     ("X-Frame-Options", "DENY"),
     # Scripts only from this site (no inline ones), so injected markup can't run code. Listing images come
     # from the shops' sites; inline style attributes are used for image backgrounds and meters. Web Awesome's
-    # own small icons come from static/cave/system-icons.svg (cave/cave-icons.js), so connect-src stays 'self'.
-    ("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
-                                "img-src 'self' https: data:; connect-src 'self'; object-src 'none'; "
+    # own small icons come from static/cave/system-icons.svg (cave/cave-icons.js). The shared bar (#540) loads from
+    # cougarcave.dev and fetches its app list and icons there; nothing else is fetched.
+    ("Content-Security-Policy", "default-src 'self'; script-src 'self' https://cougarcave.dev; "
+                                "style-src 'self' 'unsafe-inline'; "
+                                "img-src 'self' https: data:; connect-src 'self' https://cougarcave.dev; object-src 'none'; "
                                 "base-uri 'none'; form-action 'self'; frame-ancestors 'none'"),
     ("Referrer-Policy", "same-origin"),
 ]

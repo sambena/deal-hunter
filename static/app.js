@@ -242,16 +242,13 @@ async function signOut() {
   else location.reload();
 }
 
-// The Cougar Cave bar: who is signed in, and the shared account menu (<cave-account>: Settings, Appearance, Sign out).
+// The shared Cougar Cave bar (#540): who is signed in, and its account menu (Settings, Appearance, Sign out).
 function fillBar() {
-  const me = state.me || {}, account = $("cave-account");
+  const me = state.me || {}, bar = $("#cave-bar");
   const data = { name: me.name || "", email: me.email || "", items: [{ label: "Settings", icon: "settings", value: "settings" }] };
-  customElements.whenDefined("cave-account").then(() => {
-    if (JSON.stringify(account.data) !== JSON.stringify(data)) account.data = data;  // refresh() runs every minute
-  });
-  account.hidden = false;
+  if (JSON.stringify(bar.account) !== JSON.stringify(data)) bar.account = data;  // refresh() runs every minute
 }
-$("cave-account").addEventListener("cave-account-select", e => {
+$("#cave-bar").addEventListener("cave-account-select", e => {
   const value = e.detail.value;
   if (value === "settings") openSettings();
   if (value === "signout") signOut().catch(err => toast(err.message, true));
