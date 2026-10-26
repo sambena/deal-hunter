@@ -4,7 +4,7 @@
 // by code point, and ties in the order rows were added.
 import type { Db } from '@cougarcave/server';
 import { sql, type SQL } from 'drizzle-orm';
-import { BadValue, pyEq, pyFloat, pyIn, pyInt, pySplit, truthy } from './logic/py.js';
+import { BadValue, pyEq, pyFloat, pyIn, pyInt, pySplit, pyStr, pyStrip, truthy } from './logic/py.js';
 
 type Row = Record<string, unknown>;
 const rowsOf = (result: unknown): Row[] => (Array.isArray(result) ? result : (result as { rows?: Row[] }).rows ?? []);
@@ -107,6 +107,35 @@ function textValue(v: unknown): string | null {
 }
 
 const json = (v: unknown) => sql`${JSON.stringify(v)}::jsonb`;
+
+/** A device that isn't the member's (db.py's LookupError). */
+export class DeviceNotFound extends Error {}
+
+/** Python's dict.get(key, default) on a JSON value; a list item that isn't an object fails as Python's would. */
+function getOr(item: unknown, key: string, fallback: unknown): unknown {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) throw new BadValue('a list item that is not an object');
+  return key in item ? (item as Row)[key] : fallback;
+}
+
+/** Iterating a JSON value as Python would: a list's items, a string's characters, an object's keys. */
+function pyIter(v: unknown): unknown[] {
+  if (Array.isArray(v)) return v;
+  if (typeof v === 'string') return [...v];
+  if (v && typeof v === 'object') return Object.keys(v);
+  throw new BadValue('not a list');
+}
+
+/** db.py's _number: a number from what the form sent ("$1,299" too), or null when it isn't one. */
+function numberOf(v: unknown, kind: 'int' | 'float'): number | null {
+  if (v === null || v === undefined || v === '') return null;
+  const s = pyStrip(pyStr(v).replace(/\$/g, '').replace(/,/g, ''));
+  try {
+    return kind === 'int' ? pyInt(s) : pyFloat(s);
+  } catch (e) {
+    if (e instanceof BadValue) return null;
+    throw e;
+  }
+}
 
 export class Store {
   constructor(private readonly db: Db, private readonly now: () => number) {}
@@ -346,6 +375,50 @@ export class Store {
       ? await this.query(sql`SELECT * FROM deals.machines WHERE id = ${machineId}`)
       : await this.query(sql`SELECT * FROM deals.machines WHERE id = ${machineId} AND member_id = ${memberId}`);
     return row ? Store.machineRow(row) : null;
+  }
+
+  /** Adds a device (machineId null) or changes one of the member's; a LookupError's 404 when it isn't theirs. */
+  async saveMachine(data: Row, memberId: number, machineId: number | null = null): Promise<number> {
+    const parts = (Array.isArray(data.parts) ? data.parts : 'parts' in data ? pyIter(data.parts) : [])
+      .filter((p) => pyStrip(pyStr(getOr(p, 'model', ''))));
+    const kind = DEVICE_KINDS.includes(data.kind as string) ? data.kind as string : 'pc';
+    const year = numberOf(data.year, 'int');
+    const custom = ((truthy(data.custom) ? pyIter(data.custom) : []) as Row[])
+      .filter((f) => pyStrip(pyStr(getOr(f, 'label', ''))))
+      .map((f) => ({ label: [...pyStrip(pyStr(getOr(f, 'label', '')))].slice(0, 60).join(''),
+                     value: [...pyStrip(pyStr(getOr(f, 'value', '')))].slice(0, 500).join('') }));
+    const vals = {
+      name: textValue('name' in data ? data.name : 'Untitled'), notes: textValue('notes' in data ? data.notes : ''),
+      parts: json(parts), kind,
+      make: pyStrip(truthy(data.make) ? pyStr(data.make) : ''), model: pyStrip(truthy(data.model) ? pyStr(data.model) : ''),
+      year: year && year >= 1950 && year <= 2100 ? year : null, msrp: numberOf(data.msrp, 'float'),
+      purchased: pyStrip(truthy(data.purchased) ? pyStr(data.purchased) : ''), price_paid: numberOf(data.price_paid, 'float'),
+      custom: json(custom), source_ref: truthy(data.source_ref) ? textValue(data.source_ref) : null,
+    };
+    let id: number;
+    if (machineId === null) {
+      const [row] = await this.query(sql`INSERT INTO deals.machines (name, notes, parts, kind, make, model, year, msrp, purchased, price_paid,
+        custom, source_ref, member_id) VALUES (${vals.name}, ${vals.notes}, ${vals.parts}, ${vals.kind}, ${vals.make}, ${vals.model},
+        ${vals.year}, ${vals.msrp}, ${vals.purchased}, ${vals.price_paid}, ${vals.custom}, ${vals.source_ref}, ${memberId}) RETURNING id`);
+      id = Number(row!.id);
+    } else {
+      const changed = await this.query(sql`UPDATE deals.machines SET name = ${vals.name}, notes = ${vals.notes}, parts = ${vals.parts},
+        kind = ${vals.kind}, make = ${vals.make}, model = ${vals.model}, year = ${vals.year}, msrp = ${vals.msrp},
+        purchased = ${vals.purchased}, price_paid = ${vals.price_paid}, custom = ${vals.custom},
+        source_ref = COALESCE(${vals.source_ref}, source_ref) WHERE id = ${machineId} AND member_id = ${memberId} RETURNING id`);
+      if (!changed.length) throw new DeviceNotFound();
+      id = machineId;
+    }
+    // VIN and odometer change only when sent, so apps that don't know them yet don't wipe them.
+    if ('vin' in data) {
+      const vin = [...pySplit(truthy(data.vin) ? pyStr(data.vin) : '').join('').toUpperCase()].slice(0, 17).join('');
+      await this.db.execute(sql`UPDATE deals.machines SET vin = ${vin} WHERE id = ${id}`);
+    }
+    if ('odometer' in data) {
+      const miles = numberOf(data.odometer, 'int');
+      await this.db.execute(sql`UPDATE deals.machines SET odometer = ${miles && miles >= 0 ? miles : null} WHERE id = ${id}`);
+    }
+    return id;
   }
 
   async deleteMachine(machineId: number, memberId: number): Promise<boolean> {

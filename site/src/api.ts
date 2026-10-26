@@ -8,18 +8,23 @@
 //   five minutes.
 // - Errors are the framework's {error, message}; the message is the Python app's own text.
 // - Not here yet, each in its own PR: checking watches now (run, poll), the Discord test and the Home Assistant import
-//   come with the sources and scheduler; the AI routes, and the AI parts of state and settings, with the AI. Until the
-//   scheduler lands, a new watch answers as if created with check: false.
+//   come with the sources and scheduler; the AI routes, the AI parts of state and settings, and the "with AI" choice of
+//   the device routes (suggest, specs, radar), with the AI. Until the scheduler lands, a new watch answers as if created
+//   with check: false; until the AI lands, asking for AI answers 501 not_yet.
 import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { bothFactors, people, Refusal, type Session } from '@cougarcave/server';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { sql } from 'drizzle-orm';
+import * as hardware from './logic/hardware.js';
 import * as matching from './logic/matching.js';
 import { BlockedURL, check as checkAddress, checkDiscord, type Resolve, resolveHost } from './logic/netguard.js';
-import { BadValue, median, pyFloat, pyIn, pyInt, pyRound, pySplit, truthy } from './logic/py.js';
+import { BadValue, median, pyFloat, pyIn, pyInt, pyRound, pySplit, pyStr, pyStrip, truthy } from './logic/py.js';
+import { cpscGet, type CpscGet, productRecalls } from './logic/product-recalls.js';
 import { cleanTimes } from './logic/schedule.js';
-import { DEFAULT_WATCH_LIMIT, type Member, SECRET_KEYS, Store } from './store.js';
+import * as specs from './logic/specs.js';
+import { decodeVin, type Get, LookupFailed, nhtsaGet, recalls as vehicleRecalls } from './logic/vehicles.js';
+import { DEFAULT_WATCH_LIMIT, DeviceNotFound, type Member, PARTS_KINDS, SECRET_KEYS, Store } from './store.js';
 
 /** The admin's AI is managed in the owner console, so the admin can't set it here (ai.py's AI_KEYS and the limit). */
 const ADMIN_MANAGED_AI = new Set(['ai_provider', 'ollama_url', 'ollama_model', 'anthropic_api_key', 'claude_model',
@@ -48,6 +53,9 @@ export interface ApiOptions {
   downloadsDir: string;
   /** Resolves the hosts in people's addresses (Ollama, Home Assistant) to check they are public. */
   resolve?: Resolve;
+  /** NHTSA's and CPSC's answers (VINs and recalls). Tests pass made-up ones. */
+  nhtsa?: Get;
+  cpsc?: CpscGet;
 }
 
 declare module 'fastify' {
@@ -55,7 +63,7 @@ declare module 'fastify' {
 }
 
 const CODES: Record<number, string> = { 400: 'bad_request', 401: 'signed_out', 403: 'forbidden', 404: 'not_found', 409: 'conflict',
-  410: 'gone', 413: 'too_large', 422: 'need_ai', 502: 'upstream' };
+  410: 'gone', 413: 'too_large', 422: 'need_ai', 501: 'not_yet', 502: 'upstream' };
 const fail = (status: number, message: string, code = CODES[status] ?? 'bad_request') => new Refusal(status, code, message);
 
 type Params = Record<string, string>;
@@ -349,6 +357,123 @@ export async function api(app: FastifyInstance, options: ApiOptions): Promise<vo
     if ('ai_daily_cap' in body) await set('ai_daily_cap', Math.max(0, pyInt(truthy(body.ai_daily_cap) ? body.ai_daily_cap : 0)));
     if ('ai_allowance' in body) await set('ai_allowance', Math.max(0, pyRound(pyFloat(truthy(body.ai_allowance) ? body.ai_allowance : 0), 2)));
     return { ok: true };
+  });
+
+  // ---- My Stuff: devices ----------------------------------------------------------------------------------------
+
+  const nhtsa = options.nhtsa ?? nhtsaGet;
+  const cpsc = options.cpsc ?? cpscGet;
+  const notYet = () => fail(501, 'AI arrives in its own update; this works without "use AI" for now.', 'not_yet');
+  const ownMachine = async (req: FastifyRequest, m: Member, message: string) => {
+    const machine = await store.getMachine(id(req), m.id);
+    if (!machine) throw fail(404, message);
+    return machine;
+  };
+
+  route('POST', '/api/machines', async (_req, body, _p, m) => ({ id: await store.saveMachine(body, m.id) }));
+
+  route('PUT', `/api/machines/${ID}`, async (req, body, _p, m) => {
+    try {
+      await store.saveMachine(body, m.id, id(req));
+    } catch (e) {
+      if (e instanceof DeviceNotFound) throw fail(404, 'device not found');
+      throw e;
+    }
+    return { ok: true };
+  });
+
+  route('DELETE', `/api/machines/${ID}`, async (req, _b, _p, m) => {
+    if (!await store.deleteMachine(id(req), m.id)) throw fail(404, 'device not found');
+    return { ok: true };
+  });
+
+  route('POST', '/api/vin', async (_req, body) => {
+    // Decode a VIN (NHTSA vPIC): make, model, year, trim, body, drive, engine.
+    try {
+      return await decodeVin('vin' in body ? body.vin : '', nhtsa);
+    } catch (e) {
+      if (e instanceof LookupFailed) throw fail(400, e.message);
+      throw e;
+    }
+  });
+
+  route('GET', `/api/machines/${ID}/recalls`, async (req, _b, _p, m) => {
+    const machine = await ownMachine(req, m, 'device not found');
+    const kind = (machine.kind as string) || 'pc';
+    if (PARTS_KINDS.has(kind)) throw fail(400, 'recalls are for cars, appliances and other products, not built computers');
+    try {
+      if (kind === 'vehicle') {   // NHTSA
+        const found = await vehicleRecalls(String(machine.make ?? ''), String(machine.model ?? ''), machine.year as number | null, options.now(), nhtsa);
+        return { recalls: found, vehicle: `${pyStr(machine.year)} ${pyStr(machine.make)} ${pyStr(machine.model)}`, source: 'nhtsa' };
+      }
+      const found = await productRecalls(machine, options.now(), cpsc);   // CPSC
+      const what = [machine.make, machine.model || machine.name].filter(truthy).map((x) => pyStr(x)).join(' ');
+      return { recalls: found, vehicle: what, source: 'cpsc' };
+    } catch (e) {
+      if (e instanceof LookupFailed) throw fail(400, e.message);
+      throw e;
+    }
+  });
+
+  route('POST', `/api/machines/${ID}/suggest`, async (req, body, _p, m) => {
+    const machine = await ownMachine(req, m, 'machine not found');
+    const rules = PARTS_KINDS.has((machine.kind as string) || 'pc')
+      ? hardware.suggest(machine as unknown as Parameters<typeof hardware.suggest>[0])
+      : { platform: null, suggestions: [], explanation: 'the built-in rules only know PC parts; use AI or Watch this model' };
+    if (truthy(body.use_ai)) throw notYet();
+    return rules;
+  });
+
+  route('GET', '/api/specs/commands', async () => ({ windows: specs.WINDOWS_COMMAND, linux: specs.LINUX_COMMAND }));
+
+  route('POST', `/api/machines/${ID}/specs`, async (req, body, _p, m) => {
+    // Parts from pasted text: the Get specs command's output, or (with AI) anything else.
+    const machine = await ownMachine(req, m, 'machine not found');
+    const text = pyStrip(truthy(body.text) ? pyStr(body.text) : '');
+    if (!text) throw fail(400, "Paste the command's output, or any text describing the computer");
+    let parts: hardware.Part[];
+    let method: string;
+    if (specs.looksLikeReport(text)) {
+      parts = specs.parseReport(text);
+      method = 'report';
+    } else if (truthy(body.use_ai)) {
+      throw notYet();
+    } else {
+      throw fail(422, 'need_ai');
+    }
+    parts = parts.filter((p) => pyStrip(pyStr(p.model ?? '')));
+    if (!parts.length) throw fail(400, "Couldn't find any parts in that text");
+    const merged = specs.mergeParts(machine.parts as hardware.Part[], parts);
+    await store.saveMachine({ ...machine, parts: merged }, m.id, machine.id as number);
+    return { parts: merged, method, found: parts.length };
+  });
+
+  /** The Python app's RADAR_SKIP_KINDS: cheap gadgets and cars aren't what the radar is for. */
+  const RADAR_SKIP_KINDS = new Set(['smart home', 'vehicle']);
+
+  route('POST', '/api/radar', async (_req, body, _p, m) => {
+    const watched = new Set((await store.listWatches(m.id)).map((w) => pyStrip(String(w.query)).toLowerCase()));
+    const machines = await store.listMachines(m.id);
+    const items: Record<string, unknown>[] = [];
+    const skipped: Record<string, unknown>[] = [];
+    for (const machine of machines) {
+      if (!PARTS_KINDS.has((machine.kind as string) || 'pc')) continue;
+      const rules = hardware.suggest(machine as unknown as Parameters<typeof hardware.suggest>[0]);
+      if (!rules.platform) {
+        skipped.push({ machine_id: machine.id, name: machine.name,
+          why: !truthy(machine.parts) ? 'needs specs (press Get specs)' : rules.explanation });
+        continue;
+      }
+      const usable = rules.suggestions.filter((s) => pyStrip(s.query));   // "RAM: DDR4 or DDR5?" has no query
+      const picks = [...usable.filter((s) => s.category === 'cpu').slice(0, 1), ...usable.filter((s) => s.category === 'ram').slice(0, 1)];
+      if (!picks.length) skipped.push({ machine_id: machine.id, name: machine.name, why: 'already has the best drop-in CPU' });
+      for (const s of picks) items.push({ ...s, machine_id: machine.id, machine_name: machine.name, from: 'rules' });
+    }
+    const gear = machines.filter((g) => !PARTS_KINDS.has((g.kind as string) || 'pc') && !RADAR_SKIP_KINDS.has((g.kind as string) || 'pc') && truthy(g.model));
+    if (gear.length && truthy(body.use_ai)) throw notYet();
+    if (gear.length) skipped.push(...gear.map((g) => ({ machine_id: g.id, name: g.name, why: 'needs AI (turn it on in Settings)' })));
+    for (const it of items) it.already = watched.has(pyStrip(String(it.query)).toLowerCase());
+    return { items, skipped, gear_count: gear.length };
   });
 
   // ---- the Android app -----------------------------------------------------------------------------------------

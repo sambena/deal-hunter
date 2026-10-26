@@ -14,11 +14,11 @@ export interface BuildOptions extends Partial<ApiOptions> {
 }
 
 export async function build(config: Config, options: BuildOptions = {}) {
-  const { logger, now = () => Date.now() / 1000, apiPort = null, downloadsDir = join(config.DATA_DIR, 'downloads'), resolve } = options;
+  const { logger, now = () => Date.now() / 1000, apiPort = null, downloadsDir = join(config.DATA_DIR, 'downloads'), resolve, nhtsa, cpsc } = options;
   // The built page files: vite build writes them to dist/public. The same URL works from src/ (dev) and dist/.
   const app = await createApp({
     name: NAME, slug: SLUG, config, publicDir: new URL('../dist/public/', import.meta.url), now,
-    routes: (scope) => api(scope, { now, apiPort, downloadsDir, ...(resolve ? { resolve } : {}) }),
+    routes: (scope) => api(scope, { now, apiPort, downloadsDir, ...(resolve ? { resolve } : {}), ...(nhtsa ? { nhtsa } : {}), ...(cpsc ? { cpsc } : {}) }),
     ...(logger === false ? { logger } : {}),
   });
   app.addHook('onRequest', pinNeedsCode);
