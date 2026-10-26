@@ -1,6 +1,6 @@
 // Starts Deal Hunter: `npm run dev` (watching src/) or `npm start` (the build). Settings come from the environment
 // or .env (see .env.example). Deal Hunter's own: API_PORT (and API_HOST) for the API port, DOWNLOADS_DIR for the
-// Android app's folder.
+// Android app's folder, NO_POLL=1 to leave the checks off.
 import type { Server } from 'node:http';
 import { loadConfig } from '@cougarcave/server';
 import { listenApiPort } from './api-port.js';
@@ -10,6 +10,8 @@ const config = loadConfig();
 const apiPort = process.env.API_PORT ? Number(process.env.API_PORT) : null;
 if (apiPort !== null && !(Number.isInteger(apiPort) && apiPort > 0 && apiPort < 65536)) throw new Error('API_PORT must be a port number');
 const app = await build(config, { apiPort, ...(process.env.DOWNLOADS_DIR ? { downloadsDir: process.env.DOWNLOADS_DIR } : {}) });
+// The checks run in this process on their schedule (NO_POLL=1 leaves them off, as the Python app's --no-poll did).
+if (process.env.NO_POLL !== '1') app.poller.start();
 await app.listen({ host: config.HOST, port: config.PORT });
 let apiServer: Server | null = null;
 if (apiPort !== null) {

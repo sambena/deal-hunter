@@ -7,10 +7,8 @@
 // - Privileged routes (People, the shared settings) need both factors, and for a change a sign-in from the last
 //   five minutes.
 // - Errors are the framework's {error, message}; the message is the Python app's own text.
-// - Not here yet, each in its own PR: checking watches now (run, poll), the Discord test and the Home Assistant import
-//   come with the sources and scheduler; the AI routes, the AI parts of state and settings, and the "with AI" choice of
-//   the device routes (suggest, specs, radar), with the AI. Until the scheduler lands, a new watch answers as if created
-//   with check: false; until the AI lands, asking for AI answers 501 not_yet.
+// - Not here yet, each in its own PR: the Home Assistant import; the AI routes, the AI parts of state and settings, and the "with AI" choice of
+//   the device routes (suggest, specs, radar), with the AI. Until the AI lands, asking for AI answers 501 not_yet.
 import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { bothFactors, people, Refusal, type Session } from '@cougarcave/server';
@@ -24,6 +22,7 @@ import { cpscGet, type CpscGet, productRecalls } from './logic/product-recalls.j
 import { cleanTimes } from './logic/schedule.js';
 import * as specs from './logic/specs.js';
 import { decodeVin, type Get, LookupFailed, nhtsaGet, recalls as vehicleRecalls } from './logic/vehicles.js';
+import { BlockedURL as DiscordBlocked, DiscordRefused, type Poller } from './poller.js';
 import { DEFAULT_WATCH_LIMIT, DeviceNotFound, type Member, PARTS_KINDS, SECRET_KEYS, Store } from './store.js';
 
 /** The admin's AI is managed in the owner console, so the admin can't set it here (ai.py's AI_KEYS and the limit). */
@@ -56,6 +55,8 @@ export interface ApiOptions {
   /** NHTSA's and CPSC's answers (VINs and recalls). Tests pass made-up ones. */
   nhtsa?: Get;
   cpsc?: CpscGet;
+  /** The checks (poller.ts); made after the app, so given as a getter. */
+  poller: () => Poller;
 }
 
 declare module 'fastify' {
@@ -149,6 +150,7 @@ export async function api(app: FastifyInstance, options: ApiOptions): Promise<vo
     settings: await store.publicSettings(m.id, m.admin),
     me: await publicUser(m, req.session),
     api_port: options.apiPort,
+    poller: options.poller().state,
     now: options.now(),
   }));
 
@@ -159,7 +161,16 @@ export async function api(app: FastifyInstance, options: ApiOptions): Promise<vo
       throw fail(403, `watch limit reached (${limit}); delete one or ask Sam for more`);
     }
     const wid = await store.createWatch(body, m.id);
-    return { id: wid, new: 0, errors: [] };
+    if (body.check === false) return { id: wid, new: 0, errors: [] };   // many at once (deal radar): one background check after
+    return { id: wid, ...await options.poller().runOne(wid, m.id) };
+  });
+
+  route('POST', `/api/watches/${ID}/run`, async (req, _b, _p, m) => options.poller().runOne(id(req), m.id));
+
+  route('POST', '/api/poll', async (_req, _b, _p, m) => {
+    if (m.admin) options.poller().pollNow();   // everyone's watches, on the normal loop
+    else void options.poller().pollUser(m.id);   // just this person's
+    return { ok: true };
   });
 
   route('PUT', `/api/watches/${ID}`, async (req, body, _p, m) => {
@@ -311,6 +322,19 @@ export async function api(app: FastifyInstance, options: ApiOptions): Promise<vo
   });
 
   route('GET', '/api/me', async (req, _b, _p, m) => publicUser(m, req.session));
+
+  route('POST', '/api/test-discord', async (_req, _b, _p, m) => {
+    const s = await store.getSettings(m.id);
+    if (!truthy(s.discord_webhook)) throw fail(400, 'No Discord webhook saved');
+    try {
+      await options.poller().sendDiscord(s.discord_webhook as string, { content: 'Deal Hunter test message: notifications work.' });
+    } catch (e) {
+      if (e instanceof DiscordBlocked) throw fail(400, e.message);
+      if (e instanceof DiscordRefused) throw fail(502, "Discord didn't accept the message; check the webhook address");
+      throw e;
+    }
+    return { ok: true };
+  });
 
   // ---- people (admin) ------------------------------------------------------------------------------------------
 

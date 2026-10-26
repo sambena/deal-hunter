@@ -19,7 +19,7 @@ export class NetError extends Error {
 }
 
 export interface NetRequest { url: string; method: 'GET' | 'POST'; headers: Record<string, string>; body: string | null; timeout: number }
-export interface NetResponse { status: number; body: Buffer }
+export interface NetResponse { status: number; body: Buffer; reason?: string }
 /** One HTTP request; throws NetError when there is no answer. Redirects are followed, as urllib follows them. */
 export type Net = (req: NetRequest) => Promise<NetResponse>;
 export interface Clock { now(): number; sleep(seconds: number): Promise<void> }
@@ -32,7 +32,7 @@ export const realNet: Net = async ({ url, method, headers, body, timeout }) => {
     const err = e as Error & { cause?: { code?: string; message?: string } };
     throw new NetError(err.cause?.code ?? err.cause?.message ?? err.message);
   }
-  return { status: res.status, body: Buffer.from(await res.arrayBuffer()) };
+  return { status: res.status, body: Buffer.from(await res.arrayBuffer()), reason: res.statusText };
 };
 export const realClock: Clock = { now: () => Date.now() / 1000, sleep: (s) => new Promise((done) => setTimeout(done, s * 1000)) };
 
