@@ -73,6 +73,12 @@ def central_on() -> bool:
     return not rows or rows[0]["value"] == "on"
 
 
+def own_login_on() -> bool:
+    """Deal Hunter's own sign-in switch (#322). Imported late: central imports auth."""
+    import central
+    return central.own_login_on()
+
+
 def central_configured() -> bool:
     """Whether this server has central login turned on in config.json. Imported late: oidc imports auth."""
     import oidc
@@ -106,6 +112,8 @@ def user_for_token(token: str | None) -> dict | None:
         # The live deny state: an unlinked or disabled central person, central sign-in switched off, or
         # central login no longer turned on in config.json.
         return None
+    if rows[0]["via"] != "central" and not own_login_on():
+        return None  # made by the own sign-in, which is off (#322); kept, so turning it back on restores it
     db.execute("UPDATE tokens SET last_used = ? WHERE id = ?", (time.time(), rows[0]["token_id"]))
     return rows[0]
 

@@ -749,13 +749,14 @@ def _signed_in(user: dict, kind: str, name: str) -> dict:
 @route("GET", "/api/auth/status")
 def auth_status(body, params):
     req = _request.get() or {}
-    return {"setup_needed": _setup_needed(),
+    own = central.own_login_on()
+    return {"setup_needed": own and _setup_needed(),
             "user": auth.public_user(req["user"]) if req.get("user") else None,
             "central": oidc.enabled() and auth.central_on(),  # show "Sign in with Cougar Cave"
             # What the sign-in card (cave/cave-ui.js) offers: central only while it is on, and the email and password
             # form always (accounts from before Cougar Cave). Nothing here is hard-coded in the page.
             "signin": {"central": "/auth/central" if oidc.enabled() and auth.central_on() else None,
-                       "password": {"label": "Email", "reset": None}}}
+                       "password": {"label": "Email", "reset": None} if own else None}}
 
 
 @route("POST", "/api/auth/setup")
@@ -1053,6 +1054,20 @@ STATIC_TYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript; ch
                 ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".json": "application/json",
                 ".md": "text/plain; charset=utf-8", ".txt": "text/plain; charset=utf-8",
                 ".woff2": "font/woff2"}  # the kit's fonts (cave/fonts/)
+# Deal Hunter's own sign-in (#322): refused while the owner has switched it off, so central login is the only way in.
+OWN_LOGIN_ROUTES = {("POST", "/api/auth/setup"), ("POST", "/api/auth/login"), ("GET", "/api/auth/link"),
+                    ("POST", "/api/auth/accept"), ("POST", "/api/admin/invites"), ("POST", "/api/api-key")}
+OWN_LOGIN_RESET = re.compile(r"/api/admin/users/\d+/reset")
+OWN_LOGIN_OFF = "Deal Hunter's own sign-in is off. Sign in with Cougar Cave."
+
+
+def _own_login_route(method: str, path: str, body) -> bool:
+    if (method, path) in OWN_LOGIN_ROUTES or (method == "POST" and OWN_LOGIN_RESET.fullmatch(path)):
+        return True
+    return (method, path) == ("POST", "/api/me") and isinstance(body, dict) and bool(
+        body.get("email") or body.get("new_password"))
+
+
 OPEN_ROUTES = {("GET", "/api/auth/status"), ("POST", "/api/auth/setup"), ("POST", "/api/auth/login"),
                ("GET", "/api/auth/link"), ("POST", "/api/auth/accept"), ("GET", "/api/app/android")}
 
@@ -1125,7 +1140,7 @@ class Handler(BaseHTTPRequestHandler):
             if user:
                 return user, bearer
             legacy = db.get_settings(db.admin_id()).get("api_key") or ""
-            if self.api_only and legacy and hmac.compare_digest(bearer, legacy):
+            if self.api_only and legacy and central.own_login_on() and hmac.compare_digest(bearer, legacy):
                 return db.query("SELECT * FROM users WHERE id = ?", (db.admin_id(),))[0], None
             return None, None
         if not self.api_only:
@@ -1217,6 +1232,8 @@ class Handler(BaseHTTPRequestHandler):
             body = json.loads(self.rfile.read(length) or b"{}") if length else {}
             params = {k: v[0] for k, v in parse_qs(url.query).items()}
             _check_privileged(method, url.path, body, user)
+            if _own_login_route(method, url.path, body) and not central.own_login_on():
+                raise HTTPError(410, OWN_LOGIN_OFF)
             result = fn(body, params, *match.groups())
             headers = []
             if isinstance(result, dict) and "__set_cookie__" in result:
@@ -1259,6 +1276,8 @@ class Handler(BaseHTTPRequestHandler):
         if method != ("POST" if url.path == oidc.LINK_PATH else "GET"):  # the link is POST only; the rest GET only
             return self._send(405, b"Method not allowed", "text/plain")
         if url.path == oidc.LINK_PATH:
+            if not central.own_login_on():  # linking proves an account with its password: the owner links now (#322)
+                return self._json(410, {"error": OWN_LOGIN_OFF})
             return self._central_link(login)
         try:
             status, headers, body = self._central_route(login, url)

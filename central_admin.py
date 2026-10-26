@@ -6,6 +6,8 @@
     python central_admin.py disable IDENTITY       end that person's central sessions and refuse new ones
     python central_admin.py enable IDENTITY
     python central_admin.py central on|off         the rollback switch (off ends every central session)
+    python central_admin.py own-login on|off       Deal Hunter's own sign-in (#322): off = central login only;
+                                                   on again is the rollback (nothing is deleted)
     python central_admin.py audit                  the last 50 central sign-in events
 
 Linking is by exact subject, never by email. The issuer comes from config.json "oidc", so it can't be mistyped.
@@ -62,6 +64,9 @@ def run(args: list[str], out=print) -> int:
         elif cmd == "central" and len(rest) == 1:
             central.set_switch(rest[0])
             out(f"Central sign-in is {rest[0]}.")
+        elif cmd == "own-login" and len(rest) == 1:
+            central.set_own_login(rest[0])
+            out(f"Deal Hunter's own sign-in is {rest[0]}.")
         elif cmd == "audit" and not rest:
             for r in central.audit_log():
                 out(f"{_when(r['at'])}  {r['action']:<16} {r['detail']}")
