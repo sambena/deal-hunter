@@ -1,11 +1,12 @@
 """Records the Python app's answers to a list of API requests, for test/api.test.ts. Made-up people and listings only;
 nothing is fetched (a check that would search the shops is refused here).
 
-Usage, from the repository root: python make_api.py <new database file> <issuer> [core | devices] [outside.json]
+Usage, from the repository root: python make_api.py <new database file> <issuer> [core | devices | ha] [outside.json]
 It builds an old database with the real Python code (db.py, central.py), copies it to <file> before any request (the
 test copies that into the new app), then sends every request in REQUESTS through server.py's own routes, with its
 privileged check and its own-sign-in switch, at a fixed clock. "core" is watches, finds, settings and People;
-"devices" is My Stuff, with NHTSA's and CPSC's answers made up in outside.json. Prints JSON: {"requests": [...],
+"devices" is My Stuff, with NHTSA's and CPSC's answers made up in outside.json; "ha" the Home Assistant import,
+with its answers made up there too. Prints JSON: {"requests": [...],
 "answers": [...], "asked": [the outside addresses asked, in order]}."""
 import json
 import shutil
@@ -80,6 +81,21 @@ def cpsc(request, timeout=None):
 
 vehicles._get = nhtsa
 product_recalls.urllib.request.urlopen = cpsc
+
+
+def home_assistant(request, timeout=None):
+    url = request.full_url
+    asked.append(url)
+    found = outside.get("ha", {}).get(urllib.parse.urlparse(url).port and str(urllib.parse.urlparse(url).port), {"http": 404})
+    if "network" in found:
+        raise urllib.error.URLError(found["network"])
+    if "http" in found:
+        raise urllib.error.HTTPError(url, found["http"], "made up", {}, None)
+    return Answer((json.dumps(found["json"]) if "json" in found else found["body"]).encode())
+
+
+if mode == "ha":
+    urllib.request.urlopen = home_assistant
 
 OWNER = "00000000-0000-4000-8000-000000000001"    # the framework's dev login people
 MEMBER = "00000000-0000-4000-8000-000000000002"
@@ -237,6 +253,28 @@ if mode == "core":
     req(O, "GET", "/api/nothing-here")
     req(O, "POST", "/api/auth/login", {"email": "x", "password": "y"})
     req(O, "GET", "/api/app/android")
+elif mode == "ha":
+    req(O, "GET", "/api/import/ha")
+    req(O, "PUT", "/api/settings", {"ha_url": "http://10.0.0.5:8123/", "ha_token": "made-up-token"})
+    req(O, "GET", "/api/import/ha")
+    req(M, "GET", "/api/import/ha")
+    req(O, "POST", "/api/import/ha", {"devices": [
+        {"refs": ["dev-tv"], "name": "Den TV", "make": "LGE", "model": "OLED65B2AUA", "area": "Den", "kind": "tv", "parts": []},
+        {"refs": ["dev-hub"], "name": "", "make": "Google Inc.", "model": "Google Nest Hub", "area": "", "kind": "audio"},
+        {"refs": ["dev-pc-nic", "dev-pc-ping", "dev-pc-wake"], "name": "Desk PC", "computer": True, "match_id": 1, "kind": "pc",
+         "parts": [{"category": "network", "model": "Intel network adapter"}, {"category": "cpu", "model": "i7-4790K"}]},
+        {"refs": ["dev-pi-nic", "dev-pi"], "name": "Home Assistant (Raspberry Pi)", "computer": True, "kind": "server", "model": "Raspberry Pi 4 Model B",
+         "parts": [{"category": "network", "model": "Raspberry Pi network adapter"}]},
+        {"refs": ["", None], "name": None, "make": None, "model": None, "kind": "bogus"}]})
+    req(O, "POST", "/api/import/ha", {"devices": [{"refs": ["dev-tv"], "name": "Den TV again", "kind": "tv"}]})
+    req(M, "POST", "/api/import/ha", {"devices": []})
+    req(O, "GET", "/api/state")
+    req(O, "GET", "/api/import/ha")
+    for port in ["8124", "8125", "8126", "8127", "8128"]:
+        req(O, "PUT", "/api/settings", {"ha_url": f"http://10.0.0.5:{port}"})
+        req(O, "GET", "/api/import/ha")
+    req(O, "PUT", "/api/settings", {"ha_url": "http://10.0.0.5:8123/?x=1"})
+    req(O, "GET", "/api/import/ha")
 else:
     req(O, "GET", "/api/specs/commands")
     req(O, "POST", "/api/machines", {"name": "Big PC", "kind": "bogus", "notes": "Made up.", "make": " Custom ", "model": None,

@@ -15,7 +15,7 @@ import { listenApiPort } from '../src/api-port.js';
 import { build } from '../src/app.js';
 import { copy, openOld, readOld } from '../src/legacy/copy.js';
 import { clearCpscCache, type CpscGet } from '../src/logic/product-recalls.js';
-import { NetError } from '../src/logic/sources.js';
+import { type Net, NetError } from '../src/logic/sources.js';
 import { clearRecallCache, type Get, LookupFailed } from '../src/logic/vehicles.js';
 
 const ISSUER = 'https://auth.example.test/application/o/deals/';
@@ -31,8 +31,9 @@ let folder: string;
 type Recording = { requests: Req[]; answers: Answer[]; asked: string[]; ids: Record<string, number> };
 let recorded: Recording;
 let devices: Recording;
+let homeAssistant: Recording;
 const OUTSIDE = JSON.parse(readFileSync(join(SITE, 'test/fixtures/outside.json'), 'utf8')) as
-  { nhtsa: Record<string, Record<string, unknown>>; cpsc: Record<string, unknown> };
+  { nhtsa: Record<string, Record<string, unknown>>; cpsc: Record<string, unknown>; ha: Record<string, { json?: unknown; body?: string; http?: number; network?: string }> };
 let asked: string[] = [];
 
 /** NHTSA and CPSC as outside.json makes them up, noting each address asked, as make_api.py's stand-ins do. */
@@ -51,7 +52,7 @@ const cpsc: CpscGet = async (url) => {
 let app: Awaited<ReturnType<typeof build>>;
 let clock = T0;
 
-function record(mode: 'core' | 'devices'): Recording {
+function record(mode: 'core' | 'devices' | 'ha'): Recording {
   const run = spawnSync('python', [join(SITE, 'test/fixtures/make_api.py'), join(folder, `${mode}.db`), ISSUER, mode,
     join(SITE, 'test/fixtures/outside.json')],
   { cwd: REPO, env: { ...process.env, PYTHONPATH: REPO, PYTHONIOENCODING: 'utf-8', COUGAR_AI_SETTINGS: join(folder, 'none.json') },
@@ -64,7 +65,17 @@ beforeAll(() => {
   folder = mkdtempSync(join(tmpdir(), 'dh-api-'));
   recorded = record('core');
   devices = record('devices');
+  homeAssistant = record('ha');
 });
+
+/** Home Assistant as outside.json makes it up, by the address's port, noting each address asked. */
+const homeAssistantNet: Net = async (req) => {
+  asked.push(req.url);
+  const found = OUTSIDE.ha[new URL(req.url).port] ?? { http: 404 };
+  if (found.network) throw new NetError(found.network);
+  if (found.http) return { status: found.http, body: Buffer.from(''), reason: 'made up' };
+  return { status: 200, body: Buffer.from(found.json !== undefined ? JSON.stringify(found.json) : found.body ?? '') };
+};
 afterAll(() => rmSync(folder, { recursive: true, force: true }));
 afterEach(async () => app?.close());
 
@@ -129,6 +140,13 @@ describe('the same answers as the Python app', () => {
   it('for watches, finds, settings and People, in order', async () => {
     await start();
     expect(await replay(recorded)).toEqual([]);
+  });
+
+  it('for the Home Assistant import, asking Home Assistant the same things', async () => {
+    await start({ net: homeAssistantNet }, 'ha.db');
+    expect(await replay(homeAssistant)).toEqual([]);
+    expect(asked).toEqual(homeAssistant.asked);
+    expect(asked.length).toBeGreaterThan(5);
   });
 
   it('for My Stuff, VINs and recalls, asking NHTSA and CPSC the same things', async () => {

@@ -18,16 +18,18 @@ export class NetError extends Error {
   constructor(readonly reason: string) { super(reason); }
 }
 
-export interface NetRequest { url: string; method: 'GET' | 'POST'; headers: Record<string, string>; body: string | null; timeout: number }
+export interface NetRequest { url: string; method: 'GET' | 'POST'; headers: Record<string, string>; body: string | null; timeout: number;
+  /** 'manual' answers a redirect itself instead of following it (addresses from members' settings). */
+  redirect?: 'follow' | 'manual' }
 export interface NetResponse { status: number; body: Buffer; reason?: string }
 /** One HTTP request; throws NetError when there is no answer. Redirects are followed, as urllib follows them. */
 export type Net = (req: NetRequest) => Promise<NetResponse>;
 export interface Clock { now(): number; sleep(seconds: number): Promise<void> }
 
-export const realNet: Net = async ({ url, method, headers, body, timeout }) => {
+export const realNet: Net = async ({ url, method, headers, body, timeout, redirect = 'follow' }) => {
   let res: Response;
   try {
-    res = await fetch(url, { method, headers, ...(body !== null ? { body } : {}), signal: AbortSignal.timeout(timeout * 1000) });
+    res = await fetch(url, { method, headers, redirect, ...(body !== null ? { body } : {}), signal: AbortSignal.timeout(timeout * 1000) });
   } catch (e) {
     const err = e as Error & { cause?: { code?: string; message?: string } };
     throw new NetError(err.cause?.code ?? err.cause?.message ?? err.message);

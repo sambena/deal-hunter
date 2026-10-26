@@ -7,7 +7,7 @@
 // - Privileged routes (People, the shared settings) need both factors, and for a change a sign-in from the last
 //   five minutes.
 // - Errors are the framework's {error, message}; the message is the Python app's own text.
-// - Not here yet, each in its own PR: the Home Assistant import; the AI routes, the AI parts of state and settings, and the "with AI" choice of
+// - Not here yet: the AI routes, the AI parts of state and settings, and the "with AI" choice of
 //   the device routes (suggest, specs, radar), with the AI. Until the AI lands, asking for AI answers 501 not_yet.
 import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
@@ -15,15 +15,17 @@ import { bothFactors, people, Refusal, type Session } from '@cougarcave/server';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { sql } from 'drizzle-orm';
 import * as hardware from './logic/hardware.js';
+import { candidates, HAError, splitMakeModel } from './logic/homeassistant.js';
 import * as matching from './logic/matching.js';
 import { BlockedURL, check as checkAddress, checkDiscord, type Resolve, resolveHost } from './logic/netguard.js';
 import { BadValue, median, pyFloat, pyIn, pyInt, pyRound, pySplit, pyStr, pyStrip, truthy } from './logic/py.js';
 import { cpscGet, type CpscGet, productRecalls } from './logic/product-recalls.js';
+import type { Net } from './logic/sources.js';
 import { cleanTimes } from './logic/schedule.js';
 import * as specs from './logic/specs.js';
 import { decodeVin, type Get, LookupFailed, nhtsaGet, recalls as vehicleRecalls } from './logic/vehicles.js';
 import { BlockedURL as DiscordBlocked, DiscordRefused, type Poller } from './poller.js';
-import { DEFAULT_WATCH_LIMIT, DeviceNotFound, type Member, PARTS_KINDS, SECRET_KEYS, Store } from './store.js';
+import { DEFAULT_WATCH_LIMIT, DEVICE_KINDS, DeviceNotFound, type Member, PARTS_KINDS, SECRET_KEYS, Store } from './store.js';
 
 /** The admin's AI is managed in the owner console, so the admin can't set it here (ai.py's AI_KEYS and the limit). */
 const ADMIN_MANAGED_AI = new Set(['ai_provider', 'ollama_url', 'ollama_model', 'anthropic_api_key', 'claude_model',
@@ -55,6 +57,8 @@ export interface ApiOptions {
   /** NHTSA's and CPSC's answers (VINs and recalls). Tests pass made-up ones. */
   nhtsa?: Get;
   cpsc?: CpscGet;
+  /** The network for Home Assistant (the checks have their own). */
+  net: Net;
   /** The checks (poller.ts); made after the app, so given as a getter. */
   poller: () => Poller;
 }
@@ -498,6 +502,52 @@ export async function api(app: FastifyInstance, options: ApiOptions): Promise<vo
     if (gear.length) skipped.push(...gear.map((g) => ({ machine_id: g.id, name: g.name, why: 'needs AI (turn it on in Settings)' })));
     for (const it of items) it.already = watched.has(pyStrip(String(it.query)).toLowerCase());
     return { items, skipped, gear_count: gear.length };
+  });
+
+  // ---- importing from Home Assistant (admin) -------------------------------------------------------------------
+
+  route('GET', '/api/import/ha', async (_req, _b, _p, m) => {
+    requireAdmin(m);
+    const s = await store.getSettings(m.id);
+    try {
+      const devices = await candidates(s.ha_url as string, s.ha_token as string, await store.listMachines(m.id), m.admin, options.net, resolve);
+      return { devices, kinds: DEVICE_KINDS };
+    } catch (e) {
+      if (e instanceof HAError) throw fail(400, e.message);
+      throw e;
+    }
+  });
+
+  route('POST', '/api/import/ha', async (_req, body, _p, m) => {
+    // Add the ticked devices. A computer that matches one already here is linked to it, not added again.
+    requireAdmin(m);
+    const machines = await store.listMachines(m.id);
+    const known = new Set(machines.flatMap((x) => String(x.source_ref || '').split(/\s+/).filter(Boolean)));
+    let added = 0, linked = 0;
+    // Python's == on dicts: by content, whatever the key order (jsonb keeps its own).
+    const canonical = (v: unknown): unknown => (Array.isArray(v) ? v.map(canonical) : v && typeof v === 'object'
+      ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, canonical((v as Record<string, unknown>)[k])])) : v);
+    const same = (a: unknown, b: unknown) => JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
+    for (const d of ('devices' in body ? body.devices : []) as Record<string, unknown>[]) {
+      const refs = ((truthy(d.refs) ? d.refs : []) as unknown[]).filter(truthy);
+      if (refs.length && refs.every((r) => known.has(r as string))) continue;
+      const match = machines.find((x) => truthy(d.match_id) && x.id === d.match_id);
+      if (match) {
+        const extra = (truthy(d.parts) ? d.parts : []) as unknown[];
+        const parts = [...(match.parts as unknown[]), ...extra.filter((p) => !(match.parts as unknown[]).some((q) => same(p, q)))];
+        const mine = String(match.source_ref || '').split(/\s+/).filter(Boolean);
+        await store.saveMachine({ ...match, parts, source_ref: [...new Set([...mine, ...refs.map(String)])].join(' ') }, m.id, match.id as number);
+        linked++;
+        continue;
+      }
+      const [make, model] = splitMakeModel((d.make as string) || '', (d.model as string) || '');
+      let note = 'Imported from Home Assistant' + (truthy(d.area) ? ` (${pyStr(d.area)})` : '') + '.';
+      if (truthy(d.computer)) note += ' Press Get specs to fill in its parts.';
+      await store.saveMachine({ name: (d.name as string) || model || 'Device', kind: d.kind ?? null, make, model,
+        parts: truthy(d.parts) ? d.parts : [], notes: note, source_ref: refs.map(String).join(' ') }, m.id);
+      added++;
+    }
+    return { added, linked };
   });
 
   // ---- the Android app -----------------------------------------------------------------------------------------
