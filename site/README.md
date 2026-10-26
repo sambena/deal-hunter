@@ -14,8 +14,9 @@ The API (`src/api.ts`): watches, finds, settings, People, My Stuff (devices, VIN
 rules, pasted specs, the deal radar) and the Android download, with the same answers as the Python app, on the web port
 and on the API port (`src/api-port.ts`, paired phones only). The sources (`src/logic/sources.ts`: eBay, eBay local
 pickup, KSL, KSL Cars, Craigslist, OfferUp, Poshmark, Reddit, r/buildapcsales, Slickdeals, Best Buy), with the Python
-app's rate gaps, caches and retries. The schedule that runs them, the AI, the Discord test and the Home Assistant
-import follow in their own PRs. Until the cutover, the Python
+app's rate gaps, caches and retries. The checks (`src/poller.ts`): every watch against its sources on the schedule
+(every poll_minutes, or at set times in a time zone), shared requests, deal %, keep-the-cheapest, Discord alerts and
+the Best Buy purge; "Check now" and the Discord test. The AI and the Home Assistant import follow in their own PRs. Until the cutover, the Python
 app is what runs.
 
 ## Run it
@@ -47,6 +48,8 @@ Open http://127.0.0.1:8780 and sign in with the dev login (local only).
   and compares every answer, then checks each sign-in rule beside a working control.
   `test/sources.test.ts` runs every source on made-up pages and compares its listings, errors, requests and waits with
   the Python app's (`test/fixtures/make_sources.py` records them, with a fake network and clock; nothing is fetched).
+  `test/poller.test.ts` replays the Python app's checks (`test/fixtures/make_poller.py`, with made-up answers in
+  `poller-spec.json`) and compares every find, alert, request and the poller's state after each step.
 - **Checks before a PR:** `npm run typecheck && npm test && npm run build`.
 
 ## The one-time copy

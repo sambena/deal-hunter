@@ -1,0 +1,116 @@
+{
+  "_": "Made-up answers for make_poller.py and poller.test.ts: per source, per watch query, one list per pass (the last repeats). Nothing here came from a real shop.",
+  "ebay": {
+    "rtx 3080": [
+      [
+        {"source": "ebay", "source_id": "e1", "title": "RTX 3080 FE", "price": 450.0, "shipping": 10.0, "currency": "USD", "url": "https://shop.example.test/e1", "image": "https://i.example.test/e1.jpg", "location": "Made-up, UT", "condition": "Used", "buying": "fixed price", "text": "Used"},
+        {"source": "ebay", "source_id": "e2", "title": "RTX 3080 Strix", "price": 480.0, "shipping": 25.0, "currency": "USD", "url": "https://shop.example.test/e2", "image": null, "location": "", "condition": "Used", "buying": "fixed price", "text": "Used"},
+        {"source": "ebay", "source_id": "e3", "title": "RTX 3080 mining card", "price": 300.0, "shipping": 0.0, "currency": "USD", "url": "https://shop.example.test/e3", "image": null, "location": "", "condition": "Used", "buying": "fixed price", "text": "Used"},
+        {"source": "ebay", "source_id": "e4", "title": "RTX 3080", "price": 100.0, "shipping": null, "currency": "USD", "url": "https://shop.example.test/e4", "image": null, "location": "", "condition": "For parts or not working", "buying": "auction", "text": "For parts or not working"},
+        {"source": "ebay", "source_id": "e9", "title": "RTX 3080 Ventus", "price": 440.0, "shipping": 0.0, "currency": "USD", "url": "https://shop.example.test/e9", "image": null, "location": "", "condition": "Used", "buying": "fixed price", "text": ""},
+        {"source": "ebay", "source_id": "e10", "title": "RTX 3080 Eagle", "price": 445.0, "shipping": 0.0, "currency": "USD", "url": "https://shop.example.test/e10", "image": null, "location": "", "condition": "Used", "buying": "fixed price", "text": ""}
+      ],
+      [
+        {"source": "ebay", "source_id": "e1", "title": "RTX 3080 FE", "price": 450.0, "shipping": 10.0, "currency": "USD", "url": "https://shop.example.test/e1", "image": "https://i.example.test/e1.jpg", "location": "Made-up, UT", "condition": "Used", "buying": "fixed price", "text": "Used"},
+        {"source": "ebay", "source_id": "e5", "title": "RTX 3080 Gaming", "price": 399.0, "shipping": 0.0, "currency": "USD", "url": "https://shop.example.test/e5", "image": "https://i.example.test/e5.jpg", "location": "", "condition": "Used", "buying": "fixed price", "text": ""},
+        {"source": "ebay", "source_id": "e6", "title": "RTX 3080 Founders", "price": 300.005, "shipping": 0.0, "currency": "USD", "url": "https://shop.example.test/e6", "image": null, "location": "", "condition": "Used", "buying": "best offer", "text": ""},
+        {"source": "ebay", "source_id": "e7", "title": "RTX 3080 make an offer", "price": null, "shipping": null, "currency": "USD", "url": "https://shop.example.test/e7", "image": null, "location": "", "condition": "Used", "buying": "best offer", "text": ""}
+      ],
+      [
+        {"source": "ebay", "source_id": "e5", "title": "RTX 3080 Gaming", "price": 399.0, "shipping": 0.0, "currency": "USD", "url": "https://shop.example.test/e5", "image": null, "location": "", "condition": "Used", "buying": "fixed price", "text": ""}
+      ]
+    ],
+    "toyota pickup": [
+      [
+        {"source": "ebay", "source_id": "c1", "title": "2018 Toyota Tacoma TRD", "price": 27500.0, "shipping": 0.0, "currency": "USD", "url": "https://shop.example.test/c1", "image": null, "location": "", "condition": "Used", "buying": "fixed price", "text": "61k miles clean title"},
+        {"source": "ebay", "source_id": "c2", "title": "2010 Ford F-150", "price": 9000.0, "shipping": 0.0, "currency": "USD", "url": "https://shop.example.test/c2", "image": null, "location": "", "condition": "Used", "buying": "fixed price", "text": ""},
+        {"source": "ebay", "source_id": "c3", "title": "Toyota Tacoma floor mats", "price": 40.0, "shipping": 5.0, "currency": "USD", "url": "https://shop.example.test/c3", "image": null, "location": "", "condition": "New", "buying": "fixed price", "text": ""},
+        {"source": "ebay", "source_id": "c4", "title": "2019 Chevy Silverado 1500", "price": 31000.0, "shipping": 0.0, "currency": "USD", "url": "https://shop.example.test/c4", "image": null, "location": "", "condition": "Used", "buying": "fixed price", "text": "120,000 miles"}
+      ],
+      [
+        {"source": "ebay", "source_id": "c5", "title": "2017 toyota tacoma SR5", "price": 22000.0, "shipping": 0.0, "currency": "USD", "url": "https://shop.example.test/c5", "image": null, "location": "", "condition": "Used", "buying": "fixed price", "text": "salvage title, 70k miles"}
+      ]
+    ],
+    "running shoes": [
+      [
+        {"source": "ebay", "source_id": "s1", "title": "Running shoes 10.5M", "price": 40.0, "shipping": 8.0, "currency": "USD", "url": "https://shop.example.test/s1", "image": null, "location": "", "condition": "New", "buying": "fixed price", "text": ""},
+        {"source": "ebay", "source_id": "s2", "title": "Running shoes size 11", "price": 30.0, "shipping": 8.0, "currency": "USD", "url": "https://shop.example.test/s2", "image": null, "location": "", "condition": "New", "buying": "fixed price", "text": ""}
+      ]
+    ],
+    "brake pads": [
+      [
+        {"source": "ebay", "source_id": "b1", "title": "Brake pads front", "price": 45.0, "shipping": 0.0, "currency": "USD", "url": "https://shop.example.test/b1", "image": null, "location": "", "condition": "New", "buying": "fixed price · fits your Tacoma", "text": ""}
+      ]
+    ]
+  },
+  "ebay_local": {
+    "rtx 3080": [
+      [
+        {"source": "ebay_local", "source_id": "e1", "title": "RTX 3080 FE", "price": 450.0, "shipping": 0.0, "currency": "USD", "url": "https://shop.example.test/e1", "image": null, "location": "Made-up, UT", "condition": "Used", "buying": "local pickup · fixed price", "text": "Used"}
+      ],
+      []
+    ]
+  },
+  "ksl": {
+    "rtx 3080": [
+      [
+        {"source": "ksl", "source_id": "k1", "title": "RTX 3080", "price": 300.0, "shipping": 0.0, "currency": "USD", "url": "https://shop.example.test/k1", "image": null, "location": "Made-up City, UT", "condition": "used", "buying": "KSL · private seller", "text": ""}
+      ],
+      [
+        {"source": "ksl", "source_id": "k1", "title": "RTX 3080", "price": 300.0, "shipping": 0.0, "currency": "USD", "url": "https://shop.example.test/k1", "image": null, "location": "Made-up City, UT", "condition": "used", "buying": "KSL · private seller", "text": ""},
+        {"source": "ksl", "source_id": "k2", "title": "RTX 3080 broken fan", "price": 200.0, "shipping": 0.0, "currency": "USD", "url": "https://shop.example.test/k2", "image": null, "location": "", "condition": "used", "buying": "KSL", "text": ""},
+        {"source": "ksl", "source_id": "k3", "title": "RTX 3080 cheap", "price": 150.0, "shipping": 0.0, "currency": "USD", "url": "https://shop.example.test/k3", "image": null, "location": "", "condition": "used", "buying": "KSL", "text": ""}
+      ],
+      {"error": "KSL's bot protection blocked the request (HTTP 403); it usually clears on a later check"}
+    ],
+    "fails": [{"error": "set your ZIP code in Settings > Local area"}]
+  },
+  "slickdeals": {"fails": [{"error": "HTTP 503 from slickdeals"}]},
+  "reddit": {
+    "rtx 3080": [
+      [
+        {"source": "reddit", "source_id": "r1", "title": "[USA-UT] [H] RTX 3080 FE [W] PayPal", "match_text": "[usa-ut] [h] rtx 3080 fe ", "price": 400.0, "shipping": null, "currency": "USD", "url": "https://shop.example.test/r1", "image": null, "location": "USA-UT", "condition": "used", "buying": "r/hardwareswap", "text": ""}
+      ],
+      [
+        {"source": "reddit", "source_id": "r1", "title": "[USA-UT] [H] RTX 3080 FE [W] PayPal", "match_text": "[usa-ut] [h] rtx 3080 fe ", "price": 400.0, "shipping": null, "currency": "USD", "url": "https://shop.example.test/r1", "image": null, "location": "USA-UT", "condition": "used", "buying": "r/hardwareswap", "text": ""},
+        {"source": "reddit", "source_id": "r2", "title": "[US-CA] [H] Ryzen 5600X [W] RTX 3080", "match_text": "[us-ca] [h] ryzen 5600x ", "price": null, "shipping": null, "currency": "USD", "url": "https://shop.example.test/r2", "image": null, "location": "US-CA", "condition": "used", "buying": "r/hardwareswap", "text": ""}
+      ]
+    ]
+  },
+  "bestbuy": {
+    "rtx 3080": [
+      [
+        {"source": "bestbuy", "source_id": "6430620-excellent", "title": "RTX 3080 FE", "price": 499.99, "shipping": 0.0, "currency": "USD", "url": "https://shop.example.test/bb", "image": null, "location": "", "condition": "open box (excellent)", "buying": "best buy", "text": ""}
+      ],
+      [
+        {"source": "bestbuy", "source_id": "6430620-excellent", "title": "RTX 3080 FE", "price": 499.99, "shipping": 0.0, "currency": "USD", "url": "https://shop.example.test/bb", "image": null, "location": "", "condition": "open box (excellent)", "buying": "best buy", "text": ""}
+      ],
+      []
+    ]
+  },
+  "craigslist": {
+    "toyota pickup": [
+      [
+        {"source": "craigslist", "source_id": "7000000001", "title": "2016 Tacoma", "match_text": "2016 Tacoma pickup", "price": 21000.0, "shipping": 0.0, "currency": "USD", "url": "https://shop.example.test/cl1", "image": null, "location": "Ogden", "condition": "used", "buying": "Craigslist · owner", "text": "", "miles": 88000},
+        {"source": "craigslist", "source_id": "7000000002", "title": "2018 Tacoma", "match_text": "2018 Tacoma pickup", "price": 26000.0, "shipping": 0.0, "currency": "USD", "url": "https://shop.example.test/cl2", "image": null, "location": "", "condition": "used", "buying": "Craigslist · dealer", "text": "", "miles": null}
+      ]
+    ]
+  },
+  "ksl_cars": {
+    "toyota pickup": [
+      [
+        {"source": "ksl_cars", "source_id": "9001", "title": "2018 Toyota Tacoma TRD", "match_text": "2018 Toyota Tacoma TRD pickup", "price": 27500.0, "shipping": 0.0, "currency": "USD", "url": "https://shop.example.test/9001", "image": null, "location": "Made-up City, UT", "condition": "used", "buying": "KSL Cars · Made-up Motors", "text": "", "year": 2018, "make": "Toyota", "miles": 61000},
+        {"source": "ksl_cars", "source_id": "9002", "title": "2019 Ram 1500", "match_text": "2019 Ram 1500 pickup", "price": 30000.0, "shipping": 0.0, "currency": "USD", "url": "https://shop.example.test/9002", "image": null, "location": "", "condition": "used", "buying": "KSL Cars · private seller", "text": "", "year": 2019, "make": "", "miles": 150000}
+      ]
+    ]
+  },
+  "poshmark": {
+    "running shoes": [
+      [
+        {"source": "poshmark", "source_id": "pm1", "title": "Running shoes", "price": 35.0, "shipping": null, "currency": "USD", "url": "https://shop.example.test/pm1", "image": null, "location": "", "condition": "new with tags", "buying": "Poshmark", "text": "", "size": "10.5"},
+        {"source": "poshmark", "source_id": "pm2", "title": "Running shoes", "price": 25.0, "shipping": null, "currency": "USD", "url": "https://shop.example.test/pm2", "image": null, "location": "", "condition": "used", "buying": "Poshmark", "text": "", "size": "M"},
+        {"source": "poshmark", "source_id": "pm3", "title": "Running shoes no size", "price": 20.0, "shipping": null, "currency": "USD", "url": "https://shop.example.test/pm3", "image": null, "location": "", "condition": "used", "buying": "Poshmark", "text": "", "size": ""}
+      ]
+    ]
+  }
+}

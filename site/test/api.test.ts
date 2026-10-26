@@ -15,6 +15,7 @@ import { listenApiPort } from '../src/api-port.js';
 import { build } from '../src/app.js';
 import { copy, openOld, readOld } from '../src/legacy/copy.js';
 import { clearCpscCache, type CpscGet } from '../src/logic/product-recalls.js';
+import { NetError } from '../src/logic/sources.js';
 import { clearRecallCache, type Get, LookupFailed } from '../src/logic/vehicles.js';
 
 const ISSUER = 'https://auth.example.test/application/o/deals/';
@@ -73,7 +74,8 @@ async function start(extra: Parameters<typeof build>[1] = {}, database = 'core.d
   asked = [];
   clearRecallCache();
   clearCpscCache();
-  app = await build(config(), { logger: false, now: () => clock, downloadsDir: join(folder, 'downloads'), nhtsa, cpsc, ...extra });
+  app = await build(config(), { logger: false, now: () => clock, downloadsDir: join(folder, 'downloads'), nhtsa, cpsc,
+    net: async () => { throw new NetError('no network in tests'); }, clock: { now: () => clock, sleep: async (s) => { clock += s; } }, ...extra });
   const src = openOld(join(folder, database));
   try {
     await copy(app.cave.db, readOld(src, ISSUER));
@@ -114,7 +116,6 @@ function comparable(r: Req, body: unknown): unknown {
   const settings = (s: Record<string, unknown>) => { if (r.who === 'owner') for (const k of AI_SETTINGS) delete s[k]; };
   if (r.url === '/api/state') {
     delete b.ai;
-    delete b.poller;
     settings(b.settings as Record<string, unknown>);
   }
   if (r.url === '/api/settings' && r.method === 'PUT') settings(b);
@@ -396,5 +397,43 @@ describe('asking for AI on the device routes, before the AI arrives', () => {
       const plain = await call(owner, 'POST', url, body);
       expect([url, plain.statusCode]).toEqual([url, url.endsWith('/specs') ? 422 : 200]);
     }
+  });
+});
+
+describe('checking now, and the Discord test', () => {
+  it("runs a member's own watch now, never someone else's, and starts checks from Check now", async () => {
+    await start();
+    const owner = await devCookie('owner');
+    const member = await devCookie('member');
+    const mine = await call(owner, 'POST', '/api/watches/1/run', {});
+    expect(mine.statusCode).toBe(200);
+    expect(mine.json().errors).toEqual(expect.arrayContaining([expect.stringMatching(/^ebay: /)]));   // no network here: each source says why
+    expect((await call(member, 'POST', '/api/watches/1/run', {})).json()).toEqual({ new: 0, errors: ['watch not found'] });
+    const made = await call(owner, 'POST', '/api/watches', { name: 'Checked at once', query: 'lamp' });
+    expect(made.json()).toMatchObject({ id: expect.any(Number), new: 0 });
+    expect(made.json().errors.length).toBeGreaterThan(0);
+    expect((await call(owner, 'POST', '/api/poll', {})).json()).toEqual({ ok: true });
+    expect((await call(member, 'POST', '/api/poll', {})).json()).toEqual({ ok: true });
+    expect((await call(owner, 'GET', '/api/state')).json().poller).toMatchObject({ running: false, source_errors: expect.any(Object) });
+  });
+
+  it("says there's no webhook, or that Discord didn't take the message, beside a webhook that works", async () => {
+    await start();
+    const member = await devCookie('member');
+    await call(member, 'PUT', '/api/settings', { discord_webhook: '' });
+    const lee = recorded.ids.lee!;
+    await app.cave.db.execute(sql`DELETE FROM deals.user_settings WHERE member_id = ${lee} AND key = 'discord_webhook'`);
+    const none = await call(member, 'POST', '/api/test-discord', {});
+    expect([none.statusCode, none.json().message]).toEqual([400, 'No Discord webhook saved']);
+    expect((await call(member, 'PUT', '/api/settings', { discord_webhook: 'https://discord.com/api/webhooks/9/made-up' })).statusCode).toBe(200);
+    const refused = await call(member, 'POST', '/api/test-discord', {});   // no network in these tests: nothing reaches Discord
+    expect([refused.statusCode, refused.json().message]).toEqual([502, "Discord didn't accept the message; check the webhook address"]);
+    await app.close();
+    const posts: string[] = [];
+    await start({ net: async (req) => { posts.push(`${req.method} ${req.url} ${req.body}`); return { status: 204, body: Buffer.from('') }; } });
+    const again = await devCookie('member');
+    await call(again, 'PUT', '/api/settings', { discord_webhook: 'https://discord.com/api/webhooks/9/made-up' });
+    expect((await call(again, 'POST', '/api/test-discord', {})).json()).toEqual({ ok: true });
+    expect(posts).toEqual(['POST https://discord.com/api/webhooks/9/made-up {"content": "Deal Hunter test message: notifications work."}']);
   });
 });
