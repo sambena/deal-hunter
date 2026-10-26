@@ -9,7 +9,10 @@ API and tables.
 It is being moved here from the Python app at the top of this repository in steps: the plan is
 `../docs/work/457-deal-hunter-on-the-framework-and-cave-db.md`. So far: the app and its tables (`src/db/schema.ts`),
 which keep the Python app's rows column for column, the one-time copy of its data, and the rules that decide
-which listings match and how good a deal is (`src/logic/`: matching, hardware upgrades, pasted specs, VIN and recalls). Until the cutover, the Python
+which listings match and how good a deal is (`src/logic/`: matching, hardware upgrades, pasted specs, VIN and recalls).
+The API (`src/api.ts`): watches, finds, settings, People and the Android download, with the same answers as the
+Python app, on the web port and on the API port (`src/api-port.ts`, paired phones only). Devices, the AI, checking
+watches now, the Discord test and the Home Assistant import follow in their own PRs. Until the cutover, the Python
 app is what runs.
 
 ## Run it
@@ -37,6 +40,8 @@ Open http://127.0.0.1:8780 and sign in with the dev login (local only).
   `test/logic.test.ts` compares the rules with the Python app's own answers, recorded in `test/fixtures/logic-python.json`
   by `test/fixtures/make_logic.py` (run it from the repository root when the cases change); with Python on the path,
   a test also checks the recording is current.
+  `test/api.test.ts` replays requests through the Python app's own routes (`test/fixtures/make_api.py`, needs `python`)
+  and compares every answer, then checks each sign-in rule beside a working control.
 - **Checks before a PR:** `npm run typecheck && npm test && npm run build`.
 
 ## The one-time copy
