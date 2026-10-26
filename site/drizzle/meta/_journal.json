@@ -8,6 +8,13 @@
       "when": 1793051972108,
       "tag": "0000_deals",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793058142948,
+      "tag": "0001_last_check_order",
+      "breakpoints": true
     }
   ]
 }

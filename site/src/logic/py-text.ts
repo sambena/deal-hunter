@@ -215,6 +215,20 @@ function jsonString(s: string): string {
   return out + '"';
 }
 
+/** json.dumps(value, indent=n): one item per line, "," and ": " between them, nothing outside ASCII. */
+export function pyJsonIndent(value: unknown, indent: number, level = 0): string {
+  if (value === null || value === undefined || typeof value !== 'object') return pyJsonDumps(value);
+  const pad = ' '.repeat(indent * (level + 1));
+  const end = ' '.repeat(indent * level);
+  if (Array.isArray(value)) {
+    if (!value.length) return '[]';
+    return '[\n' + value.map((v) => pad + pyJsonIndent(v, indent, level + 1)).join(',\n') + '\n' + end + ']';
+  }
+  const entries = Object.entries(value as Record<string, unknown>);
+  if (!entries.length) return '{}';
+  return '{\n' + entries.map(([k, v]) => pad + jsonString(k) + ': ' + pyJsonIndent(v, indent, level + 1)).join(',\n') + '\n' + end + '}';
+}
+
 /** json.dumps(value, separators=...): Python's default ", " and ": " unless given. A number prints as JavaScript has
  * it, which matches Python for every value read from JSON except a whole float written with ".0". */
 export function pyJsonDumps(value: unknown, separators: [string, string] = [', ', ': ']): string {

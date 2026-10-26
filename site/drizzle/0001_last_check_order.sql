@@ -1,0 +1,1 @@
+ALTER TABLE "deals"."watches" ALTER COLUMN "last_check" SET DATA TYPE json;

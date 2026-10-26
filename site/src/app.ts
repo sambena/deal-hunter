@@ -16,7 +16,7 @@ declare module 'fastify' {
 export const NAME = 'Deal Hunter';
 export const SLUG = 'deals';
 
-export interface BuildOptions extends Partial<Omit<ApiOptions, 'poller' | 'net'>> {
+export interface BuildOptions extends Partial<Omit<ApiOptions, 'poller' | 'net' | 'aiSettingsFile'>> {
   logger?: false;
   /** The shops' network and the clock the checks wait on; tests pass fakes. */
   net?: Net;
@@ -30,7 +30,7 @@ export async function build(config: Config, options: BuildOptions = {}) {
   // The built page files: vite build writes them to dist/public. The same URL works from src/ (dev) and dist/.
   const app = await createApp({
     name: NAME, slug: SLUG, config, publicDir: new URL('../dist/public/', import.meta.url), now,
-    routes: (scope) => api(scope, { now, apiPort, downloadsDir, ...(resolve ? { resolve } : {}), ...(nhtsa ? { nhtsa } : {}), ...(cpsc ? { cpsc } : {}), net, poller: () => holder.poller! }),
+    routes: (scope) => api(scope, { now, apiPort, downloadsDir, ...(resolve ? { resolve } : {}), ...(nhtsa ? { nhtsa } : {}), ...(cpsc ? { cpsc } : {}), net, aiSettingsFile: config.AI_SETTINGS_FILE, sleep: (s) => clock.sleep(s), poller: () => holder.poller! }),
     ...(logger === false ? { logger } : {}),
   });
   app.addHook('onRequest', pinNeedsCode);

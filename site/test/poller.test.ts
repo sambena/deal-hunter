@@ -46,7 +46,7 @@ beforeAll(async () => {
   } finally {
     src.close();
   }
-});
+}, 60_000);   // a Python run: past the default 10 s on a busy machine
 afterAll(async () => {
   await database?.close();
   rmSync(folder, { recursive: true, force: true });

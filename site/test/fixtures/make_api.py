@@ -1,12 +1,13 @@
 """Records the Python app's answers to a list of API requests, for test/api.test.ts. Made-up people and listings only;
 nothing is fetched (a check that would search the shops is refused here).
 
-Usage, from the repository root: python make_api.py <new database file> <issuer> [core | devices | ha] [outside.json]
+Usage, from the repository root: python make_api.py <new database file> <issuer> [core | devices | ha | ai] [outside.json]
 It builds an old database with the real Python code (db.py, central.py), copies it to <file> before any request (the
 test copies that into the new app), then sends every request in REQUESTS through server.py's own routes, with its
 privileged check and its own-sign-in switch, at a fixed clock. "core" is watches, finds, settings and People;
 "devices" is My Stuff, with NHTSA's and CPSC's answers made up in outside.json; "ha" the Home Assistant import,
-with its answers made up there too. Prints JSON: {"requests": [...],
+with its answers made up there too; "ai" every AI button, with the AI providers' answers made up there and a
+stand-in for the anthropic SDK. Prints JSON: {"requests": [...],
 "answers": [...], "asked": [the outside addresses asked, in order]}."""
 import json
 import shutil
@@ -26,11 +27,14 @@ clock = [T0]
 _localtime = time.localtime
 time.time = lambda: clock[0]
 time.localtime = lambda secs=None: _localtime(clock[0] if secs is None else secs)
+_strftime = time.strftime
+time.strftime = lambda fmt, t=None: _strftime(fmt, _localtime(clock[0]) if t is None else t)   # ai.py's promo dates
 
 import ai  # noqa: E402 - after the clock is fixed
 import central  # noqa: E402
 import db  # noqa: E402
 import poller  # noqa: E402
+import netguard  # noqa: E402
 import product_recalls  # noqa: E402
 import server  # noqa: E402
 import vehicles  # noqa: E402
@@ -96,6 +100,91 @@ def home_assistant(request, timeout=None):
 
 if mode == "ha":
     urllib.request.urlopen = home_assistant
+
+# ---- the AI's stand-ins: answers from outside.json["ai"], one queue per provider ----
+import os  # noqa: E402
+import types  # noqa: E402
+
+queues = {k: list(v) for k, v in outside.get("ai", {}).items()}
+
+
+class _Obj:
+    def __init__(self, **kw):
+        self.__dict__.update(kw)
+
+
+def fake_anthropic():
+    mod = types.ModuleType("anthropic")
+
+    class APIError(Exception):
+        pass
+
+    class APIStatusError(APIError):
+        def __init__(self, message, status_code):
+            super().__init__(message)
+            self.message, self.status_code = message, status_code
+
+    class AuthenticationError(APIStatusError):
+        pass
+
+    class RateLimitError(APIStatusError):
+        pass
+
+    class APIConnectionError(APIError):
+        pass
+
+    class Messages:
+        def __init__(self, client):
+            self.client = client
+
+        def create(self, **kw):
+            asked.append({"provider": "claude", "api_key": self.client.api_key, "timeout": self.client.timeout, **kw})
+            a = queues["claude"].pop(0)
+            if a.get("error") == "rate":
+                raise RateLimitError("Error code: 429", 429)
+            if a.get("error") == "auth":
+                raise AuthenticationError("Error code: 401", 401)
+            if a.get("error") == "connection":
+                raise APIConnectionError("Connection error.")
+            if a.get("error") == "status":
+                raise APIStatusError(f"Error code: {a['status']} - {a['body']}", a["status"])
+            u = a["usage"]
+            return _Obj(usage=_Obj(**u), stop_reason=a["stop_reason"], content=[_Obj(type="text", text=a["text"])])
+
+    class Anthropic:
+        def __init__(self, api_key=None, timeout=None):
+            self.api_key, self.timeout = api_key, timeout
+            self.messages = Messages(self)
+
+    for name, value in dict(APIError=APIError, APIStatusError=APIStatusError, AuthenticationError=AuthenticationError,
+                            RateLimitError=RateLimitError, APIConnectionError=APIConnectionError, Anthropic=Anthropic).items():
+        setattr(mod, name, value)
+    return mod
+
+
+def ai_urlopen(request, timeout=None):
+    url = request.full_url
+    asked.append({"url": url, "body": json.loads(request.data), "headers": {k.lower(): v for k, v in request.header_items()}, "timeout": timeout})
+    host = urllib.parse.urlparse(url)
+    provider = "openai" if "openai" in host.netloc else "gemini" if "googleapis" in host.netloc else "ollama"
+    a = queues[provider].pop(0)
+    if "http" in a:
+        body = a.get("body", "")
+        raise urllib.error.HTTPError(url, a["http"], "made up", {}, io.BytesIO((json.dumps(body) if not isinstance(body, str) else body).encode()))
+    return Answer(json.dumps(a["json"]).encode())
+
+
+if mode == "ai":
+    import io  # noqa: E402
+    settings_file = path.with_suffix(".ai.json")
+    settings_file.write_text(json.dumps({"version": 1, "keys": {"anthropic": "made-up-anthropic-key", "openai": "", "gemini": ""},
+                                         "apps": {"deals": {"ai": True, "provider": "anthropic", "monthly_usd": 1.0, "tier": "balanced",
+                                                            "effort": "medium"}}}), encoding="utf-8")
+    os.environ["COUGAR_AI_SETTINGS"] = str(settings_file)
+    os.environ.pop("ANTHROPIC_API_KEY", None)
+    sys.modules["anthropic"] = fake_anthropic()
+    urllib.request.urlopen = ai_urlopen
+    netguard._no_redirect.open = ai_urlopen
 
 OWNER = "00000000-0000-4000-8000-000000000001"    # the framework's dev login people
 MEMBER = "00000000-0000-4000-8000-000000000002"
@@ -253,6 +342,57 @@ if mode == "core":
     req(O, "GET", "/api/nothing-here")
     req(O, "POST", "/api/auth/login", {"email": "x", "password": "y"})
     req(O, "GET", "/api/app/android")
+elif mode == "ai":
+    req(O, "POST", "/api/machines", {"name": "Den TV", "kind": "tv", "make": "LG", "model": "OLED65C1"})
+    req(O, "GET", "/api/state")
+    req(O, "GET", "/api/ai/choices")
+    req(O, "POST", "/api/ai/estimate", {"action": "judge", "listing_id": 1})
+    req(O, "POST", "/api/ai/estimate", {"action": "judge"})
+    req(O, "POST", "/api/ai/estimate", {"action": "nope"})
+    req(O, "POST", "/api/listings/1/ask-ai", {})
+    req(O, "POST", "/api/ai/estimate", {"action": "draft", "description": "  "})
+    req(O, "POST", "/api/ai/draft-watches", {"description": "a quiet NAS under $400"})
+    req(O, "POST", "/api/machines/1/suggest", {"use_ai": True})
+    req(O, "POST", "/api/machines/1/specs", {"text": "a receipt: i5-7500, 8GB, GTX 1060", "use_ai": True})
+    req(O, "POST", "/api/radar", {"use_ai": True})
+    req(O, "POST", "/api/ai/estimate", {"action": "review", "listing_ids": [1, 2, 3]})
+    req(O, "POST", "/api/ai/review", {"listing_ids": [1, 2, 3, 4, 999], "hide": True, "instructions": "no mining cards"})
+    req(O, "POST", "/api/ai/review", {"listing_ids": [999]})
+    req(O, "POST", "/api/ai/tune-watch", {"watch_id": 1, "watch": {"name": "RTX", "query": "rtx 3080", "exclude": ["mining"], "max_price": 500,
+                                                                     "sources": ["ebay", "ksl"], "kind": "item"}, "instructions": "cheaper"})
+    req(O, "POST", "/api/ai/tune-watch", {"watch": {"query": " "}})
+    for _ in range(7):
+        req(O, "POST", "/api/listings/1/ask-ai", {})
+    req(O, "POST", "/api/ai/estimate", {"action": "judge", "listing_id": 1, "provider": "openai", "model": "gpt-6-luna"})
+    req(O, "GET", "/api/ai/usage")
+    req(O, "PUT", f"/api/admin/users/{lee}", {"ai_allowance": 0.001, "ai_daily_cap": 2})
+    req(M, "GET", "/api/ai/choices")
+    req(M, "POST", "/api/ai/estimate", {"action": "judge", "listing_id": 24})
+    req(O, "PUT", f"/api/admin/users/{lee}", {"ai_allowance": 0.5})
+    req(M, "POST", "/api/listings/24/ask-ai", {})
+    req(M, "POST", "/api/listings/25/ask-ai", {})
+    req(M, "POST", "/api/listings/23/ask-ai", {})
+    req(M, "GET", "/api/ai/usage")
+    req(O, "PUT", f"/api/admin/users/{lee}", {"ai_shared": False})
+    req(M, "POST", "/api/ai/estimate", {"action": "judge", "listing_id": 25})
+    req(M, "PUT", "/api/settings", {"ai_source": "own", "ai_provider": "openai", "openai_api_key": "made-up-openai-key", "openai_model": "gpt-6-luna"})
+    req(M, "GET", "/api/ai/choices")
+    for _ in range(3):
+        req(M, "POST", "/api/ai/draft-watches", {"description": "a used GPU"})
+    req(M, "PUT", "/api/settings", {"ai_provider": "gemini", "gemini_api_key": "made-up-gemini-key", "gemini_model": "gemini-3.5-flash-lite", "gemini_free_tier": True})
+    for _ in range(3):
+        req(M, "POST", "/api/ai/draft-watches", {"description": "a used GPU"})
+    req(M, "PUT", "/api/settings", {"ai_provider": "ollama", "ollama_url": "http://8.8.8.8:11434", "ollama_model": "qwen3.5:4b"})
+    req(M, "GET", "/api/ai/choices")
+    for _ in range(2):
+        req(M, "POST", "/api/ai/draft-watches", {"description": "a used GPU"})
+    req(M, "PUT", "/api/settings", {"ai_provider": "ollama", "ollama_url": "http://8.8.8.8:11434/?x"})
+    req(M, "POST", "/api/ai/draft-watches", {"description": "a used GPU"})
+    req(M, "PUT", "/api/settings", {"ai_provider": "claude", "claude_model": "claude-unknown"})
+    req(M, "POST", "/api/ai/estimate", {"action": "draft", "description": "x"})
+    req(M, "GET", "/api/ai/usage")
+    req(M, "GET", "/api/state")
+    req(O, "GET", "/api/state")
 elif mode == "ha":
     req(O, "GET", "/api/import/ha")
     req(O, "PUT", "/api/settings", {"ha_url": "http://10.0.0.5:8123/", "ha_token": "made-up-token"})
@@ -361,6 +501,8 @@ def call(r):
         return {"status": e.status, "message": str(e)}
     except (ValueError, TypeError):
         return {"status": 400, "message": "bad request: a value sent was the wrong type or format"}
+    except ai.AIError as e:
+        return {"status": 400, "message": str(e)}
     finally:
         server._request.reset(token)
         db._current_user.reset(utoken)

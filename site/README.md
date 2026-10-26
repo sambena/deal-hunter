@@ -16,8 +16,9 @@ and on the API port (`src/api-port.ts`, paired phones only). The sources (`src/l
 pickup, KSL, KSL Cars, Craigslist, OfferUp, Poshmark, Reddit, r/buildapcsales, Slickdeals, Best Buy), with the Python
 app's rate gaps, caches and retries. The checks (`src/poller.ts`): every watch against its sources on the schedule
 (every poll_minutes, or at set times in a time zone), shared requests, deal %, keep-the-cheapest, Discord alerts and
-the Best Buy purge; "Check now" and the Discord test. The Home Assistant import (`src/logic/homeassistant.ts`). The AI follows in its own
-PR. Until the cutover, the Python
+the Best Buy purge; "Check now" and the Discord test. The Home Assistant import (`src/logic/homeassistant.ts`). The AI (`src/ai.ts`,
+prompts in `src/logic/ai-prompts.ts`): Claude, OpenAI, Gemini and Ollama, priced and capped before each request, with
+the admin's AI from the owner console's settings file (`AI_SETTINGS_FILE`). Until the cutover, the Python
 app is what runs.
 
 ## Run it

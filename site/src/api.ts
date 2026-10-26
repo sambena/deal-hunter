@@ -7,13 +7,14 @@
 // - Privileged routes (People, the shared settings) need both factors, and for a change a sign-in from the last
 //   five minutes.
 // - Errors are the framework's {error, message}; the message is the Python app's own text.
-// - Not here yet: the AI routes, the AI parts of state and settings, and the "with AI" choice of
-//   the device routes (suggest, specs, radar), with the AI. Until the AI lands, asking for AI answers 501 not_yet.
+// - The AI (ai.ts) runs only when someone presses an AI button, through one gate that prices each request first.
 import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { bothFactors, people, Refusal, type Session } from '@cougarcave/server';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { sql } from 'drizzle-orm';
+import { AIError, type AiSettings, Ai, PROVIDERS, REVIEW_MAX } from './ai.js';
+import * as prompts from './logic/ai-prompts.js';
 import * as hardware from './logic/hardware.js';
 import { candidates, HAError, splitMakeModel } from './logic/homeassistant.js';
 import * as matching from './logic/matching.js';
@@ -57,8 +58,12 @@ export interface ApiOptions {
   /** NHTSA's and CPSC's answers (VINs and recalls). Tests pass made-up ones. */
   nhtsa?: Get;
   cpsc?: CpscGet;
-  /** The network for Home Assistant (the checks have their own). */
+  /** The network for Home Assistant and the AI providers (the checks have their own). */
   net: Net;
+  /** The owner console's shared AI settings file (AI_SETTINGS_FILE). */
+  aiSettingsFile: string;
+  /** Waits between retries of a busy AI provider; tests pass a fake clock's. */
+  sleep?: (seconds: number) => Promise<void>;
   /** The checks (poller.ts); made after the app, so given as a getter. */
   poller: () => Poller;
 }
@@ -95,6 +100,13 @@ export async function pinNeedsCode(req: FastifyRequest): Promise<void> {
 
 export async function api(app: FastifyInstance, options: ApiOptions): Promise<void> {
   const store = new Store(app.cave.db, options.now);
+  /** A member's name from Cougar Cave, for "Pat's AI". */
+  const nameOf = async (memberId: number) => {
+    const [row] = await store.query(sql`SELECT p.name FROM deals.members u LEFT JOIN core.people p ON p.id = u.subject WHERE u.id = ${memberId}`);
+    return (row?.name as string | null) ?? '';
+  };
+  const ai = new Ai({ db: app.cave.db, store, net: options.net, now: options.now, settingsFile: options.aiSettingsFile, nameOf,
+    ...(options.resolve ? { resolve: options.resolve } : {}), ...(options.sleep ? { sleep: options.sleep } : {}), log: (line) => app.log.info(line) });
   const resolve = options.resolve ?? resolveHost;
   app.decorateRequest('member', null);
 
@@ -146,14 +158,30 @@ export async function api(app: FastifyInstance, options: ApiOptions): Promise<vo
       role: member.admin ? 'admin' : 'member' };
   }
 
+  /** Settings for the page. For the admin, the AI fields show what the owner console set (a key as true or false,
+   * never the key itself), with "ai_managed" saying so. */
+  async function publicSettings(m: Member): Promise<Record<string, unknown>> {
+    const s = await store.publicSettings(m.id, m.admin);
+    if (!m.admin) return s;
+    const managed = ai.managed();
+    const on = managed.off === undefined;
+    for (const [name, p] of Object.entries(PROVIDERS)) if (p.key) s[p.key] = on && managed.provider === name;
+    Object.assign(s, { ai_provider: on ? managed.provider : 'off', ai_monthly_limit: on ? managed.monthly_usd : 0.0, gemini_free_tier: false,
+      ai_managed: { on, provider: on ? managed.provider : null, model: on ? managed.model : null, monthly_usd: on ? managed.monthly_usd : null,
+        reason: managed.off ?? '' } });
+    if (on) s[PROVIDERS[managed.provider]!.model] = managed.model;
+    return s;
+  }
+
   // ---- state, watches, finds ----------------------------------------------------------------------------------
 
   route('GET', '/api/state', async (req, _b, _p, m) => ({
     watches: await store.listWatches(m.id),
     machines: await store.listMachines(m.id),
-    settings: await store.publicSettings(m.id, m.admin),
+    settings: await publicSettings(m),
     me: await publicUser(m, req.session),
     api_port: options.apiPort,
+    ai: { ...ai.catalog(), budget: await ai.budget(await ai.settingsFor(m.id)), owner: await nameOf((await store.adminId()) ?? 0) },
     poller: options.poller().state,
     now: options.now(),
   }));
@@ -322,7 +350,7 @@ export async function api(app: FastifyInstance, options: ApiOptions): Promise<vo
       throw e;
     }
     await store.updateSettings(changes, m.id, m.admin);   // members can only change their own settings
-    return store.publicSettings(m.id, m.admin);
+    return publicSettings(m);
   });
 
   route('GET', '/api/me', async (req, _b, _p, m) => publicUser(m, req.session));
@@ -387,11 +415,252 @@ export async function api(app: FastifyInstance, options: ApiOptions): Promise<vo
     return { ok: true };
   });
 
+  // ---- AI -------------------------------------------------------------------------------------------------------
+
+  /** The person's AI settings, switched to the AI they picked for this request (if they did). */
+  const aiSettings = async (m: Member, body: Record<string, unknown>) => {
+    try {
+      return ai.withChoice(await ai.settingsFor(m.id), body.provider, body.model);
+    } catch (e) {
+      if (e instanceof AIError) throw fail(400, e.message);
+      throw e;
+    }
+  };
+
+  // What each site is, for the AI improving a watch (only the ones that watch's kind can use).
+  const SOURCE_HINTS: Record<string, string> = {
+    ebay: 'eBay, nationwide, shipped', ebay_local: 'eBay listings you can pick up near your ZIP',
+    ksl: 'KSL Classifieds, Utah, local pickup', ksl_cars: 'KSL Cars, Utah used cars and trucks',
+    craigslist: 'Craigslist near your ZIP', offerup: 'OfferUp near your ZIP',
+    poshmark: 'Poshmark, clothes and shoes', reddit: 'Reddit hardware swap subreddits',
+    slickdeals: 'Slickdeals retail sales', buildapcsales: 'r/buildapcsales retail PC part sales',
+    bestbuy: 'Best Buy open-box',
+  };
+  const VEHICLE_SOURCES = ['ebay', 'ebay_local', 'craigslist', 'offerup', 'ksl_cars'];
+  const CLOTHING_SOURCES = ['ebay', 'ebay_local', 'poshmark', 'craigslist', 'offerup', 'ksl', 'slickdeals'];
+
+  async function tuneSources(watch: Record<string, unknown>, m: Member): Promise<Record<string, string>> {
+    const allowed = watch.kind === 'vehicle' ? VEHICLE_SOURCES : watch.kind === 'clothing' ? CLOTHING_SOURCES
+      : Object.keys(SOURCE_HINTS).filter((k) => k !== 'ksl_cars' && k !== 'poshmark');
+    const on = (await store.getSettings(m.id)).sources_enabled as Record<string, unknown>;
+    return Object.fromEntries(Object.entries(SOURCE_HINTS).filter(([k]) => allowed.includes(k) && truthy(on[k])));
+  }
+
+  /** The last check, per site: {source, raw, kept, new, dropped: {reason: count}} or {source, error}. */
+  const diagnosis = (watch: Record<string, unknown>): Record<string, unknown>[] =>
+    Object.entries((truthy(watch.last_check) ? watch.last_check : {}) as Record<string, Record<string, unknown>>).map(([source, d]) => ({ source, ...d }));
+
+  /** Python's str(float) for a REAL column: whole numbers keep ".0". */
+  const floatText = (n: number) => (Number.isInteger(n) && Math.abs(n) < 1e16 ? n.toFixed(1) : String(n));
+
+  /** How an existing watch's searches went: finds per site, errors, and some titles. */
+  async function tuneContext(watchId: unknown, m: Member): Promise<string> {
+    let w: Record<string, unknown> | null = null;
+    try {
+      w = truthy(watchId) ? await store.getWatch(pyInt(watchId), m.id) : null;
+    } catch (e) {
+      if (!(e instanceof BadValue)) throw e;
+    }
+    if (!w) return '';
+    const lines = ['Last check, per site (what the site returned, what the watch kept, and why the rest were dropped):'];
+    const sites = diagnosis(w).map((d) => `- ${d.source}: ` + (truthy(d.error) ? `error: ${pyStr(d.error)}`
+      : `${pyStr(d.raw)} returned, ${pyStr(d.kept)} kept` + (truthy(d.dropped)
+        ? ' (dropped: ' + Object.entries(d.dropped as Record<string, number>).map(([why, n]) => `${n} ${why}`).join(', ') + ')' : '')));
+    lines.push(...(sites.length ? sites : ['- (no check recorded yet)']));
+    const counts = await store.query(sql`SELECT source, COUNT(*)::int AS n, SUM(CASE WHEN status = 'dismissed' THEN 1 ELSE 0 END)::int AS dismissed
+      FROM deals.listings WHERE watch_id = ${w.id} GROUP BY source ORDER BY source COLLATE "C"`);
+    if (counts.length) lines.push('Stored so far: ' + counts.map((c) => `${pyStr(c.source)} ${pyStr(c.n)} (${pyStr(c.dismissed || 0)} dismissed as not wanted)`).join(', '));
+    if (truthy(w.last_error)) lines.push(`- errors: ${[...String(w.last_error)].slice(0, 400).join('')}`);
+    for (const [label, dismissed] of [['Some finds', false], ['Finds they dismissed', true]] as const) {
+      const rows = await store.query(sql`SELECT title, total FROM deals.listings WHERE watch_id = ${w.id}
+        AND ${dismissed ? sql`status = 'dismissed'` : sql`status != 'dismissed'`} ORDER BY first_seen DESC, id LIMIT 10`);
+      if (rows.length) lines.push(`${label}: ` + rows.map((r) => `${pyStr(r.title)} ($${truthy(r.total) ? floatText(r.total as number) : '?'})`).join('; '));
+    }
+    return lines.join('\n') || '- searched, nothing found on any site';
+  }
+
+  /** The prompt for an AI button, plus what's needed to use its answer. */
+  async function aiPrompt(action: unknown, body: Record<string, unknown>, m: Member, ref: string | null = null): Promise<[string, object, Record<string, unknown>]> {
+    if (action === 'judge') {
+      const [row] = await store.query(sql`SELECT l.* FROM deals.listings l JOIN deals.watches w ON w.id = l.watch_id
+        WHERE l.id = ${pyInt(ref ?? body.listing_id)} AND w.member_id = ${m.id}`);
+      if (!row) throw fail(404, 'listing not found');
+      const watch = (await store.getWatch(row.watch_id as number, m.id))!;
+      const machine = truthy(watch.machine_id) ? await store.getMachine(pyInt(watch.machine_id), m.id) : null;
+      return [...prompts.judgePrompt(row, watch, machine), { listing: row }];
+    }
+    if (action === 'upgrades') {
+      const machine = await store.getMachine(pyInt(ref ?? body.machine_id), m.id);
+      if (!machine) throw fail(404, 'machine not found');
+      return [...prompts.upgradesPrompt(machine), { machine }];
+    }
+    if (action === 'specs') {
+      if (!pyStrip(pyStr('text' in body ? body.text : ''))) throw fail(400, 'Paste some text about the computer first');
+      const machine = await store.getMachine(pyInt(ref ?? body.machine_id), m.id);
+      if (!machine) throw fail(404, 'machine not found');
+      return [...prompts.specsPrompt(machine, pyStr(body.text)), { machine }];
+    }
+    if (action === 'draft') {
+      if (!pyStrip(pyStr('description' in body ? body.description : ''))) throw fail(400, "Describe what you're looking for");
+      return [...prompts.draftPrompt(pyStr(body.description), await store.listMachines(m.id)), {}];
+    }
+    if (action === 'tune') {
+      const watch = (truthy(body.watch) ? body.watch : {}) as Record<string, unknown>;
+      if (!pyStrip(truthy(watch.query) ? pyStr(watch.query) : '')) throw fail(400, 'Type a search first');
+      return [...prompts.tunePrompt(watch, await tuneContext(body.watch_id, m), await tuneSources(watch, m),
+        [...(truthy(body.instructions) ? pyStr(body.instructions) : '')].slice(0, 1000).join('')), { watch }];
+    }
+    if (action === 'review') {
+      const ids = ((truthy(body.listing_ids) ? body.listing_ids : []) as unknown[]).map(pyInt).slice(0, REVIEW_MAX);
+      if (!ids.length) throw fail(400, 'No finds to review');
+      const rows = await store.query(sql`SELECT l.* FROM deals.listings l JOIN deals.watches w ON w.id = l.watch_id WHERE w.member_id = ${m.id}
+        AND l.id IN (${sql.join(ids.map((i) => sql`${i}`), sql`, `)}) AND l.status IN ('new', 'seen', 'starred') ORDER BY l.id`);
+      if (!rows.length) throw fail(400, 'No finds to review');
+      const watches = new Map((await store.listWatches(m.id)).map((w) => [w.id, w]));
+      return [...prompts.reviewPrompt(rows, watches, [...(truthy(body.instructions) ? pyStr(body.instructions) : '')].slice(0, 1500).join('')), { rows }];
+    }
+    if (action === 'radar') {
+      const gear = await radarGear(m);
+      if (!gear.length) throw fail(400, 'No devices with a make and model for AI to look at');
+      return [...prompts.radarPrompt(gear), { gear }];
+    }
+    throw fail(400, 'unknown AI action');
+  }
+
+  const RADAR_SKIP = new Set(['smart home', 'vehicle']);
+  const radarGear = async (m: Member) => (await store.listMachines(m.id)).filter((g) =>
+    !PARTS_KINDS.has((g.kind as string) || 'pc') && !RADAR_SKIP.has((g.kind as string) || 'pc') && truthy(g.model));
+
+  /** An AIError is the person's to read: 400 with its words, as the Python app answered. */
+  const aiRun = async (settings: AiSettings, action: string, prompt: string, schema: object) => {
+    try {
+      return await ai.run(settings, action, prompt, schema);
+    } catch (e) {
+      if (e instanceof AIError) throw fail(400, e.message);
+      throw e;
+    }
+  };
+
+  route('POST', '/api/ai/estimate', async (_req, body, _p, m) => {
+    const [prompt, schema] = await aiPrompt(body.action, body, m);
+    const settings = await aiSettings(m, body);
+    try {
+      return await ai.estimate(settings, body.action as string, prompt, schema);
+    } catch (e) {
+      if (e instanceof AIError) throw fail(400, e.message);
+      throw e;
+    }
+  });
+
+  route('POST', '/api/ai/tune-watch', async (_req, body, _p, m) => {
+    // A suggested better version of a watch (from the form, before or after saving). Nothing is saved: the form shows
+    // it and the person saves if they like it.
+    const settings = await aiSettings(m, body);
+    const [prompt, schema, extra] = await aiPrompt('tune', body, m);
+    const s = await aiRun(settings, 'tune', prompt, schema);
+    const watch = extra.watch as Record<string, unknown>;
+    const usable = await tuneSources(watch, m);
+    const picked = ((truthy(s.sources) ? s.sources : []) as unknown[]).filter((x) => Object.hasOwn(usable, x as string));
+    const sources = picked.length ? picked : [...((truthy(watch.sources) ? watch.sources : []) as unknown[])];
+    const num = (v: unknown, int = false) => {
+      const n = v === true ? 1 : typeof v === 'number' ? v : null;
+      return n !== null && n > 0 ? (int ? Math.trunc(n) : n) : null;
+    };
+    const current = /^\p{Nd}+$/u.test(truthy(body.watch_id) ? pyStr(body.watch_id) : '') ? await store.getWatch(pyInt(body.watch_id), m.id) : null;
+    const text = (v: unknown, n: number) => [...pyStrip(pyStr(v))].slice(0, n).join('');
+    return {
+      diagnosis: current ? diagnosis(current) : [],
+      query: text(truthy(s.query) ? s.query : '', 200) || watch.query,
+      exclude: ((truthy(s.exclude) ? s.exclude : []) as unknown[]).filter((x) => pyStrip(pyStr(x))).map((x) => text(x, 40)).slice(0, 30),
+      min_price: num(s.min_price), max_price: num(s.max_price), year_min: num(s.year_min, true), year_max: num(s.year_max, true),
+      max_miles: num(s.max_miles, true), size: truthy(s.size) ? (text(s.size, 20) || null) : null,
+      sources, reason: [...pyStr(truthy(s.reason) ? s.reason : '')].slice(0, 500).join(''),
+    };
+  });
+
+  route('GET', '/api/ai/choices', async (_req, _b, _p, m) => ({ choices: ai.choices(await ai.settingsFor(m.id)), max_review: REVIEW_MAX }));
+
+  route('POST', '/api/ai/review', async (_req, body, _p, m) => {
+    // Judge the finds shown: a verdict and reason on each; with hide, the obvious bad deals are dismissed (they can be
+    // restored from Dismissed). Starred finds are never hidden.
+    const settings = await aiSettings(m, body);
+    const [prompt, schema, extra] = await aiPrompt('review', body, m);
+    const rows = new Map((extra.rows as Record<string, unknown>[]).map((r) => [r.id, r]));
+    const answer = await aiRun(settings, 'review', prompt, schema);
+    const reviews = (truthy(answer.reviews) ? answer.reviews : []) as Record<string, unknown>[];
+    const counts: Record<string, number> = { good: 0, ok: 0, skip: 0 };
+    const hidden: unknown[] = [];
+    for (const r of reviews) {
+      const lid = r.id, verdict = r.verdict as string;
+      if (!rows.has(lid) || !Object.hasOwn(counts, verdict)) continue;   // an id the AI made up, or a second answer for one already done
+      counts[verdict]!++;
+      const note = `${verdict.toUpperCase()}: ${[...pyStrip(pyStr(truthy(r.reason) ? r.reason : ''))].slice(0, 300).join('')}`;
+      if (verdict === 'skip' && truthy(body.hide) && rows.get(lid)!.status !== 'starred') {
+        await app.cave.db.execute(sql`UPDATE deals.listings SET ai_note = ${note}, status = 'dismissed' WHERE id = ${lid as number}`);
+        hidden.push(lid);
+      } else {
+        await app.cave.db.execute(sql`UPDATE deals.listings SET ai_note = ${note} WHERE id = ${lid as number}`);
+      }
+      rows.delete(lid);
+    }
+    return { reviewed: counts.good! + counts.ok! + counts.skip!, ...counts, hidden: hidden.length, hidden_ids: hidden, unanswered: rows.size,
+      watch_changes: await reviewChanges((truthy(answer.watch_changes) ? answer.watch_changes : []) as Record<string, unknown>[], m) };
+  });
+
+  /** The AI's suggested watch tweaks, kept only for the person's own watches and only where they tighten something:
+   * new exclude words, a lower max price, a higher min price/year, a lower mileage cap. */
+  async function reviewChanges(raw: Record<string, unknown>[], m: Member): Promise<Record<string, unknown>[]> {
+    const out: Record<string, unknown>[] = [];
+    for (const c of raw) {
+      const wid = c.watch_id === true ? 1 : c.watch_id === false ? 0 : c.watch_id;
+      const w = typeof wid === 'number' && Number.isInteger(wid) ? await store.getWatch(wid, m.id) : null;
+      if (!w) continue;
+      const change: Record<string, unknown> = {};
+      const have = new Set((w.exclude as string[]).map((x) => x.toLowerCase()));
+      const words = ((truthy(c.add_excludes) ? c.add_excludes : []) as unknown[]).filter((x) => pyStrip(pyStr(x))).map((x) => [...pyStrip(pyStr(x))].slice(0, 40).join(''));
+      const fresh: string[] = [];
+      for (const x of words) {   // first spelling wins; skip words the watch already excludes
+        if (!have.has(x.toLowerCase())) {
+          have.add(x.toLowerCase());
+          fresh.push(x);
+        }
+      }
+      if (fresh.length) change.exclude = [...(w.exclude as string[]), ...fresh.slice(0, 8)];
+      const tighter: [string, (n: number, o: number | null) => boolean][] = [['max_price', (n, o) => o === null || n < o],
+        ['min_price', (n, o) => o === null || n > o], ['year_min', (n, o) => o === null || n > o], ['max_miles', (n, o) => o === null || n < o]];
+      for (const [key, isTighter] of tighter) {
+        const raw2 = c[key];
+        const n = raw2 === true ? 1 : typeof raw2 === 'number' ? raw2 : null;
+        if (n !== null && n > 0 && isTighter(n, (w[key] as number | null) ?? null)) {
+          if ((key === 'year_min' || key === 'max_miles') && w.kind !== 'vehicle') continue;
+          change[key] = key === 'year_min' || key === 'max_miles' ? Math.trunc(n) : pyRound(n, 2);
+        }
+      }
+      if (Object.keys(change).length) out.push({ watch_id: w.id, watch_name: w.name, changes: change, reason: [...pyStr(truthy(c.reason) ? c.reason : '')].slice(0, 300).join('') });
+    }
+    return out;
+  }
+
+  route('GET', '/api/ai/usage', async (_req, _b, _p, m) => ai.usageSummary(await ai.settingsFor(m.id)));
+
+  route('POST', `/api/listings/${ID}/ask-ai`, async (req, body, _p, m) => {
+    const lid = (req.params as { id: string }).id;
+    const [prompt, schema] = await aiPrompt('judge', body, m, lid);
+    const result = await aiRun(await ai.settingsFor(m.id), 'judge', prompt, schema);
+    const note = `${pyStr(result.verdict).toUpperCase()}: ${pyStr(result.note)}`;
+    await app.cave.db.execute(sql`UPDATE deals.listings SET ai_note = ${note} WHERE id = ${pyInt(lid)}`);
+    return { ai_note: note };
+  });
+
+  route('POST', '/api/ai/draft-watches', async (_req, body, _p, m) => {
+    const [prompt, schema] = await aiPrompt('draft', body, m);
+    return { suggestions: (await aiRun(await ai.settingsFor(m.id), 'draft', prompt, schema)).suggestions };
+  });
+
   // ---- My Stuff: devices ----------------------------------------------------------------------------------------
 
   const nhtsa = options.nhtsa ?? nhtsaGet;
   const cpsc = options.cpsc ?? cpscGet;
-  const notYet = () => fail(501, 'AI arrives in its own update; this works without "use AI" for now.', 'not_yet');
   const ownMachine = async (req: FastifyRequest, m: Member, message: string) => {
     const machine = await store.getMachine(id(req), m.id);
     if (!machine) throw fail(404, message);
@@ -448,7 +717,10 @@ export async function api(app: FastifyInstance, options: ApiOptions): Promise<vo
     const rules = PARTS_KINDS.has((machine.kind as string) || 'pc')
       ? hardware.suggest(machine as unknown as Parameters<typeof hardware.suggest>[0])
       : { platform: null, suggestions: [], explanation: 'the built-in rules only know PC parts; use AI or Watch this model' };
-    if (truthy(body.use_ai)) throw notYet();
+    if (truthy(body.use_ai)) {
+      const [prompt, schema] = await aiPrompt('upgrades', body, m, (req.params as { id: string }).id);
+      return { platform: rules.platform, explanation: 'suggested by AI', suggestions: (await aiRun(await ai.settingsFor(m.id), 'upgrades', prompt, schema)).suggestions };
+    }
     return rules;
   });
 
@@ -465,7 +737,9 @@ export async function api(app: FastifyInstance, options: ApiOptions): Promise<vo
       parts = specs.parseReport(text);
       method = 'report';
     } else if (truthy(body.use_ai)) {
-      throw notYet();
+      const [prompt, schema] = await aiPrompt('specs', body, m, (req.params as { id: string }).id);
+      parts = (await aiRun(await ai.settingsFor(m.id), 'specs', prompt, schema)).parts as hardware.Part[];
+      method = 'ai';
     } else {
       throw fail(422, 'need_ai');
     }
@@ -498,8 +772,16 @@ export async function api(app: FastifyInstance, options: ApiOptions): Promise<vo
       for (const s of picks) items.push({ ...s, machine_id: machine.id, machine_name: machine.name, from: 'rules' });
     }
     const gear = machines.filter((g) => !PARTS_KINDS.has((g.kind as string) || 'pc') && !RADAR_SKIP_KINDS.has((g.kind as string) || 'pc') && truthy(g.model));
-    if (gear.length && truthy(body.use_ai)) throw notYet();
-    if (gear.length) skipped.push(...gear.map((g) => ({ machine_id: g.id, name: g.name, why: 'needs AI (turn it on in Settings)' })));
+    if (gear.length && truthy(body.use_ai)) {
+      const [prompt, schema] = await aiPrompt('radar', body, m);
+      const names = new Map(gear.map((g) => [g.id, g.name]));
+      for (const s of (await aiRun(await ai.settingsFor(m.id), 'radar', prompt, schema)).suggestions as Record<string, unknown>[]) {
+        if (names.has(s.device_id) && pyStrip(truthy(s.query) ? pyStr(s.query) : '')) {
+          const { device_id: _device, ...rest } = s;
+          items.push({ ...rest, machine_id: s.device_id, machine_name: names.get(s.device_id), from: 'ai' });
+        }
+      }
+    } else if (gear.length) skipped.push(...gear.map((g) => ({ machine_id: g.id, name: g.name, why: 'needs AI (turn it on in Settings)' })));
     for (const it of items) it.already = watched.has(pyStrip(String(it.query)).toLowerCase());
     return { items, skipped, gear_count: gear.length };
   });

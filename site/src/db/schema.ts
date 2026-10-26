@@ -10,7 +10,7 @@
 // After changing this file: npm run db:generate (writes a migration to drizzle/), then delete its CREATE SCHEMA line
 // (in cave-db the schema exists and the app may not make one; a test checks), then commit it. The app runs any new
 // migrations when it starts.
-import { boolean, doublePrecision, index, integer, jsonb, pgSchema, primaryKey, text, unique, uuid } from 'drizzle-orm/pg-core';
+import { boolean, doublePrecision, index, integer, json, jsonb, pgSchema, primaryKey, text, unique, uuid } from 'drizzle-orm/pg-core';
 
 export const SCHEMA = 'deals';
 export const appSchema = pgSchema(SCHEMA);
@@ -71,8 +71,9 @@ export const watches = appSchema.table('watches', {
   keepCheapest: integer('keep_cheapest'),
   /** "#rrggbb" the person picked; null takes one from the palette by id. */
   color: text('color'),
-  /** What each site returned on the last check, and why listings dropped; null before the first. */
-  lastCheck: jsonb('last_check'),
+  /** What each site returned on the last check, and why listings dropped; null before the first. json, not jsonb:
+   * the sites stay in the order they were checked, as the page and the AI's prompt show them. */
+  lastCheck: json('last_check'),
   /** item | vehicle (year range, miles) | clothing (size, department). */
   kind: text('kind').notNull().default('item'),
   /** tech | cars | home | clothes as picked; null is automatic. */
