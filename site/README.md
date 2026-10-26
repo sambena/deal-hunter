@@ -8,7 +8,8 @@ API and tables.
 
 It is being moved here from the Python app at the top of this repository in steps: the plan is
 `../docs/work/457-deal-hunter-on-the-framework-and-cave-db.md`. So far: the app and its tables (`src/db/schema.ts`),
-which keep the Python app's rows column for column. Until the cutover, the Python app is what runs.
+which keep the Python app's rows column for column, and the one-time copy of its data. Until the cutover, the Python
+app is what runs.
 
 ## Run it
 
@@ -31,7 +32,29 @@ Open http://127.0.0.1:8780 and sign in with the dev login (local only).
   the new file's `CREATE SCHEMA` line (in cave-db the schema exists; a test checks), and commit the file in `drizzle/`;
   the app applies it when it starts. Locally (no `DATABASE_URL`) the data is in `data/pg`.
 - **Tests:** `npm test` (Vitest). Add one beside every route and component. They run on an in-memory database.
+  The copy's tests build an old database with the real Python code, so they need `python` on the path.
 - **Checks before a PR:** `npm run typecheck && npm test && npm run build`.
+
+## The one-time copy
+
+At the cutover, the Python app's database (`data/deal-hunter.db`, stopped and backed up first) comes over once, inside
+the container:
+
+```bash
+node dist/legacy-cli.js copy  --db <old deal-hunter.db> [--leave-out 5,6]
+node dist/legacy-cli.js check --db <old deal-hunter.db> [--leave-out 5,6] --self-check
+```
+
+- The old file is only read. Everything is written in one transaction, so a refusal or a failure writes nothing.
+- People come over by their active central link for this site's issuer (`OIDC_ISSUER`, or `--issuer`). Any account
+  without one stops the copy, listed by id: link it in the old app first, or name it in `--leave-out` (none of its
+  rows are copied).
+- Tables that already hold rows are refused; `--replace` empties them first.
+- The check compares every table's row count, a checksum over every column, and the next id. `--self-check` plants
+  a changed value, a missing row and an extra row in a transaction that is rolled back, and fails unless the checker
+  reports each one. Exit codes: 0 matching, 1 a difference, 2 refused or failed.
+- Sessions, phone pairings and the old app's own sign-in are not copied (the framework replaces them); their counts
+  are printed. The old file, kept with the backup, still holds them and the central audit.
 
 ## Ship it
 
