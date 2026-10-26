@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en" class="wa-dark" data-cave-original="cougar">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title>Deal Hunter</title>
+  <link vite-ignore rel="icon" href="/cave/icons/tag.svg">
+  <!-- The Cougar Cave look, in this order: theme first (no flash), then Web Awesome, the kit's styles, the app's.
+       vite-ignore: these are served by the server from @cougarcave/ui, so the build leaves them as they are. -->
+  <script vite-ignore src="/cave/cave-theme.js"></script>
+  <link vite-ignore rel="stylesheet" href="/cave/webawesome/styles/webawesome.css">
+  <link vite-ignore rel="stylesheet" href="/cave/cave-theme.css">
+  <link rel="stylesheet" href="/app.css">
+  <link vite-ignore rel="modulepreload" href="/cave/cave-ui.js">
+  <script vite-ignore type="module" src="/cave/webawesome/webawesome.loader.js" data-webawesome="/cave/webawesome"></script>
+  <script vite-ignore type="module" src="/cave/cave-icons.js"></script>
+  <script type="module" src="./main.ts"></script>
+</head>
+<body>
+  <cave-bar app="deals" name="Deal Hunter" icon="tag" home="/"
+            session="/auth/me" signin="/auth/login" signout="/auth/signout" devices="/auth/devices">
+    <!-- No flash: the bar's static markup, shown until the kit draws it, at the same size. -->
+    <a class="cave-home" href="https://cougarcave.dev"><img src="/cave/icons/cougar.svg" alt="" width="24" height="24"><span>Cougar Cave</span></a>
+    <wa-divider orientation="vertical"></wa-divider>
+    <a class="cave-app" href="/"><wa-icon src="/cave/icons/tag.svg"></wa-icon><span>Deal Hunter</span></a>
+    <wa-dropdown></wa-dropdown>
+  </cave-bar>
+
+  <main class="app-main">
+    <!-- Shown when nobody is signed in. -->
+    <cave-signin id="signin" app="Deal Hunter" icon="tag" lede="Used gear, cars and clothes, watched for you." hidden></cave-signin>
+
+    <!-- Shown when someone is signed in. Finds, watches, My Stuff and settings move here in their own PR (#457). -->
+    <section id="home" class="app-page" hidden>
+      <header class="app-page-header">
+        <h1>Deal Hunter</h1>
+        <p>Used gear, cars and clothes, watched for you.</p>
+      </header>
+    </section>
+  </main>
+
+  <cave-settings label="Settings">
+    <section data-section="general" data-label="General" data-icon="settings">
+      <h3>General</h3>
+      <p>Deal Hunter's own settings go here, one section per group.</p>
+    </section>
+  </cave-settings>
+</body>
+</html>
