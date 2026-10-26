@@ -10,9 +10,10 @@ It is being moved here from the Python app at the top of this repository in step
 `../docs/work/457-deal-hunter-on-the-framework-and-cave-db.md`. So far: the app and its tables (`src/db/schema.ts`),
 which keep the Python app's rows column for column, the one-time copy of its data, and the rules that decide
 which listings match and how good a deal is (`src/logic/`: matching, hardware upgrades, pasted specs, VIN and recalls).
-The API (`src/api.ts`): watches, finds, settings, People and the Android download, with the same answers as the
-Python app, on the web port and on the API port (`src/api-port.ts`, paired phones only). Devices, the AI, checking
-watches now, the Discord test and the Home Assistant import follow in their own PRs. Until the cutover, the Python
+The API (`src/api.ts`): watches, finds, settings, People, My Stuff (devices, VINs, recalls from NHTSA and CPSC, upgrade
+rules, pasted specs, the deal radar) and the Android download, with the same answers as the Python app, on the web port
+and on the API port (`src/api-port.ts`, paired phones only). The AI, checking watches now, the Discord test and the Home
+Assistant import follow in their own PRs. Until the cutover, the Python
 app is what runs.
 
 ## Run it

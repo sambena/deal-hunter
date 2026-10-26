@@ -1,0 +1,32 @@
+{
+  "_": "Made-up answers from NHTSA (by URL) and CPSC (by the brand searched), for make_api.py and api.test.ts. Nothing here came from the real services.",
+  "nhtsa": {
+    "https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/1ABCD23EFGH456789?format=json": {
+      "Results": [{"Make": "TOYOTA", "Model": "Tacoma", "ModelYear": "2018", "Trim": "TRD Off-Road", "BodyClass": "Pickup",
+                   "DriveType": "4WD", "DisplacementL": "3.5", "EngineCylinders": "6", "FuelTypePrimary": "Gasoline",
+                   "ErrorCode": "0", "ErrorText": "0 - clean"}]
+    },
+    "https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/1ABCD23EFGH000000?format=json": {"Results": [{"Make": ""}]},
+    "https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/1ABCD23EFGH999999?format=json": {"http": 500},
+    "https://api.nhtsa.gov/recalls/recallsByVehicle?make=Toyota&model=Tacoma+TRD&modelYear=2018": {"http": 400},
+    "https://api.nhtsa.gov/recalls/recallsByVehicle?make=Toyota&model=Tacoma&modelYear=2018": {
+      "results": [{"NHTSACampaignNumber": "18V000000", "ReportReceivedDate": "01/02/2018", "Component": "AIR BAGS",
+                   "Summary": "Made-up summary.", "Consequence": "Made-up consequence.", "Remedy": "Made-up remedy.", "parkIt": false},
+                  {"NHTSACampaignNumber": "19V000001", "parkIt": "true"}]
+    }
+  },
+  "cpsc": {
+    "Samsung": [
+      {"RecallNumber": "20-001", "RecallDate": "2020-05-01T00:00:00", "Title": "Made-up Brand Recalls Refrigerators",
+       "Description": "A range of models.", "URL": "https://cpsc.example.test/20-001",
+       "Products": [{"Name": "Refrigerators", "Model": "RF28R7351SG/AA", "Description": ""}],
+       "Hazards": [{"Name": "Fire hazard."}], "Remedies": [{"Name": "Stop using and unplug."}]},
+      {"RecallNumber": "22-002", "RecallDate": "2022-01-15T00:00:00", "Title": "Made-up Brand Recalls Ranges",
+       "Products": [{"Name": "Electric ranges", "Model": "NE59"}], "Hazards": [], "Remedies": [{"Name": "Repair."}]},
+      {"RecallNumber": "23-003", "RecallDate": "2023-03-03T00:00:00", "Title": "Made-up Brand Recalls Fridge Water Filters",
+       "Products": [{"Name": "Fridge filters", "Model": "DA29"}], "Remedies": [{"Name": "Refund."}]},
+      {"RecallNumber": "19-004", "RecallDate": "2019-01-01T00:00:00", "Title": "Made-up Brand Recalls Phones", "Products": []}
+    ],
+    "LG": {"http": 503}
+  }
+}

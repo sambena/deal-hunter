@@ -3,7 +3,7 @@
 // each refusal beside a working control, on the web port and the API port. Made-up data only; needs python.
 import { spawnSync } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { request as httpRequest, type Server } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -14,6 +14,8 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { listenApiPort } from '../src/api-port.js';
 import { build } from '../src/app.js';
 import { copy, openOld, readOld } from '../src/legacy/copy.js';
+import { clearCpscCache, type CpscGet } from '../src/logic/product-recalls.js';
+import { clearRecallCache, type Get, LookupFailed } from '../src/logic/vehicles.js';
 
 const ISSUER = 'https://auth.example.test/application/o/deals/';
 const REPO = fileURLToPath(new URL('../../', import.meta.url));
@@ -25,26 +27,54 @@ const config = () => loadConfig({ APP_ORIGIN: 'http://127.0.0.1:8780', DEV_LOGIN
 interface Req { who: 'owner' | 'member'; method: 'GET' | 'POST' | 'PUT' | 'DELETE'; url: string; body?: unknown; at: number }
 interface Answer { status: number; body?: unknown; message?: string }
 let folder: string;
-let recorded: { requests: Req[]; answers: Answer[]; ids: Record<string, number> };
+type Recording = { requests: Req[]; answers: Answer[]; asked: string[]; ids: Record<string, number> };
+let recorded: Recording;
+let devices: Recording;
+const OUTSIDE = JSON.parse(readFileSync(join(SITE, 'test/fixtures/outside.json'), 'utf8')) as
+  { nhtsa: Record<string, Record<string, unknown>>; cpsc: Record<string, unknown> };
+let asked: string[] = [];
+
+/** NHTSA and CPSC as outside.json makes them up, noting each address asked, as make_api.py's stand-ins do. */
+const nhtsa: Get = async (url) => {
+  asked.push(url);
+  const found = OUTSIDE.nhtsa[url] ?? {};
+  if ('http' in found) throw new LookupFailed(`NHTSA answered HTTP ${found.http}`);
+  return structuredClone(found);
+};
+const cpsc: CpscGet = async (url) => {
+  asked.push(url);
+  const found = OUTSIDE.cpsc[new URL(url).searchParams.get('RecallTitle')!] ?? [];
+  if (!Array.isArray(found) && 'http' in (found as object)) throw new LookupFailed(`CPSC answered HTTP ${(found as { http: number }).http}`);
+  return structuredClone(found);
+};
 let app: Awaited<ReturnType<typeof build>>;
 let clock = T0;
 
+function record(mode: 'core' | 'devices'): Recording {
+  const run = spawnSync('python', [join(SITE, 'test/fixtures/make_api.py'), join(folder, `${mode}.db`), ISSUER, mode,
+    join(SITE, 'test/fixtures/outside.json')],
+  { cwd: REPO, env: { ...process.env, PYTHONPATH: REPO, PYTHONIOENCODING: 'utf-8', COUGAR_AI_SETTINGS: join(folder, 'none.json') },
+    encoding: 'utf8', maxBuffer: 1 << 26 });
+  if (run.status !== 0) throw new Error(`make_api.py failed: ${run.stderr || run.error}`);
+  return JSON.parse(run.stdout) as Recording;
+}
+
 beforeAll(() => {
   folder = mkdtempSync(join(tmpdir(), 'dh-api-'));
-  const run = spawnSync('python', [join(SITE, 'test/fixtures/make_api.py'), join(folder, 'deal-hunter.db'), ISSUER],
-    { cwd: REPO, env: { ...process.env, PYTHONPATH: REPO, PYTHONIOENCODING: 'utf-8', COUGAR_AI_SETTINGS: join(folder, 'none.json') },
-      encoding: 'utf8', maxBuffer: 1 << 26 });
-  if (run.status !== 0) throw new Error(`make_api.py failed: ${run.stderr || run.error}`);
-  recorded = JSON.parse(run.stdout);
+  recorded = record('core');
+  devices = record('devices');
 });
 afterAll(() => rmSync(folder, { recursive: true, force: true }));
 afterEach(async () => app?.close());
 
 /** The app, with the old database copied in. */
-async function start(extra: Parameters<typeof build>[1] = {}) {
+async function start(extra: Parameters<typeof build>[1] = {}, database = 'core.db') {
   clock = T0;
-  app = await build(config(), { logger: false, now: () => clock, downloadsDir: join(folder, 'downloads'), ...extra });
-  const src = openOld(join(folder, 'deal-hunter.db'));
+  asked = [];
+  clearRecallCache();
+  clearCpscCache();
+  app = await build(config(), { logger: false, now: () => clock, downloadsDir: join(folder, 'downloads'), nhtsa, cpsc, ...extra });
+  const src = openOld(join(folder, database));
   try {
     await copy(app.cave.db, readOld(src, ISSUER));
   } finally {
@@ -95,15 +125,29 @@ function comparable(r: Req, body: unknown): unknown {
 }
 
 describe('the same answers as the Python app', () => {
-  it('for every recorded request, in order', async () => {
+  it('for watches, finds, settings and People, in order', async () => {
     await start();
+    expect(await replay(recorded)).toEqual([]);
+  });
+
+  it('for My Stuff, VINs and recalls, asking NHTSA and CPSC the same things', async () => {
+    await start({}, 'devices.db');
+    expect(await replay(devices)).toEqual([]);
+    expect(asked).toEqual(devices.asked);
+    expect(asked.length).toBeGreaterThan(5);
+  });
+});
+
+/** Sends the recorded requests in order, each at its recorded time; the ones whose answer differs from Python's. */
+async function replay(rec: Recording): Promise<unknown[]> {
+  {
     const differ: unknown[] = [];
-    recorded.requests.forEach((r, i) => expect(r.at, `request ${i}`).toBe(T0 + i * 60));
-    for (const [i, r] of recorded.requests.entries()) {
+    rec.requests.forEach((r, i) => expect(r.at, `request ${i}`).toBe(T0 + i * 60));
+    for (const [i, r] of rec.requests.entries()) {
       clock = r.at;
       // Signed in just now, as the Python recording's sessions were, so privileged changes count as fresh.
       const res = await call(await devCookie(r.who), r.method, r.url, r.body);
-      const python = recorded.answers[i]!;
+      const python = rec.answers[i]!;
       const port: Answer = res.statusCode === 200 ? { status: 200, body: res.json() } : { status: res.statusCode, message: res.json().message };
       const same = python.status === 200
         ? port.status === 200 && JSON.stringify(sorted(comparable(r, port.body))) === JSON.stringify(sorted(comparable(r, python.body)))
@@ -111,9 +155,9 @@ describe('the same answers as the Python app', () => {
       if (!same) differ.push({ i, request: `${r.who} ${r.method} ${r.url}`, python, port });
     }
     if (process.env.DH_API_DEBUG) writeFileSync(process.env.DH_API_DEBUG, JSON.stringify(differ, null, 1));
-    expect(differ).toEqual([]);
-  });
-});
+    return differ;
+  }
+}
 
 /** Keys sorted, so two JSON values compare by content; numbers as JSON writes them. */
 function sorted(v: unknown): unknown {
@@ -339,3 +383,18 @@ describe('the Android download', () => {
   });
 });
 
+
+describe('asking for AI on the device routes, before the AI arrives', () => {
+  it('answers 501 not_yet, beside the same request without AI', async () => {
+    await start({}, 'devices.db');
+    const owner = await devCookie('owner');
+    const pc = (await call(owner, 'POST', '/api/machines', { name: 'PC', parts: [{ category: 'cpu', model: 'i7-4790K' }] })).json().id as number;
+    await call(owner, 'POST', '/api/machines', { name: 'TV', kind: 'tv', make: 'LG', model: 'OLED65C1' });   // radar asks AI only about gear like this
+    for (const [url, body] of [[`/api/machines/${pc}/suggest`, {}], ['/api/radar', {}], [`/api/machines/${pc}/specs`, { text: 'any words at all' }]] as const) {
+      const ai = await call(owner, 'POST', url, { ...body, use_ai: true });
+      expect([url, ai.statusCode, ai.json().error]).toEqual([url, 501, 'not_yet']);
+      const plain = await call(owner, 'POST', url, body);
+      expect([url, plain.statusCode]).toEqual([url, url.endsWith('/specs') ? 422 : 200]);
+    }
+  });
+});
