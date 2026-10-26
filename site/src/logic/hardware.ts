@@ -1,0 +1,266 @@
+// Built-in upgrade rules: work out a machine's platform from its parts and suggest drop-in CPU and RAM upgrades. Used
+// when AI is off. A port of the Python app's hardware.py, rule for rule (test/logic.test.ts checks it against Python).
+//
+// It knows Intel desktop platforms from Sandy Bridge (2011) on and AMD from AM4. Anything it can't place (laptops,
+// mini PCs, GPUs) is left to AI mode or manual watches.
+import { asciiDigits, pyRe, pySplit } from './py.js';
+
+export const RAM_EXCLUDES = ['ecc', 'rdimm', 'lrdimm', 'registered', 'server', 'sodimm', 'so dimm', 'laptop'];
+
+/** [display name, query, note, chipsets?]: chipsets, when given, is a pattern the motherboard must match for that CPU
+ * to work (not checked when the board isn't known). */
+type Cpu = [string, string, string, string?];
+export interface Platform { label: string; ram: string; channels: number; kits?: string[]; cpus: Cpu[]; cpu_exclude: string[] }
+
+// Best upgrade first.
+export const PLATFORMS: Record<string, Platform> = {
+  LGA1155: {
+    label: 'Intel 6/7-series (LGA1155)',
+    ram: 'DDR3', channels: 2, kits: ['4x8gb|32gb'],   // 32GB is the most these boards take
+    cpus: [
+      ['i7-3770K', '3770k', '6-series boards (Z68/P67/H67/H61) need a BIOS update for 3rd gen'],
+      ['i7-3770', '3770 -3770k -3770s -3770t', '6-series boards (Z68/P67/H67/H61) need a BIOS update for 3rd gen'],
+      ['i7-2600K', '2600k', ''],
+    ],
+    cpu_exclude: ['xeon'],
+  },
+  LGA1150: {
+    label: 'Intel 8/9-series (LGA1150)',
+    ram: 'DDR3', channels: 2, kits: ['4x8gb|32gb'],   // 32GB is the most these boards take
+    cpus: [
+      ['i7-4790K', '4790k', "Made for 9-series (Z97/H97); only some Z87/H87 boards got a BIOS for it, so check your board's CPU support list"],
+      ['i7-5775C', '5775c', 'Broadwell: Z97/H97 only, with a BIOS update', '\\b[zh]97\\b'],
+      ['i7-4790', '4790 -4790k -4790s -4790t', 'Z87/H87/B85 need a BIOS update for the 4790'],
+      ['i7-4770K', '4770k', ''],
+    ],
+    cpu_exclude: ['xeon'],
+  },
+  LGA2066: {
+    label: 'Intel X299 (LGA2066)',
+    ram: 'DDR4', channels: 4,
+    cpus: [
+      ['i9-10980XE', '10980xe', 'Needs a BIOS with Cascade Lake-X support'],
+      ['i9-10940X', '10940x', 'Needs a BIOS with Cascade Lake-X support'],
+      ['i9-9980XE', '9980xe', 'Needs a BIOS with 9th-gen X support'],
+      ['i9-10920X', '10920x', 'Needs a BIOS with Cascade Lake-X support'],
+      ['i9-9960X', '9960x', 'Needs a BIOS with 9th-gen X support'],
+      ['i9-10900X', '10900x', 'Needs a BIOS with Cascade Lake-X support'],
+      ['i9-7980XE', '7980xe', ''],
+      ['i9-7960X', '7960x', ''],
+      ['i9-9940X', '9940x', 'Needs a BIOS with 9th-gen X support'],
+      ['i9-7940X', '7940x', ''],
+      ['i9-7920X', '7920x', ''],
+      ['i9-7900X', '7900x', ''],
+    ],
+    cpu_exclude: ['xeon', 'es', 'qs'],
+  },
+  'LGA2011-3': {
+    label: 'Intel X99 (LGA2011-3)',
+    ram: 'DDR4', channels: 4,
+    cpus: [
+      ['i7-6950X', '6950x', 'Needs a BIOS with Broadwell-E support'],
+      ['i7-6900K', '6900k', 'Needs a BIOS with Broadwell-E support'],
+      ['i7-5960X', '5960x', ''],
+      ['i7-6850K', '6850k', 'Needs a BIOS with Broadwell-E support'],
+    ],
+    cpu_exclude: ['es', 'qs'],
+  },
+  LGA1151: {
+    label: 'Intel 100/200-series (LGA1151)',
+    ram: 'DDR4', channels: 2,
+    cpus: [
+      ['i7-7700K', '7700k', '100-series boards need a BIOS update for 7th gen'],
+      ['i7-6700K', '6700k', ''],
+      ['i7-7700', '7700 -7700k -7700hq', '100-series boards need a BIOS update for 7th gen'],
+    ],
+    cpu_exclude: [],
+  },
+  LGA1151v2: {
+    label: 'Intel 300-series (LGA1151 v2)',
+    ram: 'DDR4', channels: 2,
+    cpus: [
+      ['i9-9900KS', '9900ks', 'Z370/B360/H370 need a BIOS update for 9th gen'],
+      ['i9-9900K', '9900k -9900ks', 'Z370/B360/H370 need a BIOS update for 9th gen'],
+      ['i9-9900', '9900 -9900k -9900ks -9900kf -9900x', 'Z370/B360/H370 need a BIOS update for 9th gen'],
+      ['i7-9700K', '9700k', 'Z370/B360/H370 need a BIOS update for 9th gen'],
+      ['i7-8700K', '8700k', ''],
+    ],
+    cpu_exclude: [],
+  },
+  LGA1200: {
+    label: 'Intel 400/500-series (LGA1200)',
+    ram: 'DDR4', channels: 2,
+    cpus: [
+      ['i9-11900K', '11900k', '11th gen only works on Z490/H470 (with BIOS) and 500-series, not B460/H410'],
+      ['i9-10900K', '10900k', ''],
+      ['i9-10850K', '10850k', ''],
+      ['i7-11700K', '11700k', '11th gen only works on Z490/H470 (with BIOS) and 500-series, not B460/H410'],
+      ['i7-10700K', '10700k', ''],
+    ],
+    cpu_exclude: [],
+  },
+  LGA1700: {
+    label: 'Intel 600/700-series (LGA1700)',
+    ram: 'DDR4 or DDR5 (check your board)', channels: 2,
+    cpus: [
+      ['i9-14900K', '14900k', '600-series boards need a BIOS update. Check 13th/14th-gen i7/i9 microcode (stability issue)'],
+      ['i7-14700K', '14700k', '600-series boards need a BIOS update. Check 13th/14th-gen i7/i9 microcode (stability issue)'],
+      ['i9-13900K', '13900k', '600-series boards need a BIOS update. Check 13th/14th-gen i7/i9 microcode (stability issue)'],
+      ['i7-13700K', '13700k', '600-series boards need a BIOS update. Check 13th/14th-gen i7/i9 microcode (stability issue)'],
+      ['i5-14600K', '14600k', '600-series boards need a BIOS update'],
+      ['i5-13600K', '13600k', '600-series boards need a BIOS update'],
+    ],
+    cpu_exclude: [],
+  },
+  LGA1851: {
+    label: 'Intel 800-series (LGA1851)',
+    ram: 'DDR5', channels: 2,
+    cpus: [
+      ['Core Ultra 9 285K', '285k', ''],
+      ['Core Ultra 7 265K', '265k', ''],
+      ['Core Ultra 5 245K', '245k', ''],
+    ],
+    cpu_exclude: ['laptop'],
+  },
+  AM4: {
+    label: 'AMD AM4',
+    ram: 'DDR4', channels: 2,
+    cpus: [
+      ['Ryzen 7 5800X3D', '5800x3d', '300/400-series boards need a BIOS with Ryzen 5000 support'],
+      ['Ryzen 9 5950X', '5950x', '300/400-series boards need a BIOS with Ryzen 5000 support'],
+      ['Ryzen 9 5900X', '5900x', '300/400-series boards need a BIOS with Ryzen 5000 support'],
+      ['Ryzen 7 5700X3D', '5700x3d', '300/400-series boards need a BIOS with Ryzen 5000 support'],
+      ['Ryzen 7 5700X', '5700x -5700x3d', '300/400-series boards need a BIOS with Ryzen 5000 support'],
+    ],
+    cpu_exclude: [],
+  },
+  AM5: {
+    label: 'AMD AM5',
+    ram: 'DDR5', channels: 2,
+    cpus: [
+      ['Ryzen 9 9950X3D', '9950x3d', 'Needs a BIOS with Ryzen 9000 support'],
+      ['Ryzen 7 9800X3D', '9800x3d', 'Needs a BIOS with Ryzen 9000 support'],
+      ['Ryzen 9 9950X', '9950x -9950x3d', 'Needs a BIOS with Ryzen 9000 support'],
+      ['Ryzen 7 7800X3D', '7800x3d', ''],
+      ['Ryzen 9 7950X3D', '7950x3d', ''],
+      ['Ryzen 9 9900X', '9900x -9900x3d', 'Needs a BIOS with Ryzen 9000 support'],
+    ],
+    cpu_exclude: [],
+  },
+};
+
+const CHIPSETS: [RegExp, string][] = ([
+  // Older boards glue the chipset to their name ("P8P67", "B85M-D3H"): no letter before, no digit after.
+  ['(?<![a-z])(?:z(?:77|75|68)|p67|[hbq](?:77|75|67|65|61))(?!\\d)', 'LGA1155'],
+  ['(?<![a-z])(?:[zhq](?:87|97)|b85|h81|q85)(?!\\d)', 'LGA1150'],
+  ['\\bx299\\b', 'LGA2066'],
+  ['\\bx99\\b', 'LGA2011-3'],
+  ['\\b[zbh](?:170|270|250|150|110)\\b|\\bq[12]70\\b', 'LGA1151'],
+  ['\\b[zbh](?:370|390|360|365|310|370)\\b|\\bq370\\b', 'LGA1151v2'],
+  ['\\b[zbhw](?:490|590|460|560|470|570|410|510|480)\\b', 'LGA1200'],
+  ['\\b[zbh](?:690|790|660|760|670|770|610)\\b', 'LGA1700'],
+  ['\\b[zbh](?:890|860|810)\\b', 'LGA1851'],
+  ['\\b[abx](?:320|350|370|450|470|520|550|570)\\b', 'AM4'],
+  ['\\b[abx](?:620|650|670|850|870)e?\\b', 'AM5'],
+] as [string, string][]).map(([p, key]) => [pyRe(p), key]);
+
+const CPU_NOISE = pyRe('\\((?:r|tm)\\)|\\bcpu\\b|@.*$|\\bprocessor\\b', 'g');
+const digit = (d: string) => Number(asciiDigits(d));
+
+export function cpuSocket(model: string): string | null {
+  // Raw names ("Intel(R) Core(TM) i7-7800X CPU @ 3.50GHz") would glue "cpu" onto the suffix and hide the X.
+  const t = model.toLowerCase().replace(CPU_NOISE, '').replace(/ /g, '').replace(/-/g, '');
+  let m = pyRe('i[3579](\\d{4,5})([a-z]*)').exec(t);
+  if (m) {
+    const num = [...m[1]!];   // Python counts and indexes code points
+    const suffix = m[2]!;
+    const hedt = suffix === 'x' || suffix === 'xe';
+    if (num.length === 5) {
+      const gen = digit(num.slice(0, 2).join(''));
+      if (gen === 10) return hedt ? 'LGA2066' : 'LGA1200';
+      if (gen === 11) return 'LGA1200';
+      if (gen === 12 || gen === 13 || gen === 14) return 'LGA1700';
+      return null;
+    }
+    const gen = digit(num[0]!);
+    const second89 = num[1] === '8' || num[1] === '9';
+    if ((gen === 5 || gen === 6) && (suffix === 'k' || suffix === 'x') && second89) return 'LGA2011-3';
+    if ((gen === 2 || gen === 3 || gen === 4) && second89) return null;   // LGA2011 HEDT (3930K, 4960X...): not covered
+    if (gen === 2 || gen === 3) return 'LGA1155';
+    if (gen === 4 || (gen === 5 && suffix === 'c')) return 'LGA1150';
+    if ((gen === 7 || gen === 9) && hedt) return 'LGA2066';
+    if (gen === 6 || gen === 7) return 'LGA1151';
+    if (gen === 8 || gen === 9) return 'LGA1151v2';
+    return null;
+  }
+  if (pyRe('ultra[579](2\\d{2})[a-z]*').exec(t)) return 'LGA1851';
+  m = pyRe('(?:ryzen[3579]?|r[3579])(\\d)(\\d{3})([a-z0-9]*)').exec(t);
+  if (m) {
+    const series = digit(m[1]!);
+    if (series >= 1 && series <= 5) return 'AM4';
+    if (series >= 7 && series <= 9) return 'AM5';
+  }
+  return null;
+}
+
+export interface Part { category?: string; model?: string }
+
+/** [platform key, how it was worked out]. */
+export function detectPlatform(parts: Part[]): [string | null, string] {
+  for (const p of parts) {
+    if (p.category === 'motherboard') {
+      const text = (p.model ?? '').toLowerCase();
+      for (const [pattern, key] of CHIPSETS) if (pattern.test(text)) return [key, `from motherboard '${p.model}'`];
+    }
+  }
+  for (const p of parts) {
+    if (p.category === 'cpu') {
+      const key = cpuSocket(p.model ?? '');
+      if (key) return [key, `from CPU '${p.model}'`];
+    }
+  }
+  return [null, "couldn't recognise the motherboard chipset or CPU"];
+}
+
+/** Where the machine's current CPU is in the upgrade list (the list's length when it isn't there). */
+function cpuRank(platform: Platform, parts: Part[]): number {
+  const current = parts.filter((p) => p.category === 'cpu').map((p) => p.model ?? '').join(' ').toLowerCase()
+    .replace(/-/g, '').replace(/ /g, '');
+  const i = platform.cpus.findIndex((cpu) => current.includes(pySplit(cpu[1])[0]!));
+  return i < 0 ? platform.cpus.length : i;
+}
+
+export interface Suggestion { name: string; category: string; query: string; exclude: string[]; max_price: null; reason: string }
+
+export function suggest(machine: { name: string; parts?: Part[] }): { platform: string | null; explanation: string; suggestions: Suggestion[] } {
+  const parts = machine.parts ?? [];
+  const [key, how] = detectPlatform(parts);
+  if (!key) return { platform: null, explanation: how, suggestions: [] };
+  const plat = PLATFORMS[key]!;
+  const board = parts.filter((p) => p.category === 'motherboard').map((p) => p.model ?? '').join(' ').toLowerCase();
+  const suggestions: Suggestion[] = [];
+  for (const cpu of plat.cpus.slice(0, cpuRank(plat, parts))) {
+    const [name, query, note, chipsets] = cpu;
+    if (chipsets !== undefined && board && !pyRe(chipsets).test(board)) continue;   // this board's chipset can't run it
+    suggestions.push({ name: `${name} for ${machine.name}`, category: 'cpu', query, exclude: [...plat.cpu_exclude],
+      max_price: null, reason: note || `Drop-in for ${plat.label}` });
+  }
+  const ram = plat.ram;
+  if (ram === 'DDR3' || ram === 'DDR4' || ram === 'DDR5') {
+    const kits = plat.kits ?? (plat.channels === 4 ? ['4x32gb|128gb', '4x16gb|64gb'] : ['2x32gb|64gb', '2x16gb|32gb']);
+    for (const kit of kits) {
+      suggestions.push({
+        name: `${ram} ${kit.split('|')[0]!.toUpperCase()} kit for ${machine.name}`,
+        category: 'ram',
+        query: `${ram.toLowerCase()} ${kit}`,
+        exclude: [...RAM_EXCLUDES],
+        max_price: null,
+        reason: `${plat.channels}-channel ${ram} desktop DIMMs. Check your board's max capacity and QVL.`,
+      });
+    }
+  } else {
+    suggestions.push({ name: `RAM for ${machine.name}`, category: 'ram', query: '', exclude: [...RAM_EXCLUDES], max_price: null,
+      reason: `This platform can be ${ram}; add the RAM watch yourself once you know which.` });
+  }
+  return { platform: plat.label, explanation: how, suggestions };
+}
