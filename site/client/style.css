@@ -1,0 +1,179 @@
+/* Token bridge: every colour comes from the shared Cougar Cave theme (cave/cave-theme.css, Web Awesome tokens), so
+   Deal Hunter follows whichever theme the viewer picks (cave/cave-theme.js). Deal Hunter's accent is teal (class
+   cave-accent-teal on <html>); a focus (Tech, Cars, …) may override --accent for its own content. Only the shop tags
+   and the watch colours (app.js) keep their own. The bar, sign-in card, account menu and settings drawer are the
+   kit's (cave/cave-ui.js) and have no styles here. */
+:root {
+  --bg: var(--wa-color-surface-lowered); --panel: var(--wa-color-surface-default); --panel2: var(--wa-color-surface-raised);
+  --line: var(--wa-color-surface-border); --text: var(--wa-color-text-normal); --muted: var(--wa-color-text-quiet);
+  --accent: var(--wa-color-brand); --on-accent: var(--wa-color-brand-on);
+  --good: var(--wa-color-success-60); --great: var(--wa-color-success-70); --on-great: var(--wa-color-success-05);
+  --warn: var(--wa-color-warning-70); --bad: var(--wa-color-danger-60); --on-bad: var(--wa-color-danger-on);
+  --photo: var(--wa-color-neutral-95); --shade: var(--wa-color-shadow);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 var(--wa-font-family-body); }
+[hidden] { display: none !important; }
+/* Until Web Awesome has loaded, its menus and dialogs would show as plain text; keep them out of sight. */
+wa-dropdown:not(:defined), wa-dialog:not(:defined), wa-toast:not(:defined) { display: none; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code { background: var(--panel2); padding: 1px 5px; border-radius: 4px; }
+
+/* The bar and the section links stay at the top while the page scrolls (Web Awesome's wa-page did this; it isn't
+   used because it writes a <style> element, which the page policy blocks). */
+.dh-top { position: sticky; top: 0; z-index: 10; background: var(--panel); }
+.dh-top .dh-nav { border-bottom: 1px solid var(--line); }
+/* Section links under the Cougar Cave bar: the active one in the app's accent, underlined. */
+.dh-nav { max-width: 1300px; margin: 0 auto; padding: var(--wa-space-2xs) 20px; row-gap: var(--wa-space-2xs); }
+.dh-nav a { color: var(--muted); padding: 8px 2px; border-bottom: 2px solid transparent; text-decoration: none; }
+.dh-nav a:hover { color: var(--text); text-decoration: none; }
+.dh-nav a.active { color: var(--accent); border-bottom-color: var(--accent); }
+.dh-nav select { max-width: 13em; }
+.status { color: var(--muted); font-size: 12px; }
+.badge { background: var(--accent); color: var(--on-accent); border-radius: 10px; padding: 0 7px; font-size: 11px; }
+.pill { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; border: 1px solid var(--line);
+  color: var(--muted); border-radius: 10px; padding: 1px 7px; vertical-align: middle; }
+
+main { max-width: 1300px; margin: 0 auto; padding: 20px; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+.panel h2 { font-size: 15px; margin: 0 0 12px; }
+.panel h3 { font-size: 14px; margin: 14px 0 6px; }  /* Web Awesome's heading scale is larger */
+.muted { color: var(--muted); }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.row input { flex: 1; min-width: 200px; }
+.spacer { flex: 1; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-bottom: 12px; }
+label { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: 12px; }
+label.toggle, .checks label { flex-direction: row; align-items: center; color: var(--text); font-size: 13px; margin-bottom: 8px; }
+.checks { display: flex; flex-direction: column; font-size: 12px; color: var(--muted); }
+.checks label { margin-bottom: 2px; }
+
+input, select, textarea, button { font: inherit; color: var(--text); }
+input, select, textarea { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 7px 9px; }
+input[type=checkbox], input[type=radio] { width: auto; margin-right: 6px; padding: 0; }
+textarea { resize: vertical; width: 100%; }
+button { background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; cursor: pointer; }
+button:hover { border-color: var(--muted); }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+button.danger { color: var(--bad); }
+button.small { padding: 3px 8px; font-size: 12px; }
+button:disabled { opacity: .5; cursor: wait; }
+.help { margin: 0 0 12px; color: var(--muted); }
+.help summary { cursor: pointer; }
+.toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+/* Web Awesome's native styles make form controls full width; in toolbars and the nav row they size to fit. */
+.toolbar select, .dh-nav select, .row select { width: auto; }
+.sticky-save { position: sticky; bottom: 0; background: var(--bg); padding: 12px 0; }
+
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
+.card.new { border-color: var(--accent); }
+.card.dismissed { opacity: .5; }
+.card .img { position: relative; height: 150px; background: var(--photo) center/contain no-repeat; }
+.card .img.none { background: var(--panel2); display: grid; place-items: center; color: var(--muted); }
+.card .body { padding: 10px 12px; flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.card .title { font-weight: 600; }
+.card .price { font-size: 20px; font-weight: 700; }
+.card .meta { color: var(--muted); font-size: 12px; }
+.card .actions { display: flex; gap: 6px; padding: 8px 12px; border-top: 1px solid var(--line); }
+.deal { font-size: 11px; font-weight: 700; border-radius: 4px; padding: 2px 6px; margin-left: 6px; vertical-align: middle; }
+.deal.good { background: color-mix(in srgb, var(--good) 20%, transparent); color: var(--good); }
+/* The bigger the discount, the stronger the badge: "great" is solid green, "good" a light tint. */
+.deal.great { background: var(--great); color: var(--on-great); }
+.ai-note { background: var(--panel2); border-radius: 6px; padding: 6px 8px; font-size: 12px; }
+.empty { color: var(--muted); padding: 40px; text-align: center; grid-column: 1 / -1; }
+
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 500; font-size: 12px; }
+.table-wrap { overflow-x: auto; }
+.error { color: var(--bad); font-size: 12px; }
+
+.part-row { display: grid; grid-template-columns: 140px 1fr auto; gap: 6px; margin-bottom: 6px; }
+.suggestion { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+.suggestion .max { width: 100px; }
+
+#ask-text { white-space: pre-line; margin-top: 0; }
+#ask-field input { width: 100%; }
+
+.spend { margin: 8px 0 12px; }
+.meter { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; margin: 6px 0; max-width: 420px; }
+table.people input.ai-cap, table.people input.ai-allowance { width: 4.5em; }
+.card .watch-link { color: inherit; text-decoration: none; border-bottom: 1px dotted currentColor; }
+.card .watch-link:hover { color: var(--accent); }
+.meter span { display: block; height: 100%; background: var(--accent); }
+.guide { margin: 8px 0; }
+.guide ol { margin: 6px 0 4px 20px; padding: 0; line-height: 1.5; }
+.guide a { color: var(--accent); }
+#settings-form select { width: 100%; max-width: 100%; text-overflow: ellipsis; }
+.bby-credit img { height: 18px; margin-top: 4px; vertical-align: middle; }
+.machine:not([data-kind="pc"]):not([data-kind="server"]) .parts-only { display: none; }
+.machine[data-kind="pc"] .gear-only, .machine[data-kind="server"] .gear-only { display: none; }
+table.import input[data-f=name] { min-width: 12em; }
+.specs-needed { color: var(--warn); margin: 4px 0 8px; }
+.specs-box { border-top: 1px solid var(--line); margin-top: 10px; padding-top: 10px; }
+.specs-box pre.cmd { white-space: pre-wrap; word-break: break-all; background: var(--panel2); padding: 8px; border-radius: 6px; font-size: 12px; max-height: 9em; overflow: auto; }
+.os-pick label { margin-right: 14px; }
+table.radar input[data-f=query] { min-width: 12em; }
+table.radar input[data-f=max] { width: 6em; }
+#radar-box h3 { margin: 14px 0 4px; }
+.custom-row { display: flex; gap: 6px; margin: 4px 0; }
+.custom-row input { flex: 1; min-width: 0; }
+.device { border-top: 1px solid var(--line); padding: 6px 0; }
+table.people input.limit { width: 4.5em; }
+table.people td { vertical-align: middle; }
+.app-link { margin-top: 10px; }
+
+/* Finds grouped by watch, each watch in its colour (same palette as the Android app) */
+.card { border-left: 4px solid var(--line); }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: baseline; flex: none; }
+.groups { display: flex; flex-direction: column; gap: 14px; }
+.group-head { display: flex; align-items: center; gap: 6px; width: 100%; background: none; border: 0; border-bottom: 1px solid var(--line);
+  border-radius: 0; padding: 4px 2px 8px; margin-bottom: 10px; color: var(--text); font-size: 15px; text-align: left; cursor: pointer; }
+.group-head .fold { width: 1em; color: var(--muted); }
+.group-head .meta { color: var(--muted); font-size: 12px; margin-left: 4px; }
+.group-head .new-count { color: var(--accent); }
+input[type=color] { width: 44px; height: 30px; padding: 2px; }
+.row input[type=color], .row input[type=checkbox] { flex: none; min-width: 0; }
+.src-tag { position: absolute; top: 6px; left: 6px; padding: 1px 6px; border-radius: 4px; font-size: 11px; font-weight: 700;
+  line-height: 16px; box-shadow: var(--wa-shadow-s); pointer-events: none; }
+.machine:not([data-kind="vehicle"]) .vehicle-only { display: none; }
+.recalls-box { margin-top: 10px; display: flex; flex-direction: column; gap: 10px; }
+.recall { border-left: 3px solid var(--warn); padding: 4px 10px; display: flex; flex-direction: column; gap: 3px; }
+.recall.park { border-left-color: var(--bad); }
+.title-flag { color: var(--on-bad); background: var(--bad); border-radius: 4px; padding: 0 6px; font-weight: 600; font-size: 12px; }
+.vehicle-facts { display: flex; gap: 10px; flex-wrap: wrap; font-size: 13px; }
+.vehicle-facts .title-flag { color: var(--on-bad); background: var(--bad); border-radius: 4px; padding: 0 6px; font-weight: 600; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.chip { border-radius: 999px; padding: 3px 10px; font-size: 13px; }
+.chip.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.kind-head { margin: 18px 2px 8px; font-size: 15px; color: var(--muted); }
+.prices svg { width: 100%; max-width: 560px; height: auto; display: block; }
+.prices .pc-med { fill: none; stroke: var(--accent); stroke-width: 2; }
+.prices .pc-min { fill: var(--good); }
+.prices .pc-typ { stroke: var(--muted); stroke-dasharray: 5 4; }
+.prices .pc-lab { fill: var(--muted); font-size: 11px; }
+dialog#review-dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 12px;
+  width: min(560px, calc(100vw - 32px)); padding: 18px; }
+dialog#review-dialog::backdrop { background: var(--wa-color-overlay-modal); }
+#review-form { display: flex; flex-direction: column; gap: 12px; }
+#review-form h2 { margin: 0; }
+#review-tweaks { margin-bottom: 12px; }
+#review-tweaks h3 { margin: 0 0 8px; }
+#review-tweaks .tweak { border-top: 1px solid var(--line); padding: 8px 0; display: flex; flex-direction: column; gap: 4px; }
+.tune { margin-top: 10px; border-left: 3px solid var(--accent); padding: 4px 12px; }
+.tune p { margin: 6px 0; }
+.diagnosis { margin: 4px 0; padding-left: 18px; font-size: 13px; }
+
+/* The API page (api.html): a plain header and narrower column. */
+.api-page header { display: flex; align-items: center; gap: 20px; padding: 10px 20px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.api-page header h1 { font-size: 18px; margin: 0; }
+.api-page main { max-width: 900px; }
+.api-page pre { white-space: pre-wrap; word-break: break-word; background: var(--panel2); padding: 10px; border-radius: 6px; }
+.api-page td code { white-space: nowrap; }
+.api-page h2 { margin-top: 28px; }
+
+/* Signed out: the kit's sign-in card, centred under the bar. */
+#signin { display: block; max-width: 28rem; margin: 10vh auto 0; padding: 0 16px; }
+#signin[hidden] { display: none; }

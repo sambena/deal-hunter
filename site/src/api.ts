@@ -44,7 +44,12 @@ const OWN_LOGIN_OFF = "Deal Hunter's own sign-in is off. Sign in with Cougar Cav
 const BAD_VALUE = 'bad request: a value sent was the wrong type or format';
 const ANDROID_APK = 'deal-hunter.apk';
 /** A numeric id in a path, as the Python routes' (\d+). */
-const ID = ':id(^\\d+$)';
+export const ID = ':id(^\\d+$)';
+/** The Python app's own sign-in, invites, resets, tokens and single API key. Cougar Cave has the accounts now, so each
+ * answers 410 saying so. */
+export const RETIRED = [['POST', '/api/auth/setup'], ['POST', '/api/auth/login'], ['GET', '/api/auth/link'], ['POST', '/api/auth/accept'],
+  ['POST', '/api/admin/invites'], ['DELETE', `/api/admin/invites/${ID}`], ['POST', `/api/admin/users/${ID}/reset`], ['POST', '/api/api-key'],
+  ['GET', '/api/auth/status'], ['POST', '/api/auth/logout'], ['POST', '/api/me'], ['GET', '/api/tokens'], ['DELETE', `/api/tokens/${ID}`]] as const;
 
 export interface ApiOptions {
   now: () => number;
@@ -861,11 +866,7 @@ export async function api(app: FastifyInstance, options: ApiOptions): Promise<vo
 
   const gone = (method: 'GET' | 'POST' | 'DELETE' | 'PUT', url: string, message = OWN_LOGIN_OFF) =>
     app.route({ method, url, handler: async () => { throw fail(410, message); } });
-  for (const [method, url] of [['POST', '/api/auth/setup'], ['POST', '/api/auth/login'], ['GET', '/api/auth/link'], ['POST', '/api/auth/accept'],
-    ['POST', '/api/admin/invites'], ['DELETE', `/api/admin/invites/${ID}`], ['POST', `/api/admin/users/${ID}/reset`], ['POST', '/api/api-key'],
-    ['GET', '/api/auth/status'], ['POST', '/api/auth/logout'], ['POST', '/api/me'], ['GET', '/api/tokens'], ['DELETE', `/api/tokens/${ID}`]] as const) {
-    gone(method, url);
-  }
+  for (const [method, url] of RETIRED) gone(method, url);
 
   // Anything else under /api: signed out it answers like every other route, so nobody can map the API from outside.
   app.route({ method: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'], url: '/api/*', config: { signedIn: true },

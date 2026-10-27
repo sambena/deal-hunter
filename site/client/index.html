@@ -1,50 +1,487 @@
 <!doctype html>
-<html lang="en" class="wa-dark" data-cave-original="cougar">
+<html lang="en" class="wa-dark cave-accent-teal" data-cave-original="slate">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark light">
-  <title>Deal Hunter</title>
-  <link vite-ignore rel="icon" href="/cave/icons/tag.svg">
+  <title>Deal Hunter · Cougar Cave</title>
+  <link vite-ignore rel="icon" href="/cave/icons/tag.svg" type="image/svg+xml">
   <!-- The Cougar Cave look, in this order: theme first (no flash), then Web Awesome, the kit's styles, the app's.
        vite-ignore: these are served by the server from @cougarcave/ui, so the build leaves them as they are. -->
   <script vite-ignore src="/cave/cave-theme.js"></script>
   <link vite-ignore rel="stylesheet" href="/cave/webawesome/styles/webawesome.css">
   <link vite-ignore rel="stylesheet" href="/cave/cave-theme.css">
-  <link rel="stylesheet" href="/app.css">
+  <link rel="stylesheet" href="./style.css">
   <link vite-ignore rel="modulepreload" href="/cave/cave-ui.js">
   <script vite-ignore type="module" src="/cave/webawesome/webawesome.loader.js" data-webawesome="/cave/webawesome"></script>
   <script vite-ignore type="module" src="/cave/cave-icons.js"></script>
   <script type="module" src="./main.ts"></script>
 </head>
 <body>
-  <cave-bar app="deals" name="Deal Hunter" icon="tag" home="/"
+  <header class="dh-top">
+  <!-- The shared Cougar Cave bar, from the kit (/cave/cave-ui.js): who is signed in (/auth/me), the account menu,
+       Add a phone and the Phones list. What is inside is drawn until it loads, at the same size. -->
+  <cave-bar id="cave-bar" class="cave-bar cave-brand wa-dark wa-cluster wa-gap-s wa-align-items-center"
+            app="deals" name="Deal Hunter" icon="tag" home="/"
             session="/auth/me" signin="/auth/login" signout="/auth/signout" devices="/auth/devices">
-    <!-- No flash: the bar's static markup, shown until the kit draws it, at the same size. -->
-    <a class="cave-home" href="https://cougarcave.dev"><img src="/cave/icons/cougar.svg" alt="" width="24" height="24"><span>Cougar Cave</span></a>
+    <a class="cave-home wa-cluster wa-gap-2xs wa-align-items-center" href="https://cougarcave.dev">
+      <img src="/cave/icons/cougar.svg" alt="" width="24" height="24"><span>Cougar Cave</span>
+    </a>
     <wa-divider orientation="vertical"></wa-divider>
-    <a class="cave-app" href="/"><wa-icon src="/cave/icons/tag.svg"></wa-icon><span>Deal Hunter</span></a>
-    <wa-dropdown></wa-dropdown>
+    <a class="cave-app wa-cluster wa-gap-2xs wa-align-items-center" href="/">
+      <wa-icon src="/cave/icons/tag.svg"></wa-icon><span>Deal Hunter</span>
+    </a>
+    <wa-dropdown>
+      <wa-button slot="trigger" appearance="plain" size="s">
+        <wa-icon src="/cave/icons/layout-grid.svg" label="Cougar Cave apps"></wa-icon>
+      </wa-button>
+    </wa-dropdown>
   </cave-bar>
 
-  <main class="app-main">
-    <!-- Shown when nobody is signed in. -->
-    <cave-signin id="signin" app="Deal Hunter" icon="tag" lede="Used gear, cars and clothes, watched for you." hidden></cave-signin>
+  <nav id="dh-nav" class="dh-nav wa-cluster wa-gap-m wa-align-items-center" aria-label="Deal Hunter sections" hidden>
+    <a href="#finds" data-tab="finds" class="active">Finds <span id="new-badge" class="badge" hidden></span></a>
+    <a href="#watches" data-tab="watches">Watches</a>
+    <a href="#hardware" data-tab="hardware">My Stuff</a>
+    <a href="#settings" id="settings-nav">Settings</a>
+    <a href="#admin" data-tab="admin" id="admin-nav" hidden>Admin</a>
+    <span class="spacer"></span>
+    <select id="focus-pick" aria-label="What you're hunting" title="What you're hunting: shows only that, everywhere (saved to your account)">
+      <option value="all">🔎 Everything</option>
+      <option value="tech">💻 Tech</option>
+      <option value="cars">🚗 Cars &amp; trucks</option>
+      <option value="home">🏠 Home &amp; gear</option>
+      <option value="clothes">👕 Clothes &amp; shoes</option>
+    </select>
+    <span class="status" id="poll-status"></span>
+  </nav>
+  </header>
 
-    <!-- Shown when someone is signed in. Finds, watches, My Stuff and settings move here in their own PR (#457). -->
-    <section id="home" class="app-page" hidden>
-      <header class="app-page-header">
-        <h1>Deal Hunter</h1>
-        <p>Used gear, cars and clothes, watched for you.</p>
-      </header>
+  <!-- Shown when nobody is signed in: one way in, Cougar Cave. -->
+  <cave-signin id="signin" app="Deal Hunter" icon="tag" lede="Used gear, cars and clothes, watched for you." hidden></cave-signin>
+
+  <main id="dh-main" hidden>
+    <!-- FINDS -->
+    <section id="tab-finds" class="tab">
+      <div class="toolbar">
+        <select id="f-watch"><option value="">All watches</option></select>
+        <select id="f-status">
+          <option value="active">New + seen + starred</option>
+          <option value="new">New only</option>
+          <option value="starred">Starred</option>
+          <option value="dismissed">Dismissed</option>
+          <option value="all">Everything</option>
+        </select>
+        <select id="f-source" title="Only finds from one site"><option value="">All sources</option></select>
+        <select id="f-sort"></select>
+        <label class="toggle" title="One section per watch, each in its colour; click a heading to fold it"><input type="checkbox" id="f-group" checked> Group by watch</label>
+        <span class="spacer"></span>
+        <button id="ai-review" hidden title="Have AI weed out the obvious bad deals among these finds">🤖 AI review</button>
+        <button id="mark-seen">Mark all seen</button>
+        <button id="poll-now" class="primary">Check now</button>
+      </div>
+      <div id="review-tweaks" class="panel" hidden></div>
+      <div id="listings" class="cards"></div>
+    </section>
+
+    <!-- WATCHES -->
+    <section id="tab-watches" class="tab" hidden>
+      <div class="panel" id="ai-draft" hidden>
+        <h2>Describe what you want <span class="pill">AI</span></h2>
+        <div class="row">
+          <input id="ai-desc" placeholder="e.g. low-power mini PC for Frigate with an Intel iGPU, under $200">
+          <button id="ai-draft-btn" class="primary">Suggest watches</button>
+        </div>
+        <div id="ai-draft-results"></div>
+      </div>
+
+      <div class="panel">
+        <h2 id="watch-form-title">New watch</h2>
+        <form id="watch-form">
+          <input type="hidden" name="id">
+          <div class="grid">
+            <label title="Which focus shows this watch">Category
+              <select name="category"><option value="">Automatic</option><option value="tech">💻 Tech</option>
+                <option value="cars">🚗 Cars &amp; trucks</option><option value="home">🏠 Home &amp; gear</option>
+                <option value="clothes">👕 Clothes &amp; shoes</option></select>
+            </label>
+            <label>Looking for
+              <select name="kind"><option value="item">Things (hardware, gear…)</option><option value="vehicle">A car or truck</option><option value="clothing">Clothes or shoes</option></select>
+            </label>
+            <label>Name <input name="name" required placeholder="i9-10980XE for X299 box"></label>
+            <label>Query <input name="query" required placeholder='10980xe   or   n100|n150 "mini pc"'></label>
+            <label>Exclude (comma separated) <input name="exclude" placeholder="xeon, laptop, rdimm"></label>
+            <label>Linked machine <select name="machine_id"><option value="">None</option></select></label>
+            <label>Min price (incl. shipping) <input name="min_price" type="number" step="1" min="0"></label>
+            <label>Max price (incl. shipping) <input name="max_price" type="number" step="1" min="0"></label>
+            <label data-vehicle hidden>Model year from <input name="year_min" type="number" min="1900" max="2100" placeholder="2015"></label>
+            <label data-vehicle hidden>Model year to <input name="year_max" type="number" min="1900" max="2100" placeholder="2020"></label>
+            <label data-vehicle hidden>Max miles <input name="max_miles" type="number" min="0" step="1000" placeholder="120000"></label>
+            <label data-clothing hidden>For
+              <select name="department"><option value="">Anyone</option><option value="men">Men</option>
+                <option value="women">Women</option><option value="kids">Kids</option></select>
+            </label>
+            <label data-clothing hidden>Size <input name="size" placeholder="10.5, M, 32x30 (blank = any)">
+              <span id="size-buttons" class="row"></span></label>
+            <label title="Only the cheapest finds stay; the rest are hidden and never alert. Starred finds always stay.">Keep only the cheapest
+              <select name="keep_cheapest"><option value="">All finds</option><option value="3">3</option><option value="5">5</option><option value="10">10</option><option value="20">20</option></select>
+            </label>
+            <label title="Shown on its finds and in the list. Automatic matches the Android app.">Colour
+              <span class="row"><input type="color" name="color" value="#3b82f6">
+                <label class="toggle"><input type="checkbox" name="color_auto" checked> Automatic</label></span>
+            </label>
+            <label>Condition
+              <select name="condition"><option value="any">Any</option><option value="used">Used</option><option value="new">New</option></select>
+            </label>
+            <div class="checks">
+              <span>Sources</span>
+              <label><input type="checkbox" name="src-ebay" checked> eBay</label>
+              <label><input type="checkbox" name="src-ebay_local" checked> eBay local pickup</label>
+              <label><input type="checkbox" name="src-ksl" checked> KSL Classifieds</label>
+              <label><input type="checkbox" name="src-craigslist" checked> Craigslist</label>
+              <label><input type="checkbox" name="src-offerup" checked> OfferUp</label>
+              <label><input type="checkbox" name="src-ksl_cars"> KSL Cars</label>
+              <label><input type="checkbox" name="src-poshmark"> Poshmark</label>
+              <label><input type="checkbox" name="src-reddit" checked> Reddit</label>
+              <label><input type="checkbox" name="src-slickdeals" checked> Slickdeals</label>
+              <label><input type="checkbox" name="src-buildapcsales" checked> r/buildapcsales</label>
+              <label><input type="checkbox" name="src-bestbuy"> Best Buy open-box</label>
+              <label><input type="checkbox" name="include_auctions"> Include eBay auctions</label>
+            </div>
+          </div>
+          <details class="help">
+            <summary>Query tips</summary>
+            <p>Every word must be in the listing title. <code>a|b</code> means either one. <code>"exact phrase"</code> in quotes.
+              <code>-word</code> excludes. Matching ignores case, dashes and spaces, so <code>10980xe</code> finds "i9-10980 XE".
+              Model numbers work better than full product names. Junk like "for parts" or "bent pins" is always filtered (edit the list in Settings).</p>
+          </details>
+          <div class="row">
+            <button type="submit" class="primary">Save &amp; check now</button>
+            <button type="button" id="watch-cancel" hidden>Cancel edit</button>
+            <button type="button" id="watch-tune" hidden title="Have AI suggest a better search; nothing is saved until you press Save">✨ Improve with AI</button>
+          </div>
+          <div id="tune-box" class="tune" hidden></div>
+        </form>
+      </div>
+
+      <div class="panel">
+        <h2>Your watches</h2>
+        <div id="watch-list"></div>
+      </div>
+    </section>
+
+    <!-- HARDWARE -->
+    <section id="tab-hardware" class="tab" hidden>
+      <div class="panel">
+        <p class="muted">Everything you own: computers with their parts, cars and trucks, TVs, phones, speakers,
+          network gear, fridges, stoves, blenders and more. Computers get <b>Find upgrades</b> (drop-in CPUs and RAM); cars get
+          <b>Look up</b> by VIN and <b>Find parts</b> that fit; cars and appliances get <b>Recalls</b>; anything can <b>Watch this model</b>
+          for a spare or replacement, or ask AI for upgrade ideas.</p>
+        <div class="row">
+          <button class="primary" data-add-kind="pc">+ Computer</button>
+          <button class="primary" data-add-kind="vehicle">+ Car or truck</button>
+          <button class="primary" data-add-kind="appliance">+ Appliance</button>
+          <button class="primary" data-add-kind="clothing">+ Clothes or shoes</button>
+          <button data-add-kind="">+ Something else</button>
+          <span class="spacer"></span>
+          <button id="ha-import" data-admin-only>Import from Home Assistant</button>
+          <button id="radar">Deal radar</button>
+        </div>
+        <div id="kind-chips" class="chips"></div>
+        <div id="ha-import-box"></div>
+        <div id="radar-box"></div>
+      </div>
+      <div id="machines"></div>
+    </section>
+
+    <!-- ADMIN (only the admin sees this tab; the server enforces it too) -->
+    <section id="tab-admin" class="tab" hidden>
+      <form id="admin-form">
+        <div class="panel">
+          <h2>People</h2>
+          <p class="muted">Friends and family join the first time they sign in with Cougar Cave. Each person has their own
+            watches, finds, devices and AI settings; you see their name, how many watches they have and their AI spend,
+            not what they're watching.</p>
+          <div id="people-list"></div>
+        </div>
+
+        <div class="panel">
+          <h2>Checking</h2>
+          <p class="muted">How often every watch is searched. Fewer checks are gentler on the sites (and eBay's
+            5,000 a day); "Check now" still works any time.</p>
+          <div class="grid">
+            <label>When
+              <select name="check_mode"><option value="interval">Every few minutes</option>
+                <option value="times">At set times each day</option></select></label>
+            <label data-check="interval">Check every (minutes) <input name="poll_minutes" type="number" min="5"></label>
+            <label data-check="times">Times (24-hour, comma separated) <input name="check_times" placeholder="07:00, 18:00"></label>
+            <label data-check="times">Time zone
+              <select name="check_timezone">
+                <option value="America/Denver">Mountain (Utah)</option><option value="America/Phoenix">Arizona</option>
+                <option value="America/Chicago">Central (Tennessee)</option><option value="America/New_York">Eastern</option>
+                <option value="America/Los_Angeles">Pacific</option></select></label>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Local sources</h2>
+          <p class="muted">Free, no keys. They search near each person's own ZIP code and radius.</p>
+          <label class="toggle"><input type="checkbox" name="src_ksl"> KSL Classifieds (Utah). Free, no key. Private sellers near you, pickup only</label>
+          <label class="toggle"><input type="checkbox" name="src_craigslist"> Craigslist. Free, no key. Anywhere in the US, pickup only</label>
+          <label class="toggle"><input type="checkbox" name="src_offerup"> OfferUp. Free, no key. Anywhere in the US, up to 50 miles</label>
+          <label class="toggle"><input type="checkbox" name="src_ksl_cars"> KSL Cars (Utah). Free, no key. Dealers and private sellers, for car and truck watches</label>
+          <label class="toggle"><input type="checkbox" name="src_poshmark"> Poshmark. Free, no key. Clothes and shoes in your size, shipped (clothing watches)</label>
+        </div>
+
+        <div class="panel">
+          <h2>eBay</h2>
+          <label class="toggle"><input type="checkbox" name="src_ebay"> Enabled</label>
+          <label class="toggle"><input type="checkbox" name="src_ebay_local"> Local pickup search (uses Local area)</label>
+          <p class="muted">Free. Covers both the nationwide search and local pickup.</p>
+          <details class="help guide">
+            <summary>How to get an eBay key (free)</summary>
+            <ol>
+              <li>Go to <a href="https://developer.ebay.com/signin" target="_blank" rel="noopener">developer.ebay.com</a> and join the Developers Program. Your normal eBay login works.</li>
+              <li>Open <b>Application Keys</b> and create a keyset under <b>Production</b> (not Sandbox). Give the app any name, e.g. "Deal Hunter".</li>
+              <li>eBay asks about <b>marketplace account deletion notifications</b> before it switches the keyset on. Choose the exemption: you are <i>not persisting eBay data</i>.</li>
+              <li>Copy the <b>App ID (Client ID)</b> and the <b>Cert ID (Client Secret)</b> into the boxes below, then press <b>Save settings</b>.</li>
+            </ol>
+            <p>The free tier allows 5,000 searches a day, far more than Deal Hunter uses.</p>
+          </details>
+          <div class="grid">
+            <label>App ID (Client ID) <input name="ebay_client_id"></label>
+            <label>Cert ID (Client Secret) <input name="ebay_client_secret" type="password" autocomplete="off"></label>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Reddit</h2>
+          <label class="toggle"><input type="checkbox" name="src_reddit"> Enabled</label>
+          <label>Subreddits (one per line) <textarea name="reddit_subs" rows="3"></textarea></label>
+          <p class="muted">No key needed. Only "selling" posts are matched: [H] item [W] PayPal/cash, or [FS].
+            Prices are guessed from the post text, so check the post. Nothing to set up.</p>
+        </div>
+
+        <div class="panel">
+          <h2>Retail deals</h2>
+          <label class="toggle"><input type="checkbox" name="src_slickdeals"> Slickdeals</label>
+          <label class="toggle"><input type="checkbox" name="src_buildapcsales"> r/buildapcsales</label>
+          <label>Skip Slickdeals deals older than (days) <input name="deal_max_age_days" type="number" min="1" max="365"></label>
+          <p class="muted">Free, nothing to set up. Community-posted sales from Amazon, Newegg, Walmart, Best Buy,
+            Micro Center and other stores. Prices are read from the post title, so check the post before you buy.</p>
+        </div>
+
+        <div class="panel">
+          <h2>Best Buy open-box <span class="pill">experimental</span></h2>
+          <label class="toggle"><input type="checkbox" name="src_bestbuy"> Enabled</label>
+          <p class="muted">Free, if Best Buy approves you.</p>
+          <details class="help guide">
+            <summary>How to get a Best Buy key (free)</summary>
+            <ol>
+              <li>Go to <a href="https://developer.bestbuy.com/" target="_blank" rel="noopener">developer.bestbuy.com</a> and choose <b>Get API Key</b>.</li>
+              <li>Sign up and confirm your email. Best Buy sometimes asks for a business email or reviews new sign-ups by hand, so the key can take a while or be refused.</li>
+              <li>Copy the key from your account page into the box below, tick <b>Enabled</b>, and save.</li>
+            </ol>
+            <p>It only finds open-box items for products that match your watch, and doesn't know which store they're in.</p>
+          </details>
+          <label>API key <input name="bestbuy_api_key" type="password" autocomplete="off"></label>
+        </div>
+
+        <div class="panel">
+          <h2>Home Assistant</h2>
+          <p class="muted">Optional. Lets My Stuff import your TVs, phones, speakers, network gear and appliances.
+            Deal Hunter only reads the device list; it never changes anything in Home Assistant.</p>
+          <div class="grid">
+            <label>Home Assistant address (local is best) <input name="ha_url" placeholder="http://homeassistant.local:8123"></label>
+            <label>Long-lived access token <input name="ha_token" type="password" autocomplete="off" data-ph="from your Home Assistant profile"></label>
+          </div>
+          <details class="help guide">
+            <summary>How to get a Home Assistant token (free)</summary>
+            <ol>
+              <li>In Home Assistant, click your name at the bottom left to open your <b>Profile</b>, then the <b>Security</b> tab.</li>
+              <li>Under <b>Long-lived access tokens</b>, click <b>Create token</b> and name it "Deal Hunter".</li>
+              <li>Copy the token (it's only shown once), paste it here with your Home Assistant address, and save.</li>
+            </ol>
+            <p>The token can do anything your account can, so keep it private. You can delete it from the same page any time.</p>
+          </details>
+        </div>
+
+        <div class="panel">
+          <h2>API</h2>
+          <p class="muted">Let your own apps and scripts use Deal Hunter (watches, finds, My Stuff) over your home
+            network or VPN. Every call needs a paired phone's key: pair one from the account menu (Add a phone).
+            <a href="api.html" target="_blank" rel="noopener">How to use the API</a></p>
+          <p id="api-status" class="muted"></p>
+        </div>
+
+        <div class="row sticky-save">
+          <button type="submit" class="primary">Save admin settings</button>
+        </div>
+      </form>
     </section>
   </main>
 
+  <dialog id="review-dialog">
+    <form method="dialog" id="review-form">
+      <h2>AI review</h2>
+      <p class="muted" id="review-scope"></p>
+      <label>Anything specific? (optional)
+        <textarea name="instructions" rows="4" placeholder="e.g. 4x4 only, no Dodge, under 180,000 miles, I'm fine driving 2 hours.
+Leave blank and the AI does its best."></textarea></label>
+      <label>Which AI <select name="choice"></select></label>
+      <label class="toggle"><input type="checkbox" name="hide" checked> Hide the bad deals (they go to Dismissed, where you can restore them)</label>
+      <p class="muted" id="review-cost"></p>
+      <div class="row">
+        <span class="spacer"></span>
+        <button value="cancel" formnovalidate>Cancel</button>
+        <button value="go" class="primary" id="review-go">Review</button>
+      </div>
+    </form>
+  </dialog>
+
+
+  <wa-dialog id="ask" label="">
+    <p id="ask-text"></p>
+    <label id="ask-field" hidden><span id="ask-label"></span> <input id="ask-input" autocomplete="off"></label>
+    <wa-button slot="footer" appearance="plain" data-dialog="close">Cancel</wa-button>
+    <wa-button slot="footer" variant="brand" id="ask-ok"></wa-button>
+  </wa-dialog>
+  <!-- SETTINGS: each person's own, in the shared settings drawer (<cave-settings>, cave/cave-ui.js), opened from the
+       account menu or the Settings link. One form around it, so every section's Save saves them all. -->
+  <form id="settings-form">
   <cave-settings label="Settings">
-    <section data-section="general" data-label="General" data-icon="settings">
-      <h3>General</h3>
-      <p>Deal Hunter's own settings go here, one section per group.</p>
+    <section data-section="junk" data-label="Junk words" data-icon="x">
+      <h3>Junk words</h3>
+      <p class="muted">Finds with these words in the title (or description) are always hidden. One per line.</p>
+      <label><textarea name="junk_terms" rows="6"></textarea></label>
+      <div class="row"><button type="submit" class="primary">Save settings</button></div>
+    </section>
+
+    <section data-section="sizes" data-label="My sizes" data-icon="tag">
+      <h3>My sizes</h3>
+      <p class="muted">Used to fill in new clothes and shoes watches. Only you see them.</p>
+      <div class="grid">
+        <label>Usually shop <select name="sizes.department"><option value="">Anyone</option><option value="men">Men</option>
+          <option value="women">Women</option><option value="kids">Kids</option></select></label>
+        <label>Shoe size <input name="sizes.shoe" placeholder="10.5"></label>
+        <label>Tops <input name="sizes.top" placeholder="M"></label>
+        <label>Pants <input name="sizes.pants" placeholder="32x30"></label>
+      </div>
+      <div class="row"><button type="submit" class="primary">Save settings</button></div>
+    </section>
+
+    <section data-section="local" data-label="Local area" data-icon="home">
+      <h3>Local area</h3>
+      <p class="muted">Local sources only show things you can pick up within this distance. eBay also uses the ZIP for shipping estimates.</p>
+      <div class="grid">
+        <label>Your ZIP code <input name="zip_code" inputmode="numeric" placeholder="84057"></label>
+        <label>Radius (miles) <input name="local_radius_miles" type="number" min="1" max="500"></label>
+      </div>
+      <div class="row"><button type="submit" class="primary">Save settings</button></div>
+    </section>
+
+    <section data-section="discord" data-label="Discord" data-icon="messages">
+      <h3>Discord</h3>
+      <label class="toggle"><input type="checkbox" name="discord_enabled"> Post new finds to Discord</label>
+      <label class="toggle"><input type="checkbox" name="discord_deals_only"> Only when it's a deal (10%+ under this watch's typical price)</label>
+      <label>Webhook URL <input name="discord_webhook" type="password" autocomplete="off"></label>
+      <details class="help guide">
+        <summary>How to get a Discord webhook (free)</summary>
+        <ol>
+          <li>In Discord, hover over the channel you want alerts in and click the gear (<b>Edit Channel</b>).</li>
+          <li>Open <b>Integrations → Webhooks → New Webhook</b>. Name it "Deal Hunter" if you like.</li>
+          <li>Click <b>Copy Webhook URL</b>, paste it below, tick <b>Post new finds to Discord</b>, and save.</li>
+          <li>Press <b>Send test message</b> to check it works.</li>
+        </ol>
+        <p>You need Manage Webhooks permission on the server. Anyone with the link can post to that channel, so keep it private.</p>
+      </details>
+      <button type="button" id="test-discord">Send test message</button>
+      <div class="row"><button type="submit" class="primary">Save settings</button></div>
+    </section>
+
+    <section data-section="ai" data-label="AI" data-icon="settings">
+      <h3>AI</h3>
+      <p class="muted">Off by default. AI only runs when you press an AI button, never in the background.
+        Paid models show the cost and ask first, and stop working once a request could take you past your monthly limit.</p>
+      <div class="spend" id="ai-spend"></div>
+      <p class="muted" id="ai-managed" data-admin hidden></p>
+      <label data-member>Whose AI
+        <select name="ai_source">
+          <option value="shared" id="ai-source-shared">Use the shared AI</option>
+          <option value="own">Use my own key</option>
+        </select>
+      </label>
+      <div id="ai-own">
+      <div class="grid">
+        <label>Mode
+          <select name="ai_provider"><option value="off">Off (rules only)</option></select>
+        </label>
+        <label>Monthly limit (US $) <input name="ai_monthly_limit" type="number" min="0" step="0.5"></label>
+      </div>
+      <label class="toggle"><input type="checkbox" name="ai_confirm"> Show the cost and ask before every paid AI request</label>
+      <div data-provider="claude">
+      <div class="grid">
+        <label>Claude model <select name="claude_model" data-models="claude"></select></label>
+        <label>Anthropic API key <input name="anthropic_api_key" type="password" autocomplete="off" data-ph="from console.anthropic.com"></label>
+      </div>
+      <details class="help guide">
+        <summary>How to get a Claude (Anthropic) key: pay as you go</summary>
+        <ol>
+          <li>Go to <a href="https://console.anthropic.com/" target="_blank" rel="noopener">console.anthropic.com</a> and sign in. This is separate from a Claude Pro/Max subscription, which can't be used here.</li>
+          <li>Open <b>Billing</b> and buy a few dollars of credit. $5 lasts a long time with the cheaper models.</li>
+          <li>Under <b>Settings → Limits</b>, set a monthly spend limit. That cap is on Anthropic's side, on top of the limit above.</li>
+          <li>Open <b>API Keys → Create Key</b>, copy it (it's only shown once), paste it below, and save.</li>
+        </ol>
+        <p>Claude Haiku 4.5 is the cheapest. Opus 5.5 gives the best judgement on listings.</p>
+      </details>
+      </div>
+      <div data-provider="openai">
+      <div class="grid">
+        <label>OpenAI model <select name="openai_model" data-models="openai"></select></label>
+        <label>OpenAI API key <input name="openai_api_key" type="password" autocomplete="off" data-ph="from platform.openai.com"></label>
+      </div>
+      <details class="help guide">
+        <summary>How to get an OpenAI (ChatGPT) key: pay as you go</summary>
+        <ol>
+          <li>Go to <a href="https://platform.openai.com/" target="_blank" rel="noopener">platform.openai.com</a> and sign in. A ChatGPT Plus subscription doesn't include API use.</li>
+          <li>Open <b>Settings → Billing</b> and add a few dollars of credit.</li>
+          <li>Under <b>Settings → Limits</b>, set a monthly budget.</li>
+          <li>Open <b>API keys → Create new secret key</b>, copy it (it's only shown once), paste it below, and save.</li>
+        </ol>
+      </details>
+      </div>
+      <div data-provider="gemini">
+      <div class="grid">
+        <label>Gemini model <select name="gemini_model" data-models="gemini"></select></label>
+        <label>Gemini API key <input name="gemini_api_key" type="password" autocomplete="off" data-ph="from aistudio.google.com"></label>
+      </div>
+      <label class="toggle"><input type="checkbox" name="gemini_free_tier"> My Gemini key is on the free tier (no billing set up in Google)</label>
+      <p class="muted">When ticked, Gemini requests count as $0 and don't use up the monthly limit. Untick it if you
+        turn on billing in Google, so real costs are tracked and capped again. Your key's tier is shown on
+        aistudio.google.com/apikey under "Billing Tier".</p>
+      <details class="help guide">
+        <summary>How to get a Google Gemini key: free tier, then pay as you go</summary>
+        <ol>
+          <li>Go to <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> and sign in with a Google account.</li>
+          <li>Click <b>Create API key</b>. Pick or create a Google Cloud project when asked.</li>
+          <li>Copy the key, paste it below, and save.</li>
+        </ol>
+        <p>Without billing turned on, the key uses Google's free tier: limited requests per day, and Google may use the prompts to improve its products. Turning on billing in Google Cloud lifts the limits and the cost is shown above.</p>
+      </details>
+      </div>
+      <p class="muted" id="ai-price-note"></p>
+      </div>
+      <div class="row"><button type="submit" class="primary">Save settings</button></div>
+    </section>
+
+    <!-- The Cougar Cave account (name, email, password) is managed in Cougar Cave, from the account menu; phones are
+         paired from the account menu and listed in the Phones section the bar adds. -->
+    <section data-section="android" data-label="Android app" data-icon="device-mobile">
+      <h3>Android app</h3>
+      <p class="app-link" hidden><a href="/download/android">Get the Android app</a> <span class="muted"></span></p>
+      <p class="muted">Pair the Android app from the account menu: Add a phone.</p>
     </section>
   </cave-settings>
+  </form>
+  <wa-toast id="toasts" placement="bottom-center"></wa-toast>
 </body>
 </html>
