@@ -166,7 +166,7 @@ def ai_urlopen(request, timeout=None):
     url = request.full_url
     asked.append({"url": url, "body": json.loads(request.data), "headers": {k.lower(): v for k, v in request.header_items()}, "timeout": timeout})
     host = urllib.parse.urlparse(url)
-    provider = "openai" if "openai" in host.netloc else "gemini" if "googleapis" in host.netloc else "ollama"
+    provider = "openai" if "openai" in host.netloc else "gemini"
     a = queues[provider].pop(0)
     if "http" in a:
         body = a.get("body", "")
@@ -204,6 +204,11 @@ db.update_settings({"poll_minutes": 30, "reddit_subs": ["hardwareswap"], "ebay_c
                     "sources_enabled": {"ebay": True, "bestbuy": True}}, user_id=admin)
 db.update_settings({"zip_code": "00000", "junk_terms": ["for parts"], "discord_webhook": "https://discord.com/api/webhooks/1/made-up",
                     "sizes": {"shoe": "10.5"}}, user_id=lee)
+
+# Rows the retired Ollama left behind: the copy keeps them, and reading settings ignores them (AI reads as off).
+for key, value in (("ai_provider", "ollama"), ("ollama_url", "http://10.0.0.5:11434"), ("ollama_model", "qwen3.5:4b")):
+    for uid in (admin, lee):
+        db.execute("INSERT OR REPLACE INTO user_settings (user_id, key, value) VALUES (?, ?, ?)", (uid, key, json.dumps(value)))
 
 step = [0]
 
@@ -382,12 +387,9 @@ elif mode == "ai":
     req(M, "PUT", "/api/settings", {"ai_provider": "gemini", "gemini_api_key": "made-up-gemini-key", "gemini_model": "gemini-3.5-flash-lite", "gemini_free_tier": True})
     for _ in range(3):
         req(M, "POST", "/api/ai/draft-watches", {"description": "a used GPU"})
+    # Ollama is retired: it can't be picked again, and its old settings don't come back.
     req(M, "PUT", "/api/settings", {"ai_provider": "ollama", "ollama_url": "http://8.8.8.8:11434", "ollama_model": "qwen3.5:4b"})
     req(M, "GET", "/api/ai/choices")
-    for _ in range(2):
-        req(M, "POST", "/api/ai/draft-watches", {"description": "a used GPU"})
-    req(M, "PUT", "/api/settings", {"ai_provider": "ollama", "ollama_url": "http://8.8.8.8:11434/?x"})
-    req(M, "POST", "/api/ai/draft-watches", {"description": "a used GPU"})
     req(M, "PUT", "/api/settings", {"ai_provider": "claude", "claude_model": "claude-unknown"})
     req(M, "POST", "/api/ai/estimate", {"action": "draft", "description": "x"})
     req(M, "GET", "/api/ai/usage")

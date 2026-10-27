@@ -1,6 +1,5 @@
-// Addresses that come from people's settings (Ollama, Home Assistant, Discord) are fetched by the server, so a member
-// could point them at the home network. The admin's own settings may be local (the home Ollama and Home Assistant
-// are); everyone else's must be public internet addresses. A port of the Python app's netguard.py, with Python's own
+// Addresses that come from people's settings (Home Assistant, Discord) are fetched by the server, so a member could
+// point them at the home network. The admin's own settings may be local (Home Assistant at home is); everyone else's must be public internet addresses. A port of the Python app's netguard.py, with Python's own
 // rule for "public" (ipaddress.is_global, the IANA special-purpose registries as Python 3.13 has them).
 import { lookup } from 'node:dns/promises';
 import { isGlobal, isMulticast } from './ip-ranges.js';

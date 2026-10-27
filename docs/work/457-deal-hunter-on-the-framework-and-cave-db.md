@@ -46,7 +46,7 @@ Deal Hunter runs on the Cougar Cave web framework (`@cougarcave/server` 1.0.5, `
   in a time zone; a restart on set times waits for the next one. One pass checks every enabled watch with its owner's
   settings, shares identical fetches across watches (`fetch_key`), posts Discord alerts, and purges Best Buy finds
   after 72 hours. "Check now" for one watch, one person's watches, or (admin) everyone's.
-- **AI** (`ai.py`, `shared_ai.py`): Claude, OpenAI, Gemini and Ollama; estimate-and-confirm before each paid call;
+- **AI** (`ai.py`, `shared_ai.py`): Claude, OpenAI and Gemini (Ollama was retired in PR #82); estimate-and-confirm before each paid call;
   monthly limit; each call recorded in `ai_usage` with who paid. The admin's AI comes from the owner console's shared
   settings file (app `deals`, with tier and effort, #494, #517). Members use the admin's AI on their allowance and daily
   cap, or their own key.
@@ -97,10 +97,10 @@ Deal Hunter runs on the Cougar Cave web framework (`@cougarcave/server` 1.0.5, `
      before the cutover. A framework exemption for Bearer writes is the alternative; not proposed (framework change).
    - How the second listener is made (a second Fastify instance sharing the routes and store, or a framework
      option) is settled in the API PR, without framework changes if possible.
-7. **AI.** Deal Hunter's own AI module is ported as it is: four providers, people's own keys and Ollama, estimate
+7. **AI.** Deal Hunter's own AI module is ported as it is: three providers, people's own keys, estimate
    and confirm, allowances and daily caps, the `ai_usage` ledger in the `deals` schema. The admin's entry is read with
    the framework's `aiSettings('deals', AI_SETTINGS_FILE)`, same file, same app key.
-   - The framework's AI helper is not used: it has no own keys, no Ollama and no per-person allowances.
+   - The framework's AI helper is not used: it has no own keys and no per-person allowances.
    - Tests use a stand-in provider; no test calls a paid API.
 8. **The schedule is the existing job, ported.** One in-process loop with the same rules: interval or set times in
    a time zone, restart behaviour, shared fetches, the 72-hour Best Buy purge, and the per-source gaps. No new jobs,

@@ -7,12 +7,10 @@
 // file, never from the database or the environment; with no file or no entry it is off. Other people either use their
 // own key ("own") or the admin's AI ("shared"), within limits the admin sets per person: requests a day, and dollars a
 // month of paid AI. The admin's monthly limit covers everything run on the admin's key, by anyone.
-// Providers: Claude (Anthropic's Messages API), OpenAI, Google Gemini and Ollama (free, local), over the injected
-// network, so tests never call a paid API.
+// Providers: Claude (Anthropic's Messages API), OpenAI and Google Gemini, over the injected network, so tests never call a paid API.
 import { readFileSync, statSync } from 'node:fs';
 import type { Db } from '@cougarcave/server';
 import { sql } from 'drizzle-orm';
-import { BlockedURL, check as checkAddress, type Resolve, resolveHost } from './logic/netguard.js';
 import { pyJsonDumps } from './logic/py-text.js';
 import { pyFixed, pyRepr, pyRound, pyStr, pyStrip, truthy } from './logic/py.js';
 import { type Net, NetError } from './logic/sources.js';
@@ -47,11 +45,10 @@ export const MODELS: Model[] = [
   { provider: 'gemini', id: 'gemini-3.5-flash-lite', family: 'flash-lite', gen: [3, 5], label: 'Gemini 3.5 Flash-Lite (cheapest)', in: 0.30, out: 2.50, effort: true },
 ];
 
-export const PROVIDERS: Record<string, { label: string; key: string | null; model: string }> = {
+export const PROVIDERS: Record<string, { label: string; key: string; model: string }> = {
   claude: { label: 'Claude (Anthropic)', key: 'anthropic_api_key', model: 'claude_model' },
   openai: { label: 'OpenAI (ChatGPT)', key: 'openai_api_key', model: 'openai_model' },
   gemini: { label: 'Google Gemini', key: 'gemini_api_key', model: 'gemini_model' },
-  ollama: { label: 'Ollama (free, local)', key: null, model: 'ollama_model' },
 };
 
 // Token allowances per button. `max_out` is a hard cap sent to the provider, so it also caps the cost.
@@ -68,8 +65,8 @@ export const ACTIONS: Record<string, { label: string; typical_out: number; max_o
 };
 export const REVIEW_MAX = 40;
 
-export const AI_KEYS = ['ai_provider', 'ollama_url', 'ollama_model', 'anthropic_api_key', 'claude_model', 'openai_api_key', 'openai_model',
-  'gemini_api_key', 'gemini_model', 'gemini_free_tier'];
+export const AI_KEYS = ['ai_provider', 'anthropic_api_key', 'claude_model', 'openai_api_key', 'openai_model', 'gemini_api_key',
+  'gemini_model', 'gemini_free_tier'];
 // Which family the console's "balanced" and "best" tiers mean. OpenAI's mini and plain GPT models aren't in MODELS, so
 // for OpenAI those tiers fall back to cheapest.
 const TIERS: Record<string, Record<string, string>> = { claude: { balanced: 'sonnet', best: 'opus' }, openai: { balanced: 'mini', best: 'plain' },
@@ -181,7 +178,7 @@ class Lock {
   }
 }
 
-export interface AiOptions { db: Db; store: Store; net: Net; now: () => number; settingsFile: string; resolve?: Resolve;
+export interface AiOptions { db: Db; store: Store; net: Net; now: () => number; settingsFile: string;
   /** The person's name from Cougar Cave, for "Pat's AI". */
   nameOf: (memberId: number) => Promise<string>; log?: (line: string) => void; sleep?: (seconds: number) => Promise<void> }
 
@@ -214,7 +211,7 @@ export class Ai {
     if (m.off !== undefined) Object.assign(out, { ai_provider: 'off', ai_monthly_limit: 0.0 });
     else {
       const p = PROVIDERS[m.provider]!;
-      Object.assign(out, { ai_provider: m.provider, [p.model]: m.model, [p.key!]: m.key, ai_monthly_limit: m.monthly_usd });
+      Object.assign(out, { ai_provider: m.provider, [p.model]: m.model, [p.key]: m.key, ai_monthly_limit: m.monthly_usd });
     }
     return [out, m];
   }
@@ -272,14 +269,7 @@ export class Ai {
     const provider = settings.ai_provider as string;
     const current = JSON.stringify([settings.ai_provider ?? null, Object.hasOwn(PROVIDERS, provider) ? settings[PROVIDERS[provider]!.model] ?? null : null]);
     for (const [name, p] of Object.entries(PROVIDERS)) {
-      if (name === 'ollama') {
-        if (truthy(settings.ollama_url) && truthy(settings.ollama_model)) {
-          out.push({ provider: 'ollama', model: settings.ollama_model, free: true, label: `Ollama ${pyStr(settings.ollama_model)} (free)`,
-            current: current === JSON.stringify(['ollama', settings.ollama_model]) });
-        }
-        continue;
-      }
-      if (!(truthy(settings[p.key!]) || (name === 'claude' && this.envKeyOk(settings)))) continue;
+      if (!(truthy(settings[p.key]) || (name === 'claude' && this.envKeyOk(settings)))) continue;
       for (const m of MODELS) {
         if (m.provider !== name) continue;
         const free = name === 'gemini' && truthy(settings.gemini_free_tier);
@@ -306,7 +296,6 @@ export class Ai {
     const provider = 'ai_provider' in settings ? settings.ai_provider as string : 'off';
     if (!Object.hasOwn(PROVIDERS, provider)) throw new AIError(settings._ai.blocked || 'AI is off. Turn it on in Settings.');
     const model = pyStrip((settings[PROVIDERS[provider]!.model] as string) || '');
-    if (provider === 'ollama') return { provider, id: model, label: `Ollama ${model}`, in: 0.0, out: 0.0, effort: false, free: true };
     for (const m of MODELS) {
       if (m.provider === provider && m.id === model) {
         // Google bills nothing on a key without billing; its replies don't say which tier, so the person does.
@@ -418,8 +407,7 @@ export class Ai {
   private call(settings: AiSettings, info: ModelInfo, prompt: string, schema: object, maxOut: number): Promise<[string, number, number, string | null]> {
     if (info.provider === 'claude') return this.claude(settings, info, prompt, schema, maxOut);
     if (info.provider === 'openai') return this.openai(settings, info, prompt, schema, maxOut);
-    if (info.provider === 'gemini') return this.gemini(settings, info, prompt, schema, maxOut);
-    return this.ollama(settings, info, prompt, schema, maxOut);
+    return this.gemini(settings, info, prompt, schema, maxOut);
   }
 
   /** Claude through Anthropic's Messages API, as the Python SDK sent it, with the SDK's two retries on a busy or
@@ -467,37 +455,6 @@ export class Ai {
     else if (data.stop_reason === 'max_tokens') problem = "Claude's answer was cut off; try again";
     const block = ((data.content ?? []) as Row[]).find((b) => b.type === 'text');
     return [block ? String(block.text) : '', tokensIn, Number(u.output_tokens ?? 0), problem];
-  }
-
-  private async ollama(settings: AiSettings, info: ModelInfo, prompt: string, schema: object, maxOut: number): Promise<[string, number, number, string | null]> {
-    const body = pyJsonDumps({ model: info.id, messages: [{ role: 'user', content: prompt }], format: schema, stream: false,
-      // Thinking models (qwen3.5) otherwise spend the whole allowance thinking and return no answer.
-      think: false, options: { num_predict: maxOut } });
-    const base = pyStrip(settings.ollama_url as string);
-    if (base.includes('?') || base.includes('#')) throw new AIError("The Ollama address can't contain ? or #");
-    const trusted = settings._ai.trusted ?? false;
-    const url = base.replace(/\/+$/, '') + '/api/chat';
-    let res;
-    try {
-      await checkAddress(url, trusted, 'Ollama address', this.o.resolve ?? resolveHost);
-      res = await this.o.net({ url, method: 'POST', body, headers: { 'Content-Type': 'application/json' }, timeout: 300, redirect: trusted ? 'follow' : 'manual' });
-    } catch (e) {
-      if (e instanceof BlockedURL) throw new AIError(e.message);
-      if (e instanceof NetError) throw new AIError(trusted ? `Can't reach Ollama at ${base} (${e.reason}). Is it running?` : "Can't reach Ollama at that address");
-      throw e;
-    }
-    if (res.status >= 300) {
-      const detail = trusted ? `: ${[...new TextDecoder('utf-8').decode(res.body)].slice(0, 200).join('')}` : '';
-      throw new AIError(`Ollama returned HTTP ${res.status}${detail}`);
-    }
-    let data: Row;
-    try {
-      data = JSON.parse(new TextDecoder('utf-8').decode(res.body)) as Row;
-    } catch {
-      throw new AIError("Ollama's answer wasn't readable");
-    }
-    const message = (truthy(data.message) ? data.message : {}) as Row;
-    return ['content' in message ? String(message.content) : '', Number(data.prompt_eval_count ?? 0), Number(data.eval_count ?? 0), null];
   }
 
   private async postJson(url: string, headers: Record<string, string>, body: Row, name: string): Promise<Row> {

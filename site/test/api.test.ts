@@ -101,7 +101,7 @@ function aiNet() {
       return { status: 200, body: Buffer.from(JSON.stringify({ content: [{ type: 'text', text: a.text }], usage: a.usage, stop_reason: a.stop_reason })) };
     }
     asked.push({ url: req.url, body: JSON.parse(req.body!), headers, timeout: req.timeout });
-    const provider = host.includes('openai') ? 'openai' : host.includes('googleapis') ? 'gemini' : 'ollama';
+    const provider = host.includes('openai') ? 'openai' : 'gemini';
     const a = queues[provider]!.shift()!;
     if (a.http) return { status: a.http, body: Buffer.from(typeof a.body === 'string' ? a.body : JSON.stringify(a.body ?? '')), reason: 'made up' };
     return { status: 200, body: Buffer.from(JSON.stringify(a.json)) };

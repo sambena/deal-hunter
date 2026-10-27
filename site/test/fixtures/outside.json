@@ -581,21 +581,6 @@
     "http": 429,
     "body": "slow down"
    }
-  ],
-  "ollama": [
-   {
-    "json": {
-     "message": {
-      "content": "{\"suggestions\": [{\"name\": \"Quiet NAS\", \"category\": \"storage\", \"query\": \"ds920\", \"exclude\": [\"parts\"], \"max_price\": 350, \"reason\": \"Made-up reason.\"}]}"
-     },
-     "prompt_eval_count": 500,
-     "eval_count": 150
-    }
-   },
-   {
-    "http": 500,
-    "body": "made-up failure"
-   }
   ]
  }
 }

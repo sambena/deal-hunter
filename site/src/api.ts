@@ -26,11 +26,10 @@ import { cleanTimes } from './logic/schedule.js';
 import * as specs from './logic/specs.js';
 import { decodeVin, type Get, LookupFailed, nhtsaGet, recalls as vehicleRecalls } from './logic/vehicles.js';
 import { BlockedURL as DiscordBlocked, DiscordRefused, type Poller } from './poller.js';
-import { DEFAULT_WATCH_LIMIT, DEVICE_KINDS, DeviceNotFound, type Member, PARTS_KINDS, SECRET_KEYS, Store } from './store.js';
+import { AI_PROVIDERS, DEFAULT_WATCH_LIMIT, DEVICE_KINDS, DeviceNotFound, type Member, PARTS_KINDS, SECRET_KEYS, Store } from './store.js';
 
 /** The admin's AI is managed in the owner console, so the admin can't set it here (ai.py's AI_KEYS and the limit). */
-const ADMIN_MANAGED_AI = new Set(['ai_provider', 'ollama_url', 'ollama_model', 'anthropic_api_key', 'claude_model',
-  'openai_api_key', 'openai_model', 'gemini_api_key', 'gemini_model', 'gemini_free_tier', 'ai_monthly_limit']);
+const ADMIN_MANAGED_AI = new Set(['ai_provider', 'anthropic_api_key', 'claude_model', 'openai_api_key', 'openai_model', 'gemini_api_key', 'gemini_model', 'gemini_free_tier', 'ai_monthly_limit']);
 
 const OWNER_FACTORS = 'Admin sign-in needs your password and your authenticator code in the same sign-in. This '
   + "browser's Cougar Cave session may have started with a code only. Sign in from a private window, "
@@ -53,7 +52,7 @@ export interface ApiOptions {
   apiPort: number | null;
   /** Where the Android project publishes deal-hunter.apk and android.json. */
   downloadsDir: string;
-  /** Resolves the hosts in people's addresses (Ollama, Home Assistant) to check they are public. */
+  /** Resolves the hosts in people's addresses (Home Assistant) to check they are public. */
   resolve?: Resolve;
   /** NHTSA's and CPSC's answers (VINs and recalls). Tests pass made-up ones. */
   nhtsa?: Get;
@@ -106,7 +105,7 @@ export async function api(app: FastifyInstance, options: ApiOptions): Promise<vo
     return (row?.name as string | null) ?? '';
   };
   const ai = new Ai({ db: app.cave.db, store, net: options.net, now: options.now, settingsFile: options.aiSettingsFile, nameOf,
-    ...(options.resolve ? { resolve: options.resolve } : {}), ...(options.sleep ? { sleep: options.sleep } : {}), log: (line) => app.log.info(line) });
+    ...(options.sleep ? { sleep: options.sleep } : {}), log: (line) => app.log.info(line) });
   const resolve = options.resolve ?? resolveHost;
   app.decorateRequest('member', null);
 
@@ -333,6 +332,7 @@ export async function api(app: FastifyInstance, options: ApiOptions): Promise<vo
       !(SECRET_KEYS.has(k) && pyIn(v, '', null, true)) && !(m.admin && ADMIN_MANAGED_AI.has(k))));
     if ('check_times' in changes) changes.check_times = cleanTimes(changes.check_times);
     if ('check_mode' in changes && !['interval', 'times'].includes(changes.check_mode as string)) delete changes.check_mode;
+    if ('ai_provider' in changes && !AI_PROVIDERS.includes(changes.ai_provider as string)) delete changes.ai_provider;
     if ('sizes' in changes) {   // {"department", "shoe", "top", "pants"}: short strings only
       const sizes = (changes.sizes && typeof changes.sizes === 'object' && !Array.isArray(changes.sizes) ? changes.sizes : {}) as Record<string, unknown>;
       changes.sizes = Object.fromEntries(['department', 'shoe', 'top', 'pants'].filter((k) => truthy(sizes[k]))
@@ -342,7 +342,7 @@ export async function api(app: FastifyInstance, options: ApiOptions): Promise<vo
     const current = await store.getSettings(m.id);
     try {
       if (truthy(changes.discord_webhook) && changes.discord_webhook !== current.discord_webhook) checkDiscord(String(changes.discord_webhook));
-      for (const [key, what] of [['ollama_url', 'Ollama address'], ['ha_url', 'Home Assistant address']] as const) {
+      for (const [key, what] of [['ha_url', 'Home Assistant address']] as const) {
         if (truthy(changes[key]) && changes[key] !== current[key]) await checkAddress(String(changes[key]), m.admin, what, resolve);
       }
     } catch (e) {
