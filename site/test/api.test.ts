@@ -13,6 +13,7 @@ import { sql } from 'drizzle-orm';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { listenApiPort } from '../src/api-port.js';
 import { build } from '../src/app.js';
+import { loadShared } from '../src/ai.js';
 import { copy, openOld, readOld } from '../src/legacy/copy.js';
 import { clearCpscCache, type CpscGet } from '../src/logic/product-recalls.js';
 import { type Net, NetError } from '../src/logic/sources.js';
@@ -23,18 +24,19 @@ const REPO = fileURLToPath(new URL('../../', import.meta.url));
 const SITE = fileURLToPath(new URL('../', import.meta.url));
 const T0 = 1_793_000_000;
 const KIM = '00000000-0000-4000-8000-0000000000c3';
-const config = () => loadConfig({ APP_ORIGIN: 'http://127.0.0.1:8780', DEV_LOGIN: '1', DATA_DIR: ':memory:' });
+const config = (aiFile = join(folder, 'none.json')) => loadConfig({ APP_ORIGIN: 'http://127.0.0.1:8780', DEV_LOGIN: '1', DATA_DIR: ':memory:', AI_SETTINGS_FILE: aiFile });
 
 interface Req { who: 'owner' | 'member'; method: 'GET' | 'POST' | 'PUT' | 'DELETE'; url: string; body?: unknown; at: number }
 interface Answer { status: number; body?: unknown; message?: string }
 let folder: string;
-type Recording = { requests: Req[]; answers: Answer[]; asked: string[]; ids: Record<string, number> };
+type Recording = { requests: Req[]; answers: Answer[]; asked: unknown[]; ids: Record<string, number> };
 let recorded: Recording;
 let devices: Recording;
 let homeAssistant: Recording;
+let aiRecording: Recording;
 const OUTSIDE = JSON.parse(readFileSync(join(SITE, 'test/fixtures/outside.json'), 'utf8')) as
   { nhtsa: Record<string, Record<string, unknown>>; cpsc: Record<string, unknown>; ha: Record<string, { json?: unknown; body?: string; http?: number; network?: string }> };
-let asked: string[] = [];
+let asked: unknown[] = [];
 
 /** NHTSA and CPSC as outside.json makes them up, noting each address asked, as make_api.py's stand-ins do. */
 const nhtsa: Get = async (url) => {
@@ -52,7 +54,7 @@ const cpsc: CpscGet = async (url) => {
 let app: Awaited<ReturnType<typeof build>>;
 let clock = T0;
 
-function record(mode: 'core' | 'devices' | 'ha'): Recording {
+function record(mode: 'core' | 'devices' | 'ha' | 'ai'): Recording {
   const run = spawnSync('python', [join(SITE, 'test/fixtures/make_api.py'), join(folder, `${mode}.db`), ISSUER, mode,
     join(SITE, 'test/fixtures/outside.json')],
   { cwd: REPO, env: { ...process.env, PYTHONPATH: REPO, PYTHONIOENCODING: 'utf-8', COUGAR_AI_SETTINGS: join(folder, 'none.json') },
@@ -66,7 +68,46 @@ beforeAll(() => {
   recorded = record('core');
   devices = record('devices');
   homeAssistant = record('ha');
-});
+  aiRecording = record('ai');
+}, 120_000);   // four Python recordings: well past the default 10 s on a busy machine
+
+type Answer2 = { error?: string; status?: number; body?: unknown; text?: string; usage?: unknown; stop_reason?: string; json?: unknown; http?: number };
+const AI_ANSWERS = (JSON.parse(readFileSync(join(SITE, 'test/fixtures/outside.json'), 'utf8')) as { ai: Record<string, Answer2[]> }).ai;
+
+/** The AI providers as outside.json makes them up: one queue each, in order. A request is noted the way make_api.py's
+ * stand-ins note it (Claude's as the SDK's arguments). A busy Claude (429, no connection) answers every retry the
+ * same, and the retries count once, as the Python SDK stand-in doesn't retry. */
+function aiNet() {
+  const queues = Object.fromEntries(Object.entries(AI_ANSWERS).map(([k, v]) => [k, [...v]]));
+  let tries = 0;
+  let retrying: Answer2 | null = null;
+  const net: Net = async (req) => {
+    const headers = Object.fromEntries(Object.entries(req.headers).map(([k, v]) => [k.toLowerCase(), v]));
+    const host = new URL(req.url).host;
+    if (host === 'api.anthropic.com') {
+      const body = JSON.parse(req.body!) as Record<string, unknown>;
+      const entry = { provider: 'claude', api_key: headers['x-api-key'], timeout: req.timeout, ...body };
+      const a = queues.claude![0]!;
+      // A retry asks again while the same busy answer is still being given; anything else is a new request.
+      if (!(a === retrying && tries > 0)) { asked.push(entry); retrying = a; tries = 0; }
+      if (a.error === 'rate' || a.error === 'connection') {
+        if (++tries >= 3) queues.claude!.shift();
+        if (a.error === 'connection') throw new NetError('made-up connection failure');
+        return { status: 429, body: Buffer.from('{}') };
+      }
+      queues.claude!.shift();
+      if (a.error === 'auth') return { status: 401, body: Buffer.from('{}') };
+      if (a.error === 'status') return { status: a.status!, body: Buffer.from(JSON.stringify(a.body)) };
+      return { status: 200, body: Buffer.from(JSON.stringify({ content: [{ type: 'text', text: a.text }], usage: a.usage, stop_reason: a.stop_reason })) };
+    }
+    asked.push({ url: req.url, body: JSON.parse(req.body!), headers, timeout: req.timeout });
+    const provider = host.includes('openai') ? 'openai' : 'gemini';
+    const a = queues[provider]!.shift()!;
+    if (a.http) return { status: a.http, body: Buffer.from(typeof a.body === 'string' ? a.body : JSON.stringify(a.body ?? '')), reason: 'made up' };
+    return { status: 200, body: Buffer.from(JSON.stringify(a.json)) };
+  };
+  return net;
+}
 
 /** Home Assistant as outside.json makes it up, by the address's port, noting each address asked. */
 const homeAssistantNet: Net = async (req) => {
@@ -80,12 +121,12 @@ afterAll(() => rmSync(folder, { recursive: true, force: true }));
 afterEach(async () => app?.close());
 
 /** The app, with the old database copied in. */
-async function start(extra: Parameters<typeof build>[1] = {}, database = 'core.db') {
+async function start(extra: Parameters<typeof build>[1] = {}, database = 'core.db', aiFile?: string) {
   clock = T0;
   asked = [];
   clearRecallCache();
   clearCpscCache();
-  app = await build(config(), { logger: false, now: () => clock, downloadsDir: join(folder, 'downloads'), nhtsa, cpsc,
+  app = await build(config(aiFile), { logger: false, now: () => clock, downloadsDir: join(folder, 'downloads'), nhtsa, cpsc,
     net: async () => { throw new NetError('no network in tests'); }, clock: { now: () => clock, sleep: async (s) => { clock += s; } }, ...extra });
   const src = openOld(join(folder, database));
   try {
@@ -119,17 +160,9 @@ function call(cookie: string, method: string, url: string, body?: unknown) {
 
 // ---- the same answers as the Python app ------------------------------------------------------------------------
 
-/** The AI's parts of the answers come with the AI's own PR; the sign-in records with the framework. */
-const AI_SETTINGS = ['ai_provider', 'ollama_url', 'ollama_model', 'anthropic_api_key', 'claude_model', 'openai_api_key', 'openai_model',
-  'gemini_api_key', 'gemini_model', 'gemini_free_tier', 'ai_monthly_limit', 'ai_managed'];
+/** People's has_password is retired, and last_active now comes from the framework's sign-in records. */
 function comparable(r: Req, body: unknown): unknown {
   const b = structuredClone(body) as Record<string, unknown>;
-  const settings = (s: Record<string, unknown>) => { if (r.who === 'owner') for (const k of AI_SETTINGS) delete s[k]; };
-  if (r.url === '/api/state') {
-    delete b.ai;
-    settings(b.settings as Record<string, unknown>);
-  }
-  if (r.url === '/api/settings' && r.method === 'PUT') settings(b);
   if (r.url === '/api/admin/users' && Array.isArray(b.users)) {
     for (const u of b.users as Record<string, unknown>[]) { delete u.has_password; delete u.last_active; }
   }
@@ -140,21 +173,28 @@ describe('the same answers as the Python app', () => {
   it('for watches, finds, settings and People, in order', async () => {
     await start();
     expect(await replay(recorded)).toEqual([]);
-  });
+  }, 60_000);
+
+  it('for every AI button, asking each AI provider the same things', async () => {
+    await start({ net: aiNet() }, 'ai.db', join(folder, 'ai.ai.json'));
+    expect(await replay(aiRecording)).toEqual([]);
+    expect(asked).toEqual(aiRecording.asked);
+    expect(asked.length).toBeGreaterThan(20);
+  }, 60_000);
 
   it('for the Home Assistant import, asking Home Assistant the same things', async () => {
     await start({ net: homeAssistantNet }, 'ha.db');
     expect(await replay(homeAssistant)).toEqual([]);
     expect(asked).toEqual(homeAssistant.asked);
     expect(asked.length).toBeGreaterThan(5);
-  });
+  }, 60_000);
 
   it('for My Stuff, VINs and recalls, asking NHTSA and CPSC the same things', async () => {
     await start({}, 'devices.db');
     expect(await replay(devices)).toEqual([]);
     expect(asked).toEqual(devices.asked);
     expect(asked.length).toBeGreaterThan(5);
-  });
+  }, 60_000);
 });
 
 /** Sends the recorded requests in order, each at its recorded time; the ones whose answer differs from Python's. */
@@ -403,21 +443,6 @@ describe('the Android download', () => {
 });
 
 
-describe('asking for AI on the device routes, before the AI arrives', () => {
-  it('answers 501 not_yet, beside the same request without AI', async () => {
-    await start({}, 'devices.db');
-    const owner = await devCookie('owner');
-    const pc = (await call(owner, 'POST', '/api/machines', { name: 'PC', parts: [{ category: 'cpu', model: 'i7-4790K' }] })).json().id as number;
-    await call(owner, 'POST', '/api/machines', { name: 'TV', kind: 'tv', make: 'LG', model: 'OLED65C1' });   // radar asks AI only about gear like this
-    for (const [url, body] of [[`/api/machines/${pc}/suggest`, {}], ['/api/radar', {}], [`/api/machines/${pc}/specs`, { text: 'any words at all' }]] as const) {
-      const ai = await call(owner, 'POST', url, { ...body, use_ai: true });
-      expect([url, ai.statusCode, ai.json().error]).toEqual([url, 501, 'not_yet']);
-      const plain = await call(owner, 'POST', url, body);
-      expect([url, plain.statusCode]).toEqual([url, url.endsWith('/specs') ? 422 : 200]);
-    }
-  });
-});
-
 describe('checking now, and the Discord test', () => {
   it("runs a member's own watch now, never someone else's, and starts checks from Check now", async () => {
     await start();
@@ -453,5 +478,28 @@ describe('checking now, and the Discord test', () => {
     await call(again, 'PUT', '/api/settings', { discord_webhook: 'https://discord.com/api/webhooks/9/made-up' });
     expect((await call(again, 'POST', '/api/test-discord', {})).json()).toEqual({ ok: true });
     expect(posts).toEqual(['POST https://discord.com/api/webhooks/9/made-up {"content": "Deal Hunter test message: notifications work."}']);
+  });
+});
+
+describe("the owner console's AI settings file", () => {
+  // shared_ai.py's rules: version 1, an entry with ai: true, a known provider, a monthly limit of 0-1000 and that
+  // provider's key; an unknown tier or effort is ignored, never an error. Each refusal beside the file that works.
+  const file = join(tmpdir(), `dh-ai-${process.pid}.json`);
+  const ok = { version: 1, keys: { anthropic: ' made-up ' }, apps: { deals: { ai: true, provider: 'anthropic', monthly_usd: 1000, tier: 'turbo', effort: 'max' } } };
+  const read = (data: unknown) => { writeFileSync(file, typeof data === 'string' ? data : JSON.stringify(data)); return loadShared(file); };
+  afterAll(() => rmSync(file, { force: true }));
+
+  it('turns the admin AI on only for a complete entry', () => {
+    expect(read(ok)).toEqual({ provider: 'claude', model: null, tier: 'turbo', effort: null, monthly_usd: 1000, key: 'made-up' });
+    expect(loadShared(join(tmpdir(), 'dh-no-such-file.json'))).toBeNull();
+    expect(read('{not json')).toBeNull();
+    expect(read({ ...ok, version: 2 })).toBeNull();
+    expect(read({ ...ok, apps: {} })).toBeNull();
+    expect(read({ ...ok, apps: { deals: { ...ok.apps.deals, ai: 1 } } })).toBeNull();
+    expect(read({ ...ok, apps: { deals: { ...ok.apps.deals, provider: 'claude' } } })).toBeNull();
+    expect(read({ ...ok, apps: { deals: { ...ok.apps.deals, monthly_usd: 1000.01 } } })).toBeNull();
+    expect(read({ ...ok, apps: { deals: { ...ok.apps.deals, monthly_usd: '5' } } })).toBeNull();
+    expect(read({ ...ok, keys: { anthropic: '  ' } })).toBeNull();
+    expect(read({ ...ok, apps: { deals: { ...ok.apps.deals, model: 'claude-haiku-5-5', effort: 'high' } } })).toMatchObject({ model: 'claude-haiku-5-5', effort: 'high' });
   });
 });

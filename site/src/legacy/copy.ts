@@ -220,7 +220,7 @@ export async function copy(db: Db, old: Old, options: { replace?: boolean } = {}
       const rows = converted.get(t.name)!;
       for (let i = 0; i < rows.length; i += BATCH) {
         const values = sql.join(rows.slice(i, i + BATCH).map((r) => sql`(${sql.join(r.map(({ col, value }) =>
-          col.kind === 'json' && value !== null ? sql`${value}::jsonb` : col.kind === 'uuid' ? sql`${value}::uuid` : sql`${value}`), sql`, `)})`), sql`, `);
+          col.kind === 'json' && value !== null ? sql`${value}::json` : col.kind === 'uuid' ? sql`${value}::uuid` : sql`${value}`), sql`, `)})`), sql`, `);
         await tx.execute(sql`INSERT INTO ${sql.raw(`${SCHEMA}.${q(t.name)}`)} (${sql.raw(t.cols.map((x) => q(x.name)).join(', '))}) OVERRIDING SYSTEM VALUE VALUES ${values}`);
       }
       if (t.serial) {

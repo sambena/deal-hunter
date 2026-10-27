@@ -33,9 +33,7 @@ export const DEFAULT_SETTINGS: Record<string, unknown> = {
   discord_enabled: false,
   discord_webhook: '',
   discord_deals_only: true,
-  ai_provider: 'off',   // off | ollama | claude
-  ollama_url: 'http://localhost:11434',   // Ollama's own default; OLLAMA_URL sets an install's own
-  ollama_model: 'qwen3.5:4b',
+  ai_provider: 'off',   // one of AI_PROVIDERS
   api_key: '',   // the retired single API key; kept so old settings read the same
   ha_url: '',   // Home Assistant, for importing devices into My Stuff
   ha_token: '',
@@ -53,21 +51,25 @@ export const DEFAULT_SETTINGS: Record<string, unknown> = {
   claude_model: 'claude-opus-5-5',
 };
 
+// The AI providers a setting may name ("off" included), and settings rows left from retired features.
+export const AI_PROVIDERS = ['off', 'claude', 'openai', 'gemini'];
+const RETIRED_KEYS = ['ollama_url', 'ollama_model'];
+
 export const SECRET_KEYS = new Set(['ebay_client_secret', 'bestbuy_api_key', 'discord_webhook', 'anthropic_api_key',
   'openai_api_key', 'gemini_api_key', 'ha_token', 'api_key']);
 
 // Each person's own settings. Everything else (source keys, check interval, Reddit subs...) is shared and only the
 // admin can change it.
 export const USER_KEYS = new Set(['zip_code', 'local_radius_miles', 'junk_terms', 'discord_enabled', 'discord_webhook',
-  'discord_deals_only', 'ai_provider', 'ollama_url', 'ollama_model', 'anthropic_api_key', 'claude_model',
-  'openai_api_key', 'openai_model', 'gemini_api_key', 'gemini_model', 'gemini_free_tier',
+  'discord_deals_only', 'ai_provider', 'anthropic_api_key', 'claude_model', 'openai_api_key',
+  'openai_model', 'gemini_api_key', 'gemini_model', 'gemini_free_tier',
   'ai_monthly_limit', 'ai_confirm', 'ai_source', 'ha_url', 'ha_token', 'focus', 'sizes']);
 
 // What a member (not the admin) may see and change: their area, junk words, Discord and their own AI. Everything
 // else, including their Home Assistant link, is the admin's.
 export const MEMBER_KEYS = new Set(['zip_code', 'local_radius_miles', 'junk_terms', 'discord_enabled', 'discord_webhook',
-  'discord_deals_only', 'ai_source', 'ai_provider', 'ollama_url', 'ollama_model', 'anthropic_api_key',
-  'claude_model', 'openai_api_key', 'openai_model', 'gemini_api_key', 'gemini_model',
+  'discord_deals_only', 'ai_source', 'ai_provider', 'anthropic_api_key', 'claude_model',
+  'openai_api_key', 'openai_model', 'gemini_api_key', 'gemini_model',
   'gemini_free_tier', 'ai_monthly_limit', 'ai_confirm', 'focus', 'sizes']);
 // Shared settings a member's pages still need to read (which sources are switched on, how often checks run).
 export const MEMBER_READS = new Set(['sources_enabled', 'poll_minutes', 'check_mode', 'check_times', 'check_timezone']);
@@ -179,6 +181,9 @@ export class Store {
     Object.assign(merged, mine);
     // Sources added after the settings were saved start at their default on/off.
     merged.sources_enabled = { ...(DEFAULT_SETTINGS.sources_enabled as object), ...((shared.sources_enabled as object) ?? {}) };
+    // A provider that is gone (Ollama, retired 2026-10) means AI off; its old settings rows are ignored.
+    if (!AI_PROVIDERS.includes(merged.ai_provider as string)) merged.ai_provider = 'off';
+    for (const key of RETIRED_KEYS) delete merged[key];
     return merged;
   }
 

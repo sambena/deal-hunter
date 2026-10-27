@@ -340,5 +340,247 @@
   "8128": {
    "http": 500
   }
+ },
+ "ai": {
+  "claude": [
+   {
+    "text": "{\"verdict\": \"good\", \"note\": \"Fair price for a made-up card.\"}",
+    "stop_reason": "end_turn",
+    "usage": {
+     "input_tokens": 900,
+     "output_tokens": 120,
+     "cache_creation_input_tokens": 0,
+     "cache_read_input_tokens": null
+    }
+   },
+   {
+    "text": "{\"suggestions\": [{\"name\": \"Quiet NAS\", \"category\": \"storage\", \"query\": \"ds920\", \"exclude\": [\"parts\"], \"max_price\": 350, \"reason\": \"Made-up reason.\"}, {\"name\": \"Second\", \"category\": \"storage\", \"query\": \"n100\", \"exclude\": [\"parts\"], \"max_price\": null, \"reason\": \"Made-up reason.\"}]}",
+    "stop_reason": "end_turn",
+    "usage": {
+     "input_tokens": 900,
+     "output_tokens": 120,
+     "cache_creation_input_tokens": 50,
+     "cache_read_input_tokens": null
+    }
+   },
+   {
+    "text": "{\"suggestions\": [{\"name\": \"i7-4790K\", \"category\": \"cpu\", \"query\": \"4790k\", \"exclude\": [\"parts\"], \"max_price\": 350, \"reason\": \"Made-up reason.\"}]}",
+    "stop_reason": "end_turn",
+    "usage": {
+     "input_tokens": 900,
+     "output_tokens": 120,
+     "cache_creation_input_tokens": 0,
+     "cache_read_input_tokens": null
+    }
+   },
+   {
+    "text": "{\"parts\": [{\"category\": \"cpu\", \"model\": \"Intel Core i5-7500\"}, {\"category\": \"ram\", \"model\": \"  \"}, {\"category\": \"gpu\", \"model\": \"GTX 1060\"}]}",
+    "stop_reason": "end_turn",
+    "usage": {
+     "input_tokens": 900,
+     "output_tokens": 120,
+     "cache_creation_input_tokens": 0,
+     "cache_read_input_tokens": null
+    }
+   },
+   {
+    "text": "{\"suggestions\": [{\"device_id\": 4, \"name\": \"Better TV\", \"category\": \"tv\", \"query\": \"oled65c3\", \"exclude\": [], \"max_price\": 900, \"reason\": \"Brighter.\"}, {\"device_id\": 99, \"name\": \"Nope\", \"category\": \"tv\", \"query\": \"x\", \"exclude\": [], \"max_price\": null, \"reason\": \"Made up.\"}, {\"device_id\": 4, \"name\": \"Empty\", \"category\": \"tv\", \"query\": \"  \", \"exclude\": [], \"max_price\": null, \"reason\": \"\"}]}",
+    "stop_reason": "end_turn",
+    "usage": {
+     "input_tokens": 900,
+     "output_tokens": 120,
+     "cache_creation_input_tokens": 0,
+     "cache_read_input_tokens": null
+    }
+   },
+   {
+    "text": "{\"reviews\": [{\"id\": 1, \"verdict\": \"good\", \"reason\": \" Cheap. \"}, {\"id\": 2, \"verdict\": \"skip\", \"reason\": \"Mining card.\"}, {\"id\": 3, \"verdict\": \"skip\", \"reason\": \"Starred, so kept.\"}, {\"id\": 999, \"verdict\": \"skip\", \"reason\": \"Made up.\"}, {\"id\": 1, \"verdict\": \"ok\", \"reason\": \"A second answer.\"}, {\"id\": 4, \"verdict\": \"maybe\", \"reason\": \"Bad verdict.\"}], \"watch_changes\": [{\"watch_id\": 1, \"add_excludes\": [\"Mining\", \"mining\", \" lhr \", \"\"], \"max_price\": 450.123, \"min_price\": 0, \"year_min\": 2015, \"max_miles\": null, \"reason\": \"Tighter.\"}, {\"watch_id\": 1, \"add_excludes\": [], \"max_price\": 999, \"min_price\": null, \"year_min\": null, \"max_miles\": null, \"reason\": \"Looser: dropped.\"}, {\"watch_id\": 5, \"add_excludes\": [\"x\"], \"max_price\": 1, \"min_price\": null, \"year_min\": null, \"max_miles\": null, \"reason\": \"Not theirs.\"}, {\"watch_id\": 2, \"add_excludes\": [], \"max_price\": null, \"min_price\": null, \"year_min\": 2017, \"max_miles\": 80000.7, \"reason\": \"Newer.\"}]}",
+    "stop_reason": "end_turn",
+    "usage": {
+     "input_tokens": 900,
+     "output_tokens": 120,
+     "cache_creation_input_tokens": 0,
+     "cache_read_input_tokens": null
+    }
+   },
+   {
+    "text": "{\"query\": \" rtx 3080 -lhr \", \"exclude\": [\"mining\", \" \", \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"], \"min_price\": 0, \"max_price\": 420.5, \"year_min\": null, \"year_max\": true, \"max_miles\": -5, \"size\": \"  \", \"sources\": [\"ebay\", \"ksl_cars\", \"nope\"], \"reason\": \"Made-up tune.\"}",
+    "stop_reason": "end_turn",
+    "usage": {
+     "input_tokens": 900,
+     "output_tokens": 120,
+     "cache_creation_input_tokens": 0,
+     "cache_read_input_tokens": null
+    }
+   },
+   {
+    "error": "rate"
+   },
+   {
+    "error": "status",
+    "status": 400,
+    "body": {
+     "type": "error",
+     "error": {
+      "type": "invalid_request_error",
+      "message": "Made-up problem."
+     }
+    }
+   },
+   {
+    "error": "auth"
+   },
+   {
+    "error": "connection"
+   },
+   {
+    "text": "{\"verdict\": \"skip\", \"note\": \"x\"}",
+    "stop_reason": "refusal",
+    "usage": {
+     "input_tokens": 900,
+     "output_tokens": 120,
+     "cache_creation_input_tokens": 0,
+     "cache_read_input_tokens": null
+    }
+   },
+   {
+    "text": "{\"verdict\": \"skip\", \"note\": \"x\"}",
+    "stop_reason": "max_tokens",
+    "usage": {
+     "input_tokens": 900,
+     "output_tokens": 120,
+     "cache_creation_input_tokens": 0,
+     "cache_read_input_tokens": null
+    }
+   },
+   {
+    "text": "not json at all",
+    "stop_reason": "end_turn",
+    "usage": {
+     "input_tokens": 900,
+     "output_tokens": 120,
+     "cache_creation_input_tokens": 0,
+     "cache_read_input_tokens": null
+    }
+   },
+   {
+    "text": "{\"verdict\": \"ok\", \"note\": \"Member's first.\"}",
+    "stop_reason": "end_turn",
+    "usage": {
+     "input_tokens": 900,
+     "output_tokens": 120,
+     "cache_creation_input_tokens": 0,
+     "cache_read_input_tokens": null
+    }
+   },
+   {
+    "text": "{\"verdict\": \"ok\", \"note\": \"Member's second.\"}",
+    "stop_reason": "end_turn",
+    "usage": {
+     "input_tokens": 900,
+     "output_tokens": 120,
+     "cache_creation_input_tokens": 0,
+     "cache_read_input_tokens": null
+    }
+   }
+  ],
+  "openai": [
+   {
+    "json": {
+     "status": "completed",
+     "usage": {
+      "input_tokens": 700,
+      "output_tokens": 300
+     },
+     "output": [
+      {
+       "type": "reasoning",
+       "content": []
+      },
+      {
+       "type": "message",
+       "content": [
+        {
+         "type": "output_text",
+         "text": "{\"suggestions\": [{\"name\": \"Quiet NAS\", \"category\": \"storage\", \"query\": \"ds920\", \"exclude\": [\"parts\"], \"max_price\": 350, \"reason\": \"Made-up reason.\"}]}"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "http": 401,
+    "body": {
+     "error": {
+      "message": "Made-up bad key."
+     }
+    }
+   },
+   {
+    "json": {
+     "status": "incomplete",
+     "incomplete_details": {
+      "reason": "max_output_tokens"
+     },
+     "usage": {
+      "input_tokens": 700,
+      "output_tokens": 8000
+     },
+     "output": [
+      {
+       "type": "message",
+       "content": [
+        {
+         "type": "output_text",
+         "text": "{\"sugg"
+        }
+       ]
+      }
+     ]
+    }
+   }
+  ],
+  "gemini": [
+   {
+    "json": {
+     "usageMetadata": {
+      "promptTokenCount": 650,
+      "candidatesTokenCount": 200,
+      "thoughtsTokenCount": 40
+     },
+     "candidates": [
+      {
+       "finishReason": "STOP",
+       "content": {
+        "parts": [
+         {
+          "text": "thinking...",
+          "thought": true
+         },
+         {
+          "text": "{\"suggestions\": [{\"name\": \"Quiet NAS\", \"category\": \"storage\", \"query\": \"ds920\", \"exclude\": [\"parts\"], \"max_price\": 350, \"reason\": \"Made-up reason.\"}]}"
+         }
+        ]
+       }
+      }
+     ]
+    }
+   },
+   {
+    "json": {
+     "usageMetadata": {
+      "promptTokenCount": 650
+     },
+     "promptFeedback": {
+      "blockReason": "SAFETY"
+     }
+    }
+   },
+   {
+    "http": 429,
+    "body": "slow down"
+   }
+  ]
  }
 }

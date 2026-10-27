@@ -188,7 +188,7 @@ export class Poller {
       }
     }
     await this.db.execute(sql`UPDATE deals.watches SET last_polled = ${this.clock.now()}, last_error = ${errors.join('; ') || null},
-      polled_sources = ${JSON.stringify([...polled].sort())}::jsonb, last_check = ${JSON.stringify(diagnosis)}::jsonb WHERE id = ${watch.id}`);
+      polled_sources = ${JSON.stringify([...polled].sort())}::jsonb, last_check = ${JSON.stringify(diagnosis)}::json WHERE id = ${watch.id}`);
     if (limited && newRows.length) {
       // Only the cheapest N stay; a new find that didn't make the cut stays hidden and never alerts.
       await this.store.pruneCheapest(watch, new Set(newRows.map((r) => r.id)));

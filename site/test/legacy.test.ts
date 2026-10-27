@@ -58,7 +58,7 @@ beforeAll(() => {
   folder = mkdtempSync(join(tmpdir(), 'dh-legacy-'));
   file = join(folder, 'deal-hunter.db');
   accounts = makeLegacy(file);
-});
+}, 60_000);   // a Python run: past the default 10 s on a busy machine
 afterAll(() => rmSync(folder, { recursive: true, force: true }));
 beforeEach(async () => {
   database = await openDatabase({ dataDir: ':memory:' });
