@@ -8,6 +8,8 @@
     "noUncheckedIndexedAccess": false,
     "types": [],
     "noEmit": true,
+    "allowJs": true,
+    "checkJs": false,
     "paths": { "/cave/cave-ui.js": ["../node_modules/@cougarcave/ui/dist/types/index.d.ts"] }
   },
   "include": ["."]

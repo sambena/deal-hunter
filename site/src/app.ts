@@ -30,6 +30,8 @@ export async function build(config: Config, options: BuildOptions = {}) {
   // The built page files: vite build writes them to dist/public. The same URL works from src/ (dev) and dist/.
   const app = await createApp({
     name: NAME, slug: SLUG, config, publicDir: new URL('../dist/public/', import.meta.url), now,
+    // Finds show the shops' own photos (and Best Buy's logo, as its API terms ask), from wherever each shop keeps them.
+    policy: { extend: { 'img-src': ['*'] } },
     routes: (scope) => api(scope, { now, apiPort, downloadsDir, ...(resolve ? { resolve } : {}), ...(nhtsa ? { nhtsa } : {}), ...(cpsc ? { cpsc } : {}), net, aiSettingsFile: config.AI_SETTINGS_FILE, sleep: (s) => clock.sleep(s), poller: () => holder.poller! }),
     ...(logger === false ? { logger } : {}),
   });
