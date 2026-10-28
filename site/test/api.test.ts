@@ -261,14 +261,14 @@ describe('signing in', () => {
     }
   });
 
-  it('refuses a change to People or the shared settings unless the sign-in is under five minutes old; reading is fine', async () => {
+  it('refuses a change to People or the shared settings unless the sign-in is under an hour old; reading is fine', async () => {
     await start();
     const lee = recorded.ids.lee!;
-    const old = session(DEV_OWNER.subject, ['pwd', 'mfa'], T0 - 301);
-    const fresh = session(DEV_OWNER.subject, ['pwd', 'mfa'], T0 - 299);
+    const old = session(DEV_OWNER.subject, ['pwd', 'mfa'], T0 - 3601);
+    const fresh = session(DEV_OWNER.subject, ['pwd', 'mfa'], T0 - 3599);
     const stale = await call(old, 'PUT', '/api/settings', { poll_minutes: 25 });
     expect([stale.statusCode, stale.json().error]).toEqual([403, 'needs_recent_signin']);
-    expect(stale.json().message).toMatch(/your last Cougar Cave sign-in was 5 minutes ago/);
+    expect(stale.json().message).toMatch(/your last Cougar Cave sign-in was 60 minutes ago/);
     expect((await call(old, 'PUT', `/api/admin/users/${lee}`, { watch_limit: 4 })).json().error).toBe('needs_recent_signin');
     expect((await call(old, 'GET', '/api/admin/users')).statusCode).toBe(200);
     expect((await call(old, 'GET', '/api/state')).statusCode).toBe(200);
