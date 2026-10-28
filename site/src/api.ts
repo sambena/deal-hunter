@@ -10,7 +10,7 @@
 // - The AI (ai.ts) runs only when someone presses an AI button, through one gate that prices each request first.
 import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { bothFactors, people, Refusal, type Session } from '@cougarcave/server';
+import { bothFactors, isFresh, people, Refusal, type Session } from '@cougarcave/server';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { sql } from 'drizzle-orm';
 import { AIError, type AiSettings, Ai, PROVIDERS, REVIEW_MAX } from './ai.js';
@@ -38,8 +38,6 @@ const NEEDS_BOTH = 'This needs a Cougar Cave sign-in that used both your passwor
   + 'Sign out, then use Sign in with Cougar Cave.';
 const stale = (age: number) => `For this change, sign in again: your last Cougar Cave sign-in was ${Math.floor(age / 60)} minutes ago. `
   + 'Sign out, then use Sign in with Cougar Cave from a private window so it asks for your password and code.';
-const FRESH_SECONDS = 300;
-const SKEW_SECONDS = 30;
 const OWN_LOGIN_OFF = "Deal Hunter's own sign-in is off. Sign in with Cougar Cave.";
 const BAD_VALUE = 'bad request: a value sent was the wrong type or format';
 const ANDROID_APK = 'deal-hunter.apk';
@@ -134,7 +132,8 @@ export async function api(app: FastifyInstance, options: ApiOptions): Promise<vo
     if (privileged(req.method, path, member)) {
       if (!bothFactors(session)) throw fail(403, NEEDS_BOTH, 'needs_both_factors');
       const age = options.now() - (session.authTime ?? 0);
-      if (req.method !== 'GET' && !(age >= -SKEW_SECONDS && age <= FRESH_SECONDS)) throw fail(403, stale(age), 'needs_recent_signin');
+      // A recent sign-in: an hour by default, or as the owner console sets it for every app (the framework's isFresh).
+      if (req.method !== 'GET' && !isFresh(session, options.now())) throw fail(403, stale(age), 'needs_recent_signin');
     }
     req.member = member;
   });

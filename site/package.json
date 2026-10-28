@@ -17,7 +17,7 @@
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
-    "@cougarcave/server": "file:vendor/cougarcave-server-1.0.5.tgz",
+    "@cougarcave/server": "file:vendor/cougarcave-server-1.0.9.tgz",
     "@cougarcave/ui": "file:vendor/cougarcave-ui-1.1.0.tgz",
     "drizzle-orm": "0.45.4",
     "fastify": "5.12.7",
