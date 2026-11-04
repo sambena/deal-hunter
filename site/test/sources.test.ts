@@ -1,8 +1,7 @@
 // The sources give the Python app's own answers, ask the same things and wait the same gaps: test/fixtures/
-// sources-python.json is what sources.py did for each call, on made-up pages (test/fixtures/make_sources.py), with a
+// sources-python.json is what sources.py did for each call, on made-up pages (recorded once from the retired Python app), with a
 // fake clock. Here the same pages are served to the port, in the same order, on one Sources (so caches, tokens and
 // rate gaps carry over between calls as they did in Python). Nothing is fetched.
-import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,7 +10,6 @@ import { type Clock, type Net, NetError, type NetRequest, SourceError, Sources }
 import { DateValueError, htmlUnescape, JSONDecodeError, parsedateTimestamp, pyJsonDumps, quote, quotePlus, rawDecode, urlencode } from '../src/logic/py-text.js';
 
 const SITE = fileURLToPath(new URL('../', import.meta.url));
-const REPO = join(SITE, '..');
 interface Rule { url: string; has?: string[]; method?: string; status?: number; json?: unknown; body?: string; network?: string }
 interface Sent { method: string; url: string; headers: Record<string, string>; body: string | null; timeout: number }
 interface Result { out?: unknown; error?: string; message?: string; sent: Sent[]; slept: number[]; clock: number }
@@ -101,17 +99,5 @@ describe("the Python behaviour the sources rest on", () => {
     check('raw_decode', (text: string, idx: number) => rawDecode(text, idx));
     check('dumps', (v: unknown) => pyJsonDumps(v));
     check('dumps_compact', (v: unknown) => pyJsonDumps(v, [',', ':']));
-  });
-});
-
-describe('the recording', () => {
-  // The fixture is committed, so the comparison needs no Python. When Python is here, check it is still what the
-  // Python code gives, so a stale recording can't hide a difference.
-  const python = spawnSync('python', ['--version'], { encoding: 'utf8' });
-  it.skipIf(python.status !== 0)('is what the Python code gives today', () => {
-    const run = spawnSync('python', [join(SITE, 'test/fixtures/make_sources.py')], {
-      cwd: REPO, env: { ...process.env, PYTHONPATH: REPO, PYTHONIOENCODING: 'utf-8' }, encoding: 'utf8', maxBuffer: 1 << 26 });
-    expect(run.status, run.stderr).toBe(0);
-    expect(JSON.parse(run.stdout)).toEqual(recorded);
   });
 });

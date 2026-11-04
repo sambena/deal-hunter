@@ -1,0 +1,1 @@
+{"version": 1, "keys": {"anthropic": "made-up-anthropic-key", "openai": "", "gemini": ""}, "apps": {"deals": {"ai": true, "provider": "anthropic", "monthly_usd": 1.0, "tier": "balanced", "effort": "medium"}}}

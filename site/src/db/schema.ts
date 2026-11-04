@@ -1,8 +1,6 @@
 // Deal Hunter's tables, in its own schema (in cave-db the owner console's Add app made it; locally the kit does).
-// They keep the Python app's SQLite tables (../db.py) column for column, so the one-time copy can be checked row by
-// row and the API answers as it does today:
-// - ids are the old ones (the Android app keeps them), so every id column takes a given value; new rows count on from
-//   the highest;
+// They kept the old Python app's tables column for column, so the API answers as it always did:
+// - every id column takes a given value; new rows count on from the highest;
 // - times stay epoch seconds as floats (double precision), never converted;
 // - columns that held JSON text are jsonb; a setting's value is the JSON value the Python app stored.
 // A person is their central subject (a uuid); names and emails come from `people` in @cougarcave/server, never copied.

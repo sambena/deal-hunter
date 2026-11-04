@@ -1,7 +1,6 @@
 // The ported rules give the Python app's own answers: test/fixtures/logic-python.json is what matching.py, hardware.py,
-// specs.py and vehicles.py (and the Python behaviour they rest on) returned for the same made-up inputs, recorded by
-// test/fixtures/make_logic.py. NHTSA's answers are made up; nothing is fetched.
-import { spawnSync } from 'node:child_process';
+// specs.py and vehicles.py (and the Python behaviour they rest on) returned for the same made-up inputs, recorded once
+// from the retired Python app. NHTSA's answers are made up; nothing is fetched.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,7 +12,6 @@ import * as specs from '../src/logic/specs.js';
 import * as vehicles from '../src/logic/vehicles.js';
 
 const SITE = fileURLToPath(new URL('../', import.meta.url));
-const REPO = join(SITE, '..');
 const FIXTURE = join(SITE, 'test/fixtures/logic-python.json');
 type Case = { in: unknown[]; out?: unknown; error?: string; message?: string };
 const recorded = JSON.parse(readFileSync(FIXTURE, 'utf8')) as Record<string, Case[]>;
@@ -134,18 +132,5 @@ describe('the Python behaviour the rules rest on', () => {
   it('urllib quoting', async () => {
     expect(await differences('quote', pyQuote)).toEqual([]);
     expect(await differences('urlencode', T(pyUrlencode))).toEqual([]);
-  });
-});
-
-describe('the recording', () => {
-  // The fixture is committed, so these tests need no Python. When Python is here, check it is still what the Python
-  // code says, so a stale recording can't hide a difference.
-  const python = spawnSync('python', ['--version'], { encoding: 'utf8' });
-  it.skipIf(python.status !== 0)('is what the Python code gives today', () => {
-    const run = spawnSync('python', [join(SITE, 'test/fixtures/make_logic.py')], {
-      cwd: REPO, env: { ...process.env, PYTHONPATH: REPO, PYTHONIOENCODING: 'utf-8', PYTHONHASHSEED: '0' }, encoding: 'utf8', maxBuffer: 1 << 26,
-    });
-    expect(run.status, run.stderr).toBe(0);
-    expect(JSON.parse(run.stdout)).toEqual(recorded);
   });
 });
