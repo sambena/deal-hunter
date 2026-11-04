@@ -1,7 +1,6 @@
-// Deal Hunter's API: the same answers as the Python app for the same requests (test/fixtures/make_api.py replays them
-// through server.py's own routes on a database the real db.py made, which is copied in here), then the sign-in rules,
-// each refusal beside a working control, on the web port and the API port. Made-up data only; needs python.
-import { spawnSync } from 'node:child_process';
+// Deal Hunter's API: the same answers the retired Python app gave for the same requests (recorded once in
+// test/fixtures/api-<mode>.json, with the starting data loaded here), then the sign-in rules, each refusal beside a
+// working control, on the web port and the API port. Made-up data only.
 import { createHash, randomBytes } from 'node:crypto';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { request as httpRequest, type Server } from 'node:http';
@@ -14,13 +13,12 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { listenApiPort } from '../src/api-port.js';
 import { build } from '../src/app.js';
 import { loadShared } from '../src/ai.js';
-import { copy, openOld, readOld } from '../src/legacy/copy.js';
 import { clearCpscCache, type CpscGet } from '../src/logic/product-recalls.js';
 import { type Net, NetError } from '../src/logic/sources.js';
 import { clearRecallCache, type Get, LookupFailed } from '../src/logic/vehicles.js';
+import { seed, type Start } from './seed.js';
 
 const ISSUER = 'https://auth.example.test/application/o/deals/';
-const REPO = fileURLToPath(new URL('../../', import.meta.url));
 const SITE = fileURLToPath(new URL('../', import.meta.url));
 const T0 = 1_793_000_000;
 const KIM = '00000000-0000-4000-8000-0000000000c3';
@@ -54,13 +52,11 @@ const cpsc: CpscGet = async (url) => {
 let app: Awaited<ReturnType<typeof build>>;
 let clock = T0;
 
+const starts: Record<string, Start> = {};
 function record(mode: 'core' | 'devices' | 'ha' | 'ai'): Recording {
-  const run = spawnSync('python', [join(SITE, 'test/fixtures/make_api.py'), join(folder, `${mode}.db`), ISSUER, mode,
-    join(SITE, 'test/fixtures/outside.json')],
-  { cwd: REPO, env: { ...process.env, PYTHONPATH: REPO, PYTHONIOENCODING: 'utf-8', COUGAR_AI_SETTINGS: join(folder, 'none.json') },
-    encoding: 'utf8', maxBuffer: 1 << 26 });
-  if (run.status !== 0) throw new Error(`make_api.py failed: ${run.stderr || run.error}`);
-  return JSON.parse(run.stdout) as Recording;
+  const frozen = JSON.parse(readFileSync(join(SITE, `test/fixtures/api-${mode}.json`), 'utf8')) as { recording: Recording; start: Start };
+  starts[`${mode}.db`] = frozen.start;
+  return frozen.recording;
 }
 
 beforeAll(() => {
@@ -69,7 +65,7 @@ beforeAll(() => {
   devices = record('devices');
   homeAssistant = record('ha');
   aiRecording = record('ai');
-}, 120_000);   // four Python recordings: well past the default 10 s on a busy machine
+});
 
 type Answer2 = { error?: string; status?: number; body?: unknown; text?: string; usage?: unknown; stop_reason?: string; json?: unknown; http?: number };
 const AI_ANSWERS = (JSON.parse(readFileSync(join(SITE, 'test/fixtures/outside.json'), 'utf8')) as { ai: Record<string, Answer2[]> }).ai;
@@ -120,7 +116,7 @@ const homeAssistantNet: Net = async (req) => {
 afterAll(() => rmSync(folder, { recursive: true, force: true }));
 afterEach(async () => app?.close());
 
-/** The app, with the old database copied in. */
+/** The app, with the recorded starting data loaded. */
 async function start(extra: Parameters<typeof build>[1] = {}, database = 'core.db', aiFile?: string) {
   clock = T0;
   asked = [];
@@ -128,12 +124,7 @@ async function start(extra: Parameters<typeof build>[1] = {}, database = 'core.d
   clearCpscCache();
   app = await build(config(aiFile), { logger: false, now: () => clock, downloadsDir: join(folder, 'downloads'), nhtsa, cpsc,
     net: async () => { throw new NetError('no network in tests'); }, clock: { now: () => clock, sleep: async (s) => { clock += s; } }, ...extra });
-  const src = openOld(join(folder, database));
-  try {
-    await copy(app.cave.db, readOld(src, ISSUER));
-  } finally {
-    src.close();
-  }
+  await seed(app.cave.db, starts[database]!);
   // Kim never signs in here; in cave-db core.people is the login service's own list, which knows everyone.
   await app.cave.db.execute(sql`INSERT INTO core.people (id, name, email, is_active) VALUES (${KIM}, 'Kim', 'kim@example.test', true)`);
 }
@@ -176,7 +167,7 @@ describe('the same answers as the Python app', () => {
   }, 60_000);
 
   it('for every AI button, asking each AI provider the same things', async () => {
-    await start({ net: aiNet() }, 'ai.db', join(folder, 'ai.ai.json'));
+    await start({ net: aiNet() }, 'ai.db', join(SITE, 'test/fixtures/api-ai-settings.json'));
     expect(await replay(aiRecording)).toEqual([]);
     expect(asked).toEqual(aiRecording.asked);
     expect(asked.length).toBeGreaterThan(20);

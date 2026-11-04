@@ -1,9 +1,8 @@
-// The checks give the Python app's own results: test/fixtures/make_poller.py runs poller.py on a database the real
-// db.py made, with every source answering from test/fixtures/poller-spec.json (made up) and Discord replaced by a
-// stand-in. Here the same database is copied in and the same steps run on the port, with the same answers and clock;
-// after each step the watches, every find, the Discord posts, the sources asked and the poller's state must match.
-// Needs python. Nothing is fetched.
-import { spawnSync } from 'node:child_process';
+// The checks give the retired Python app's own results, recorded once in test/fixtures/poller-python.json: poller.py
+// ran on a starting database with every source answering from test/fixtures/poller-spec.json (made up) and Discord
+// replaced by a stand-in. Here the same starting data is loaded and the same steps run, with the same answers and
+// clock; after each step the watches, every find, the Discord posts, the sources asked and the poller's state must
+// match. Nothing is fetched.
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -12,15 +11,14 @@ import { openDatabase, type Database } from '@cougarcave/server';
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { SCHEMA } from '../src/db/schema.js';
-import { copy, openOld, readOld } from '../src/legacy/copy.js';
 import { nextCheck, wallToEpoch } from '../src/logic/schedule.js';
 import { type Listing, type Net, SourceError } from '../src/logic/sources.js';
 import { Poller } from '../src/poller.js';
 import { Store } from '../src/store.js';
+import { seed, type Start } from './seed.js';
 
 const ISSUER = 'https://auth.example.test/application/o/deals/';
 const SITE = fileURLToPath(new URL('../', import.meta.url));
-const REPO = join(SITE, '..');
 const SPEC_FILE = join(SITE, 'test/fixtures/poller-spec.json');
 const SPEC = JSON.parse(readFileSync(SPEC_FILE, 'utf8')) as Record<string, Record<string, unknown[]>>;
 const SOURCE_NAMES = ['ebay', 'ebay_local', 'reddit', 'bestbuy', 'slickdeals', 'buildapcsales', 'ksl', 'craigslist', 'offerup', 'ksl_cars', 'poshmark'];
@@ -34,19 +32,12 @@ let database: Database;
 
 beforeAll(async () => {
   folder = mkdtempSync(join(tmpdir(), 'dh-poller-'));
-  const run = spawnSync('python', [join(SITE, 'test/fixtures/make_poller.py'), join(folder, 'deal-hunter.db'), ISSUER, SPEC_FILE],
-    { cwd: REPO, env: { ...process.env, PYTHONPATH: REPO, PYTHONIOENCODING: 'utf-8' }, encoding: 'utf8', maxBuffer: 1 << 26 });
-  if (run.status !== 0) throw new Error(`make_poller.py failed: ${run.stderr || run.error}`);
-  recorded = JSON.parse(run.stdout);
+  const frozen = JSON.parse(readFileSync(join(SITE, 'test/fixtures/poller-python.json'), 'utf8')) as { recorded: typeof recorded; start: Start };
+  recorded = frozen.recorded;
   database = await openDatabase({ dataDir: ':memory:' });
   await database.migrate(fileURLToPath(new URL('../drizzle/', import.meta.url)), SCHEMA);
-  const src = openOld(join(folder, 'deal-hunter.db'));
-  try {
-    await copy(database.db, readOld(src, ISSUER));
-  } finally {
-    src.close();
-  }
-}, 60_000);   // a Python run: past the default 10 s on a busy machine
+  await seed(database.db, frozen.start);
+});
 afterAll(async () => {
   await database?.close();
   rmSync(folder, { recursive: true, force: true });
