@@ -11,7 +11,7 @@ import { DEV_MEMBER, DEV_OWNER, loadConfig } from '@cougarcave/server';
 import { sql } from 'drizzle-orm';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { listenApiPort } from '../src/api-port.js';
-import { build } from '../src/app.js';
+import { build, grantSpend } from '../src/app.js';
 import { loadShared } from '../src/ai.js';
 import { clearCpscCache, type CpscGet } from '../src/logic/product-recalls.js';
 import { type Net, NetError } from '../src/logic/sources.js';
@@ -476,12 +476,16 @@ describe("the owner console's AI settings file", () => {
   // shared_ai.py's rules: version 1, an entry with ai: true, a known provider, a monthly limit of 0-1000 and that
   // provider's key; an unknown tier or effort is ignored, never an error. Each refusal beside the file that works.
   const file = join(tmpdir(), `dh-ai-${process.pid}.json`);
-  const ok = { version: 1, keys: { anthropic: ' made-up ' }, apps: { deals: { ai: true, provider: 'anthropic', monthly_usd: 1000, tier: 'turbo', effort: 'max' } } };
+  const use = { model: 'claude-haiku-5-5', takes_effort: true, effort: '', price: { input: 100000, output: 500000, cache_write: 125000, cache_read: 10000 },
+    long_prompt: { above: 100000, price: { input: 500000, output: 2500000, cache_write: 625000, cache_read: 50000 } }, prices_as_of: '2026-11-03' };
+  const ok = { version: 1, keys: { anthropic: ' made-up ' }, apps: { deals: { ai: true, provider: 'anthropic', monthly_usd: 1000, tier: 'turbo', effort: 'max', use } } };
+  const withUse = (u: unknown) => read({ ...ok, apps: { deals: { ...ok.apps.deals, use: u } } });
   const read = (data: unknown) => { writeFileSync(file, typeof data === 'string' ? data : JSON.stringify(data)); return loadShared(file); };
   afterAll(() => rmSync(file, { force: true }));
 
   it('turns the admin AI on only for a complete entry', () => {
-    expect(read(ok)).toEqual({ provider: 'claude', model: null, tier: 'turbo', effort: null, monthly_usd: 1000, key: 'made-up' });
+    expect(read(ok)).toEqual({ provider: 'claude', model: null, tier: 'turbo', effort: null, monthly_usd: 1000, key: 'made-up',
+      use: { model: 'claude-haiku-5-5', takes_effort: true, effort: null, in: 0.1, out: 0.5, long: { over: 100000, in: 0.5, out: 2.5 }, prices_as_of: '2026-11-03' } });
     expect(loadShared(join(tmpdir(), 'dh-no-such-file.json'))).toBeNull();
     expect(read('{not json')).toBeNull();
     expect(read({ ...ok, version: 2 })).toBeNull();
@@ -492,5 +496,153 @@ describe("the owner console's AI settings file", () => {
     expect(read({ ...ok, apps: { deals: { ...ok.apps.deals, monthly_usd: '5' } } })).toBeNull();
     expect(read({ ...ok, keys: { anthropic: '  ' } })).toBeNull();
     expect(read({ ...ok, apps: { deals: { ...ok.apps.deals, model: 'claude-haiku-5-5', effort: 'high' } } })).toMatchObject({ model: 'claude-haiku-5-5', effort: 'high' });
+  });
+
+  it("is off until the console has published a model, and off for a malformed one", () => {
+    expect(withUse({ ...use, long_prompt: null })).toMatchObject({ use: { model: 'claude-haiku-5-5', in: 0.1, out: 0.5 } });
+    expect(withUse({ ...use, long_prompt: null })?.use).not.toHaveProperty('long');
+    const { use: _, ...noUse } = ok.apps.deals;
+    expect(read({ ...ok, apps: { deals: noUse } })).toBeNull();
+    for (const bad of [
+      { ...use, price: { ...use.price, input: -1 } },
+      { ...use, price: { ...use.price, output: 0.5 } },
+      { ...use, price: { input: 1, output: 1 } },
+      { ...use, takes_effort: undefined },
+      { ...use, takes_effort: 'yes' },
+      { ...use, effort: 'max' },
+      { ...use, model: 'bad model' },
+      { ...use, model: '' },
+      { ...use, prices_as_of: '' },
+      { ...use, long_prompt: undefined },
+      { ...use, long_prompt: { above: 0, price: use.price } },
+      { ...use, long_prompt: { above: 100000, price: { ...use.price, cache_read: -5 } } },
+      'claude-haiku-5-5',
+    ]) expect(withUse(bad)).toBeNull();
+  });
+});
+
+describe('the model the owner console published (#927)', () => {
+  // Sonnet at twice its listed price, so a price taken from Deal Hunter's own list would show.
+  const file = join(tmpdir(), `dh-use-${process.pid}.json`);
+  const price = (input: number, output: number) => ({ input, output, cache_write: input, cache_read: 0 });
+  const publish = (use: Record<string, unknown>) => writeFileSync(file, JSON.stringify({ version: 1, keys: { anthropic: 'made-up-anthropic-key' },
+    apps: { deals: { ai: true, provider: 'anthropic', monthly_usd: 1.0, tier: 'cheapest', effort: 'medium',
+      use: { model: 'claude-sonnet-5-5', takes_effort: true, effort: 'medium', price: price(4_000_000, 20_000_000), long_prompt: null, prices_as_of: '2026-11-03', ...use } } } }));
+  afterAll(() => rmSync(file, { force: true }));
+  const estimate = async (extra: Record<string, unknown> = {}) => call(await devCookie('owner'), 'POST', '/api/ai/estimate', { action: 'judge', listing_id: 1, ...extra });
+
+  it('prices every estimate with the published price, not its own list', async () => {
+    publish({});
+    await start({}, 'ai.db', file);
+    const res = await estimate();
+    expect(res.statusCode).toBe(200);
+    // The recorded answer at the listed $2 / $10 was typical 0.00365 and max 0.03115.
+    expect(res.json()).toMatchObject({ model: 'claude-sonnet-5-5', typical: 0.0073, max: 0.0623 });
+  });
+
+  it('uses the long-prompt price only above its size', async () => {
+    publish({ long_prompt: { above: 1_000_000, price: price(40_000_000, 200_000_000) } });
+    await start({}, 'ai.db', file);
+    expect((await estimate()).json()).toMatchObject({ typical: 0.0073 });
+    publish({ long_prompt: { above: 10, price: price(40_000_000, 200_000_000) } });
+    expect((await estimate()).json()).toMatchObject({ typical: 0.073 });
+  });
+
+  it('calls only the published model: another is refused, one Deal Hunter has never heard of works', async () => {
+    publish({ model: 'claude-haiku-5-5' });
+    await start({}, 'ai.db', file);
+    expect((await call(await devCookie('owner'), 'GET', '/api/ai/choices')).json().choices)
+      .toEqual([{ provider: 'claude', model: 'claude-haiku-5-5', label: 'Claude Haiku 5.5 (cheapest)', free: false, current: true }]);
+    const other = await estimate({ provider: 'claude', model: 'claude-sonnet-5-5' });
+    expect([other.statusCode, other.json().message]).toEqual([400, "That AI isn't available to you; pick one from the list"]);
+    expect((await estimate({ provider: 'claude', model: 'claude-haiku-5-5' })).statusCode).toBe(200);
+    publish({ model: 'claude-made-up-9' });
+    expect((await estimate()).json()).toMatchObject({ model: 'claude-made-up-9', model_label: 'claude-made-up-9', typical: 0.0073 });
+  });
+
+  it("is off with no published model, beside the same file with one", async () => {
+    publish({});
+    const raw = JSON.parse(readFileSync(file, 'utf8'));
+    delete raw.apps.deals.use;
+    writeFileSync(file, JSON.stringify(raw));
+    await start({}, 'ai.db', file);
+    const off = await estimate();
+    expect([off.statusCode, off.json().message]).toEqual([400, "The admin's AI is off in the owner console."]);
+    publish({});
+    expect((await estimate()).statusCode).toBe(200);
+  });
+
+  it("sends effort only when the published model takes it, the console's effort first", async () => {
+    const bodies: Record<string, unknown>[] = [];
+    const net: Net = async (req) => {
+      bodies.push(JSON.parse(req.body!) as Record<string, unknown>);
+      return { status: 200, body: Buffer.from(JSON.stringify({ content: [{ type: 'text', text: '{}' }], usage: { input_tokens: 10, output_tokens: 10 }, stop_reason: 'end_turn' })) };
+    };
+    const tune = async () => call(await devCookie('owner'), 'POST', '/api/ai/tune-watch', { watch: { name: 'RTX', query: 'rtx 3080', kind: 'item' }, instructions: 'cheaper' });
+    publish({ effort: 'high' });
+    await start({ net }, 'ai.db', file);
+    await tune();
+    publish({ takes_effort: false, effort: '' });
+    await tune();
+    publish({ effort: '' });   // the entry's effort, medium
+    await tune();
+    const raw = JSON.parse(readFileSync(file, 'utf8'));
+    delete raw.apps.deals.effort;
+    writeFileSync(file, JSON.stringify(raw));   // neither: low
+    await tune();
+    // A member on the admin's AI gets the console's effort too.
+    publish({ effort: 'high' });
+    await call(await devCookie('member'), 'POST', '/api/ai/tune-watch', { watch: { name: 'RTX', query: 'rtx 3080', kind: 'item' }, instructions: 'cheaper' });
+    expect(bodies.map((b) => [b.model, (b.output_config as Record<string, unknown>).effort])).toEqual([['claude-sonnet-5-5', 'high'],
+      ['claude-sonnet-5-5', undefined], ['claude-sonnet-5-5', 'medium'], ['claude-sonnet-5-5', 'low'], ['claude-sonnet-5-5', 'high']]);
+  });
+
+  it('records each call at the published price', async () => {
+    const net: Net = async () => ({ status: 200, body: Buffer.from(JSON.stringify({ content: [{ type: 'text', text: '{}' }], usage: { input_tokens: 1000, output_tokens: 100 }, stop_reason: 'end_turn' })) });
+    publish({});
+    await start({ net }, 'ai.db', file);
+    await app.cave.db.execute(sql`DELETE FROM deals.ai_usage`);
+    await call(await devCookie('owner'), 'POST', '/api/ai/tune-watch', { watch: { name: 'RTX', query: 'rtx 3080', kind: 'item' }, instructions: 'cheaper' });
+    const got = (await app.cave.db.execute(sql`SELECT model, cost FROM deals.ai_usage`)) as unknown as { rows?: unknown[] };
+    // $4 and $20 a million, twice the listed price.
+    expect((got.rows ?? (got as unknown as unknown[])).map((r: unknown) => ({ ...(r as object) }))).toEqual([{ model: 'claude-sonnet-5-5', cost: (1000 * 4 + 100 * 20) / 1e6 }]);
+  });
+});
+
+describe("the owner console's view of Deal Hunter's AI spend (#924)", () => {
+  it("counts only calls on the admin's AI, by UTC month, and shows no person or model", async () => {
+    await start();
+    const members = (await app.cave.db.execute(sql`SELECT id, admin FROM deals.members ORDER BY id`)) as unknown as { rows?: { id: number; admin: boolean }[] };
+    const rows = members.rows ?? (members as unknown as { id: number; admin: boolean }[]);
+    const admin = rows.find((r) => r.admin)!.id, member = rows.find((r) => !r.admin)!.id;
+    const nov = Date.UTC(2026, 10, 4) / 1000, dec = Date.UTC(2026, 11, 1) / 1000;
+    await app.cave.db.execute(sql`DELETE FROM deals.ai_usage`);
+    for (const [at, cost, who, paidBy] of [[nov, 0.25, admin, admin], [nov, 0.000001, member, admin], [nov, 5, member, member], [dec, 0.5, admin, admin]] as const) {
+      await app.cave.db.execute(sql`INSERT INTO deals.ai_usage (at, provider, model, action, input_tokens, output_tokens, cost, member_id, paid_by)
+        VALUES (${at}, 'claude', 'm', 'judge', 1, 1, ${cost}, ${who}, ${paidBy})`);
+    }
+    const view = (await app.cave.db.execute(sql`SELECT * FROM deals.cave_ai_month ORDER BY month`)) as unknown as { rows?: unknown[] };
+    expect((view.rows ?? (view as unknown as unknown[])).map((r: unknown) => ({ ...(r as object) }))).toEqual([
+      { app: 'deals', month: '2026-11', billed_micros: 250001, calls: 2 },
+      { app: 'deals', month: '2026-12', billed_micros: 500000, calls: 1 },
+    ]);
+  });
+
+  it('is granted to the console role made after the view, and only the view', async () => {
+    await start();
+    const can = async () => ((await app.cave.db.execute(sql`SELECT has_table_privilege('cave_spend', 'deals.cave_ai_month', 'SELECT') AS v,
+      has_table_privilege('cave_spend', 'deals.ai_usage', 'SELECT') AS t`)) as unknown as { rows?: unknown[] });
+    await app.cave.db.execute(sql`CREATE ROLE cave_spend`);
+    try {
+      const before = await can();
+      expect({ ...((before.rows ?? (before as unknown as unknown[]))[0] as object) }).toEqual({ v: false, t: false });
+      await grantSpend(app.cave.db);
+      const after = await can();
+      expect({ ...((after.rows ?? (after as unknown as unknown[]))[0] as object) }).toEqual({ v: true, t: false });
+    } finally {
+      await app.cave.db.execute(sql`REVOKE ALL ON ALL TABLES IN SCHEMA deals FROM cave_spend`);
+      await app.cave.db.execute(sql`REVOKE ALL ON SCHEMA deals FROM cave_spend`);
+      await app.cave.db.execute(sql`DROP ROLE cave_spend`);
+    }
   });
 });

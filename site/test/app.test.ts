@@ -57,7 +57,7 @@ describe('Deal Hunter', () => {
     app = await build(config(), { logger: false });
     const rows = await app.cave.db.execute(sql`SELECT table_name FROM information_schema.tables WHERE table_schema = ${SCHEMA} ORDER BY table_name`);
     const names = ((rows as unknown as { rows?: { table_name: string }[] }).rows ?? (rows as unknown as { table_name: string }[])).map((r) => r.table_name);
-    expect(names).toEqual(['__drizzle_migrations', 'ai_usage', 'listings', 'machines', 'members', 'settings', 'user_settings', 'watches']);
+    expect(names).toEqual(['__drizzle_migrations', 'ai_usage', 'cave_ai_month', 'listings', 'machines', 'members', 'settings', 'user_settings', 'watches']);
     const again = await app.cave.database.migrate(fileURLToPath(new URL('../drizzle/', import.meta.url)), SCHEMA);
     expect(again).toBe(0);
   });
