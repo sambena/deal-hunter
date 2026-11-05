@@ -24,8 +24,19 @@ export interface BuildOptions extends Partial<Omit<ApiOptions, 'poller' | 'net' 
   clock?: Clock;
 }
 
-/** Lets cave-db's cave_spend role (the owner console) read deals.cave_ai_month and nothing else of Deal Hunter's. */
+/** Deal Hunter's own deals.cave_ai_month (drizzle/0002), put back on every start, then granted to cave-db's cave_spend
+ * role (the owner console), which may read it and nothing else of Deal Hunter's.
+ *
+ * Why put back: with sideData 'database' the framework makes its own cave_ai_month on every start, over its AI ledger
+ * (cave_ai_usage), in the same schema. Deal Hunter keeps its AI spend in deals.ai_usage instead, so the framework's
+ * view would always read zero. It runs after createApp, so Deal Hunter's view is the one left. */
 export async function grantSpend(db: Db): Promise<void> {
+  await db.execute(sql.raw(`CREATE OR REPLACE VIEW "deals"."cave_ai_month" AS
+  SELECT 'deals'::text AS app, to_char(to_timestamp(u.at) AT TIME ZONE 'UTC', 'YYYY-MM') AS month,
+         SUM(round(u.cost * 1000000))::bigint AS billed_micros, COUNT(*)::bigint AS calls
+    FROM "deals"."ai_usage" u JOIN "deals"."members" m ON m.id = COALESCE(u.paid_by, u.member_id)
+   WHERE m.admin
+   GROUP BY 2`));
   await db.execute(sql.raw(`DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'cave_spend') THEN
     GRANT USAGE ON SCHEMA "deals" TO cave_spend;

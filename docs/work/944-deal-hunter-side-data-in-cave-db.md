@@ -25,3 +25,13 @@ sign-ins and pairings made after the move are lost. Upgrading again after a roll
   restart sticks); the cave-db check refuses a live start without `DATABASE_URL`.
 - `npm run typecheck` clean; `npm test`: 91 passed.
 - Live: `deals-web` already has `DATABASE_URL`, and its `cave.db` is there to copy.
+
+## Fresh-agent review: needs changes, fixed
+- **High: the owner console would have read zero for Deal Hunter.** With `sideData: 'database'` the framework makes its
+  own `cave_ai_month` on every start, in the app's schema (live, `deals`), over its AI ledger, which Deal Hunter
+  doesn't use. Postgres would have replaced Deal Hunter's view (#927) quietly, as the columns match. Fixed:
+  `grantSpend()` now puts Deal Hunter's view back on every start, after `createApp`, then grants it. The view test now
+  replaces the view with the framework's, sees zero, and sees Deal Hunter's totals again after `grantSpend()`. Tests
+  can't show the clash itself, as PGlite puts the framework's view in `public`. Longer term the framework should let
+  an app with its own AI keep its own view (new item).
+- Low, no change: the last-active query is valid in Postgres and PGlite; one query per person is fine for a family.

@@ -635,11 +635,23 @@ describe("the owner console's view of Deal Hunter's AI spend (#924)", () => {
       await app.cave.db.execute(sql`INSERT INTO deals.ai_usage (at, provider, model, action, input_tokens, output_tokens, cost, member_id, paid_by)
         VALUES (${at}, 'claude', 'm', 'judge', 1, 1, ${cost}, ${who}, ${paidBy})`);
     }
-    const view = (await app.cave.db.execute(sql`SELECT * FROM deals.cave_ai_month ORDER BY month`)) as unknown as { rows?: unknown[] };
-    expect((view.rows ?? (view as unknown as unknown[])).map((r: unknown) => ({ ...(r as object) }))).toEqual([
+    const read = async () => {
+      const view = (await app.cave.db.execute(sql`SELECT * FROM deals.cave_ai_month ORDER BY month`)) as unknown as { rows?: unknown[] };
+      return (view.rows ?? (view as unknown as unknown[])).map((r: unknown) => ({ ...(r as object) }));
+    };
+    const totals = [
       { app: 'deals', month: '2026-11', billed_micros: 250001, calls: 2 },
       { app: 'deals', month: '2026-12', billed_micros: 500000, calls: 1 },
-    ]);
+    ];
+    expect(await read()).toEqual(totals);
+    // Live, the framework's own cave_ai_month (over its empty cave_ai_usage) lands in deals on every start, as here.
+    // Deal Hunter puts its own back after it, so the console never reads zero.
+    await app.cave.db.execute(sql.raw(`CREATE OR REPLACE VIEW deals.cave_ai_month AS
+      SELECT app, to_char(to_timestamp(at) AT TIME ZONE 'UTC', 'YYYY-MM') AS month, SUM(billed_micros)::bigint AS billed_micros,
+             COUNT(*)::bigint AS calls FROM cave_ai_usage GROUP BY 1, 2`));
+    expect(await read()).toEqual([]);
+    await grantSpend(app.cave.db);
+    expect(await read()).toEqual(totals);
   });
 
   it('is granted to the console role made after the view, and only the view', async () => {
