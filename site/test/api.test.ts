@@ -135,10 +135,10 @@ async function devCookie(who: 'owner' | 'member') {
 }
 
 /** A browser session made directly in the framework's store: whoever, signed in however and whenever. */
-function session(subject: string, amr: string[] | null, authTime = clock): string {
+async function session(subject: string, amr: string[] | null, authTime = clock): Promise<string> {
   const token = randomBytes(24).toString('base64url');
   const person = JSON.stringify({ subject, name: 'Made up', email: 'made-up@example.test', role: 'member' });
-  app.cave.store.run('INSERT INTO sessions (hash, sid, subject, person, auth_time, amr, created, seen, expires) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+  await app.cave.side.run('INSERT INTO cave_sessions (hash, sid, subject, person, auth_time, amr, created, seen, expires) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
     createHash('sha256').update(token).digest('hex'), 'sid-' + token.slice(0, 6), subject, person, authTime, amr ? JSON.stringify(amr) : null,
     clock, clock, clock + 30 * 86400);
   return `cave_session=${token}`;
@@ -234,10 +234,10 @@ describe('signing in', () => {
 
   it('refuses an admin whose sign-in lacked both factors on every route; a member signed in that way still works', async () => {
     await start();
-    const pwdOnly = session(DEV_OWNER.subject, ['pwd']);
-    const codeOnly = session(DEV_OWNER.subject, ['mfa']);
-    const both = session(DEV_OWNER.subject, ['pwd', 'mfa']);
-    const member = session(DEV_MEMBER.subject, ['pwd']);
+    const pwdOnly = await session(DEV_OWNER.subject, ['pwd']);
+    const codeOnly = await session(DEV_OWNER.subject, ['mfa']);
+    const both = await session(DEV_OWNER.subject, ['pwd', 'mfa']);
+    const member = await session(DEV_MEMBER.subject, ['pwd']);
     for (const [method, url] of [['GET', '/api/state'], ['GET', '/api/listings'], ['GET', '/api/me'], ['POST', '/api/listings/mark-seen'],
       ['GET', '/download/android']] as const) {
       for (const cookie of [pwdOnly, codeOnly]) {
@@ -252,11 +252,25 @@ describe('signing in', () => {
     }
   });
 
+  it("shows when each person was last here from the framework's sign-in records in cave-db", async () => {
+    await start();
+    const lee = recorded.ids.lee!;
+    const found = await app.cave.db.execute(sql`SELECT subject FROM deals.members WHERE id = ${lee}`);
+    const subject = ((found as unknown as { rows?: { subject: string }[] }).rows ?? (found as unknown as { subject: string }[]))[0]!.subject;
+    const owner = await session(DEV_OWNER.subject, ['pwd', 'mfa']);
+    const before = (await call(owner, 'GET', '/api/admin/users')).json().users as { id: number; last_active: number | null }[];
+    expect(before.find((u) => u.id === lee)!.last_active).toBeNull();
+    clock = T0 + 500;
+    await session(subject, ['pwd']);
+    const after = (await call(owner, 'GET', '/api/admin/users')).json().users as { id: number; last_active: number | null }[];
+    expect(after.find((u) => u.id === lee)!.last_active).toBe(T0 + 500);
+  });
+
   it('refuses a change to People or the shared settings unless the sign-in is under an hour old; reading is fine', async () => {
     await start();
     const lee = recorded.ids.lee!;
-    const old = session(DEV_OWNER.subject, ['pwd', 'mfa'], T0 - 3601);
-    const fresh = session(DEV_OWNER.subject, ['pwd', 'mfa'], T0 - 3599);
+    const old = await session(DEV_OWNER.subject, ['pwd', 'mfa'], T0 - 3601);
+    const fresh = await session(DEV_OWNER.subject, ['pwd', 'mfa'], T0 - 3599);
     const stale = await call(old, 'PUT', '/api/settings', { poll_minutes: 25 });
     expect([stale.statusCode, stale.json().error]).toEqual([403, 'needs_recent_signin']);
     expect(stale.json().message).toMatch(/your last Cougar Cave sign-in was 60 minutes ago/);
@@ -266,14 +280,14 @@ describe('signing in', () => {
     expect((await call(fresh, 'PUT', '/api/settings', { poll_minutes: 25 })).statusCode).toBe(200);
     expect((await call(fresh, 'PUT', `/api/admin/users/${lee}`, { watch_limit: 4 })).statusCode).toBe(200);
     // A member's own settings aren't privileged: an old sign-in may change them.
-    const memberOld = session(DEV_MEMBER.subject, ['pwd'], T0 - 3600);
+    const memberOld = await session(DEV_MEMBER.subject, ['pwd'], T0 - 3600);
     expect((await call(memberOld, 'PUT', '/api/settings', { zip_code: '00003' })).statusCode).toBe(200);
   });
 
   it('keeps People to the admin, and asks a member for both factors first, as the Python app did', async () => {
     await start();
-    const memberBoth = session(DEV_MEMBER.subject, ['pwd', 'mfa']);
-    const memberPwd = session(DEV_MEMBER.subject, ['pwd']);
+    const memberBoth = await session(DEV_MEMBER.subject, ['pwd', 'mfa']);
+    const memberPwd = await session(DEV_MEMBER.subject, ['pwd']);
     const res = await call(memberBoth, 'GET', '/api/admin/users');
     expect([res.statusCode, res.json().message]).toEqual([403, 'only the admin can do that']);
     expect((await call(memberPwd, 'GET', '/api/admin/users')).json().error).toBe('needs_both_factors');
@@ -297,7 +311,7 @@ describe('signing in', () => {
   it('makes a member row on a first sign-in, with a new friend\'s limits', async () => {
     await start();
     const someone = '00000000-0000-4000-8000-0000000000d4';
-    const res = await call(session(someone, ['pwd']), 'GET', '/api/state');
+    const res = await call(await session(someone, ['pwd']), 'GET', '/api/state');
     expect(res.statusCode).toBe(200);
     expect(res.json().watches).toEqual([]);
     const [row] = (await app.cave.db.execute(sql`SELECT * FROM deals.members WHERE subject = ${someone}`) as unknown as { rows: Record<string, unknown>[] }).rows;
@@ -344,10 +358,10 @@ function onApiPort(server: Server, method: string, path: string, headers: Record
 describe('phones', () => {
   it('pairs only from a sign-in that used a code, as before', async () => {
     await start();
-    const pwdOnly = session(DEV_MEMBER.subject, ['pwd']);
+    const pwdOnly = await session(DEV_MEMBER.subject, ['pwd']);
     const res = await call(pwdOnly, 'POST', '/auth/devices/code', {});
     expect([res.statusCode, res.json().error]).toEqual([403, 'needs_recent_signin']);
-    expect((await call(session(DEV_MEMBER.subject, ['mfa']), 'POST', '/auth/devices/code', {})).statusCode).toBe(201);
+    expect((await call(await session(DEV_MEMBER.subject, ['mfa']), 'POST', '/auth/devices/code', {})).statusCode).toBe(201);
   });
 
   it("an admin's phone works on ordinary routes but not privileged ones", async () => {
@@ -621,11 +635,23 @@ describe("the owner console's view of Deal Hunter's AI spend (#924)", () => {
       await app.cave.db.execute(sql`INSERT INTO deals.ai_usage (at, provider, model, action, input_tokens, output_tokens, cost, member_id, paid_by)
         VALUES (${at}, 'claude', 'm', 'judge', 1, 1, ${cost}, ${who}, ${paidBy})`);
     }
-    const view = (await app.cave.db.execute(sql`SELECT * FROM deals.cave_ai_month ORDER BY month`)) as unknown as { rows?: unknown[] };
-    expect((view.rows ?? (view as unknown as unknown[])).map((r: unknown) => ({ ...(r as object) }))).toEqual([
+    const read = async () => {
+      const view = (await app.cave.db.execute(sql`SELECT * FROM deals.cave_ai_month ORDER BY month`)) as unknown as { rows?: unknown[] };
+      return (view.rows ?? (view as unknown as unknown[])).map((r: unknown) => ({ ...(r as object) }));
+    };
+    const totals = [
       { app: 'deals', month: '2026-11', billed_micros: 250001, calls: 2 },
       { app: 'deals', month: '2026-12', billed_micros: 500000, calls: 1 },
-    ]);
+    ];
+    expect(await read()).toEqual(totals);
+    // Live, the framework's own cave_ai_month (over its empty cave_ai_usage) lands in deals on every start, as here.
+    // Deal Hunter puts its own back after it, so the console never reads zero.
+    await app.cave.db.execute(sql.raw(`CREATE OR REPLACE VIEW deals.cave_ai_month AS
+      SELECT app, to_char(to_timestamp(at) AT TIME ZONE 'UTC', 'YYYY-MM') AS month, SUM(billed_micros)::bigint AS billed_micros,
+             COUNT(*)::bigint AS calls FROM cave_ai_usage GROUP BY 1, 2`));
+    expect(await read()).toEqual([]);
+    await grantSpend(app.cave.db);
+    expect(await read()).toEqual(totals);
   });
 
   it('is granted to the console role made after the view, and only the view', async () => {

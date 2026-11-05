@@ -4,9 +4,10 @@
 import type { Server } from 'node:http';
 import { loadConfig } from '@cougarcave/server';
 import { listenApiPort } from './api-port.js';
-import { build } from './app.js';
+import { build, requireCaveDb } from './app.js';
 
 const config = loadConfig();
+requireCaveDb(config);
 const apiPort = process.env.API_PORT ? Number(process.env.API_PORT) : null;
 if (apiPort !== null && !(Number.isInteger(apiPort) && apiPort > 0 && apiPort < 65536)) throw new Error('API_PORT must be a port number');
 const app = await build(config, { apiPort, ...(process.env.DOWNLOADS_DIR ? { downloadsDir: process.env.DOWNLOADS_DIR } : {}) });

@@ -24,14 +24,35 @@ export interface BuildOptions extends Partial<Omit<ApiOptions, 'poller' | 'net' 
   clock?: Clock;
 }
 
-/** Lets cave-db's cave_spend role (the owner console) read deals.cave_ai_month and nothing else of Deal Hunter's. */
+/** Deal Hunter's own deals.cave_ai_month (drizzle/0002), put back on every start, then granted to cave-db's cave_spend
+ * role (the owner console), which may read it and nothing else of Deal Hunter's.
+ *
+ * Why put back: with sideData 'database' the framework makes its own cave_ai_month on every start, over its AI ledger
+ * (cave_ai_usage), in the same schema. Deal Hunter keeps its AI spend in deals.ai_usage instead, so the framework's
+ * view would always read zero. It runs after createApp, so Deal Hunter's view is the one left. */
 export async function grantSpend(db: Db): Promise<void> {
+  await db.execute(sql.raw(`CREATE OR REPLACE VIEW "deals"."cave_ai_month" AS
+  SELECT 'deals'::text AS app, to_char(to_timestamp(u.at) AT TIME ZONE 'UTC', 'YYYY-MM') AS month,
+         SUM(round(u.cost * 1000000))::bigint AS billed_micros, COUNT(*)::bigint AS calls
+    FROM "deals"."ai_usage" u JOIN "deals"."members" m ON m.id = COALESCE(u.paid_by, u.member_id)
+   WHERE m.admin
+   GROUP BY 2`));
   await db.execute(sql.raw(`DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'cave_spend') THEN
     GRANT USAGE ON SCHEMA "deals" TO cave_spend;
     GRANT SELECT ON "deals"."cave_ai_month" TO cave_spend;
   END IF;
 END $$`));
+}
+
+/** Live Deal Hunter keeps every row in cave-db (Library 132). Without its address it would quietly start a private
+ * PGlite in DATA_DIR, so it refuses to start instead. Only local work (the dev login, 127.0.0.1 only) and tests run
+ * on PGlite. */
+export function requireCaveDb(config: Config): void {
+  if (!config.DATABASE_URL && !config.DEV_LOGIN) {
+    throw new Error('Deal Hunter needs cave-db: set DATABASE_URL (from its db.env, written by the owner console Add app). ' +
+                    'Only local work with DEV_LOGIN=1 runs without it.');
+  }
 }
 
 export async function build(config: Config, options: BuildOptions = {}) {
@@ -41,6 +62,9 @@ export async function build(config: Config, options: BuildOptions = {}) {
   // The built page files: vite build writes them to dist/public. The same URL works from src/ (dev) and dist/.
   const app = await createApp({
     name: NAME, slug: SLUG, config, publicDir: new URL('../dist/public/', import.meta.url), now,
+    // The framework's side data (sessions, paired phones, rate limits, the audit log) goes in Deal Hunter's cave-db
+    // schema with the rest of its data, not in a cave.db file (Library 132). An existing cave.db is copied in once.
+    sideData: 'database',
     // Finds show the shops' own photos (and Best Buy's logo, as its API terms ask), from wherever each shop keeps them.
     policy: { extend: { 'img-src': ['*'] } },
     routes: (scope) => api(scope, { now, apiPort, downloadsDir, ...(resolve ? { resolve } : {}), ...(nhtsa ? { nhtsa } : {}), ...(cpsc ? { cpsc } : {}), net, aiSettingsFile: config.AI_SETTINGS_FILE, sleep: (s) => clock.sleep(s), poller: () => holder.poller! }),
