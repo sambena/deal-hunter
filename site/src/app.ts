@@ -27,9 +27,8 @@ export interface BuildOptions extends Partial<Omit<ApiOptions, 'poller' | 'net' 
 /** Deal Hunter's own deals.cave_ai_month (drizzle/0002), put back on every start, then granted to cave-db's cave_spend
  * role (the owner console), which may read it and nothing else of Deal Hunter's.
  *
- * Why put back: with sideData 'database' the framework makes its own cave_ai_month on every start, over its AI ledger
- * (cave_ai_usage), in the same schema. Deal Hunter keeps its AI spend in deals.ai_usage instead, so the framework's
- * view would always read zero. It runs after createApp, so Deal Hunter's view is the one left. */
+ * aiSpendView: 'app' leaves this view to Deal Hunter. Keeping this repair after createApp also handles older
+ * framework starts that replaced the view with their unused ledger. */
 export async function grantSpend(db: Db): Promise<void> {
   await db.execute(sql.raw(`CREATE OR REPLACE VIEW "deals"."cave_ai_month" AS
   SELECT 'deals'::text AS app, to_char(to_timestamp(u.at) AT TIME ZONE 'UTC', 'YYYY-MM') AS month,
@@ -65,6 +64,7 @@ export async function build(config: Config, options: BuildOptions = {}) {
     // The framework's side data (sessions, paired phones, rate limits, the audit log) goes in Deal Hunter's cave-db
     // schema with the rest of its data, not in a cave.db file (Library 132). An existing cave.db is copied in once.
     sideData: 'database',
+    aiSpendView: 'app',
     // Finds show the shops' own photos (and Best Buy's logo, as its API terms ask), from wherever each shop keeps them.
     policy: { extend: { 'img-src': ['*'] } },
     routes: (scope) => api(scope, { now, apiPort, downloadsDir, ...(resolve ? { resolve } : {}), ...(nhtsa ? { nhtsa } : {}), ...(cpsc ? { cpsc } : {}), net, aiSettingsFile: config.AI_SETTINGS_FILE, sleep: (s) => clock.sleep(s), poller: () => holder.poller! }),
