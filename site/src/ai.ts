@@ -279,7 +279,7 @@ export class Ai {
     for (const k of AI_KEYS) s[k] = adminAi[k];
     s.ai_monthly_limit = Number(user!.ai_allowance || 0);
     const owner = (await this.o.nameOf(adminId)) || 'the admin';
-    const scope: Scope = { source: 'shared', user_id: memberId, paid_by: adminId, owner, trusted: true, managed: true,
+    const scope: Scope = { source: 'shared', user_id: memberId, paid_by: adminId, owner, trusted: true, managed: true, effort: m.off === undefined ? m.effort : null,
       daily_cap: Math.trunc(Number(user!.ai_daily_cap || 0)), pool_limit: Number(adminAi.ai_monthly_limit || 0) };
     if (m.off === undefined) scope.published = this.published(m);
     if (!user!.ai_shared) {

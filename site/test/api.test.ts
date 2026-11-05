@@ -11,7 +11,7 @@ import { DEV_MEMBER, DEV_OWNER, loadConfig } from '@cougarcave/server';
 import { sql } from 'drizzle-orm';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { listenApiPort } from '../src/api-port.js';
-import { build } from '../src/app.js';
+import { build, grantSpend } from '../src/app.js';
 import { loadShared } from '../src/ai.js';
 import { clearCpscCache, type CpscGet } from '../src/logic/product-recalls.js';
 import { type Net, NetError } from '../src/logic/sources.js';
@@ -584,7 +584,28 @@ describe('the model the owner console published (#927)', () => {
     await tune();
     publish({ takes_effort: false, effort: '' });
     await tune();
-    expect(bodies.map((b) => [b.model, (b.output_config as Record<string, unknown>).effort])).toEqual([['claude-sonnet-5-5', 'high'], ['claude-sonnet-5-5', undefined]]);
+    publish({ effort: '' });   // the entry's effort, medium
+    await tune();
+    const raw = JSON.parse(readFileSync(file, 'utf8'));
+    delete raw.apps.deals.effort;
+    writeFileSync(file, JSON.stringify(raw));   // neither: low
+    await tune();
+    // A member on the admin's AI gets the console's effort too.
+    publish({ effort: 'high' });
+    await call(await devCookie('member'), 'POST', '/api/ai/tune-watch', { watch: { name: 'RTX', query: 'rtx 3080', kind: 'item' }, instructions: 'cheaper' });
+    expect(bodies.map((b) => [b.model, (b.output_config as Record<string, unknown>).effort])).toEqual([['claude-sonnet-5-5', 'high'],
+      ['claude-sonnet-5-5', undefined], ['claude-sonnet-5-5', 'medium'], ['claude-sonnet-5-5', 'low'], ['claude-sonnet-5-5', 'high']]);
+  });
+
+  it('records each call at the published price', async () => {
+    const net: Net = async () => ({ status: 200, body: Buffer.from(JSON.stringify({ content: [{ type: 'text', text: '{}' }], usage: { input_tokens: 1000, output_tokens: 100 }, stop_reason: 'end_turn' })) });
+    publish({});
+    await start({ net }, 'ai.db', file);
+    await app.cave.db.execute(sql`DELETE FROM deals.ai_usage`);
+    await call(await devCookie('owner'), 'POST', '/api/ai/tune-watch', { watch: { name: 'RTX', query: 'rtx 3080', kind: 'item' }, instructions: 'cheaper' });
+    const got = (await app.cave.db.execute(sql`SELECT model, cost FROM deals.ai_usage`)) as unknown as { rows?: unknown[] };
+    // $4 and $20 a million, twice the listed price.
+    expect((got.rows ?? (got as unknown as unknown[])).map((r: unknown) => ({ ...(r as object) }))).toEqual([{ model: 'claude-sonnet-5-5', cost: (1000 * 4 + 100 * 20) / 1e6 }]);
   });
 });
 
@@ -605,5 +626,23 @@ describe("the owner console's view of Deal Hunter's AI spend (#924)", () => {
       { app: 'deals', month: '2026-11', billed_micros: 250001, calls: 2 },
       { app: 'deals', month: '2026-12', billed_micros: 500000, calls: 1 },
     ]);
+  });
+
+  it('is granted to the console role made after the view, and only the view', async () => {
+    await start();
+    const can = async () => ((await app.cave.db.execute(sql`SELECT has_table_privilege('cave_spend', 'deals.cave_ai_month', 'SELECT') AS v,
+      has_table_privilege('cave_spend', 'deals.ai_usage', 'SELECT') AS t`)) as unknown as { rows?: unknown[] });
+    await app.cave.db.execute(sql`CREATE ROLE cave_spend`);
+    try {
+      const before = await can();
+      expect({ ...((before.rows ?? (before as unknown as unknown[]))[0] as object) }).toEqual({ v: false, t: false });
+      await grantSpend(app.cave.db);
+      const after = await can();
+      expect({ ...((after.rows ?? (after as unknown as unknown[]))[0] as object) }).toEqual({ v: true, t: false });
+    } finally {
+      await app.cave.db.execute(sql`REVOKE ALL ON ALL TABLES IN SCHEMA deals FROM cave_spend`);
+      await app.cave.db.execute(sql`REVOKE ALL ON SCHEMA deals FROM cave_spend`);
+      await app.cave.db.execute(sql`DROP ROLE cave_spend`);
+    }
   });
 });

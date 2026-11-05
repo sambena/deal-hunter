@@ -2,7 +2,8 @@
 // settings and /healthz; this file names the app and adds its API (api.ts).
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createApp, type Config } from '@cougarcave/server';
+import { createApp, type Config, type Db } from '@cougarcave/server';
+import { sql } from 'drizzle-orm';
 import { api, type ApiOptions, pinNeedsCode } from './api.js';
 import { type Clock, type Net, realClock, realNet, Sources } from './logic/sources.js';
 import { Poller } from './poller.js';
@@ -23,6 +24,16 @@ export interface BuildOptions extends Partial<Omit<ApiOptions, 'poller' | 'net' 
   clock?: Clock;
 }
 
+/** Lets cave-db's cave_spend role (the owner console) read deals.cave_ai_month and nothing else of Deal Hunter's. */
+export async function grantSpend(db: Db): Promise<void> {
+  await db.execute(sql.raw(`DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'cave_spend') THEN
+    GRANT USAGE ON SCHEMA "deals" TO cave_spend;
+    GRANT SELECT ON "deals"."cave_ai_month" TO cave_spend;
+  END IF;
+END $$`));
+}
+
 export async function build(config: Config, options: BuildOptions = {}) {
   const { logger, now = () => Date.now() / 1000, apiPort = null, downloadsDir = join(config.DATA_DIR, 'downloads'), resolve, nhtsa, cpsc, net = realNet } = options;
   const clock = options.clock ?? (options.now ? { now, sleep: realClock.sleep } : realClock);
@@ -41,5 +52,9 @@ export async function build(config: Config, options: BuildOptions = {}) {
   app.addHook('onClose', async () => holder.poller?.stop());
   // Bring the app's tables up to date (drizzle/, written by npm run db:generate). Running it again changes nothing.
   await app.cave.database.migrate(fileURLToPath(new URL('../drizzle/', import.meta.url)), SCHEMA);
+  // The owner console reads the AI totals (deals.cave_ai_month, drizzle/0002) through cave-db's cave_spend role. Granted
+  // on every start, as the framework grants its own view, so a role made after the view still gets it. Without the role
+  // (local development) nothing is granted.
+  await grantSpend(app.cave.db);
   return app;
 }
