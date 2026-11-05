@@ -79,11 +79,46 @@ const SHARED_APP = 'deals';
 const SHARED_PROVIDERS: Record<string, string> = { anthropic: 'claude', openai: 'openai', gemini: 'gemini' };
 const EFFORTS = ['low', 'medium', 'high'];
 
-export interface Shared { provider: string; model: string | null; tier: string | null; effort: string | null; monthly_usd: number; key: string }
+/** What the owner console published for this app (#922): the one model it may call and its prices, in US dollars per
+ * million tokens here (the file has microdollars). A prompt over `long.over` tokens pays the long row for the whole call. */
+export interface Published { model: string; takes_effort: boolean; effort: string | null; in: number; out: number;
+  long?: { over: number; in: number; out: number }; prices_as_of: string }
 
-/** This app's AI from the shared file, or null (off). Read again only when the file changes. The same rules as
- * shared_ai.py: version 1, an entry with ai: true, a known provider, a monthly limit of 0-1000 and a key; an unknown
- * tier or effort is ignored, never an error. */
+export interface Shared { provider: string; model: string | null; tier: string | null; effort: string | null; monthly_usd: number; key: string;
+  use: Published }
+
+const MODEL_NAME = /^[A-Za-z0-9_\-.:/@]{1,100}$/;
+const micros = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 1_000_000_000;
+const priceRow = (v: unknown): { in: number; out: number } | null => {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+  const r = v as Row;
+  if (![r.input, r.output, r.cache_write, r.cache_read].every(micros)) return null;
+  return { in: (r.input as number) / 1_000_000, out: (r.output as number) / 1_000_000 };
+};
+
+/** The entry's "use", checked the way the shared package checks it (cougar-cave-ui #923), or null if it is malformed. */
+export function readUse(v: unknown): Published | null {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+  const u = v as Row;
+  if (typeof u.model !== 'string' || !MODEL_NAME.test(u.model) || typeof u.takes_effort !== 'boolean') return null;
+  if (!['', ...EFFORTS].includes(u.effort as string)) return null;
+  if (typeof u.prices_as_of !== 'string' || u.prices_as_of.length < 1 || u.prices_as_of.length > 40) return null;
+  const price = priceRow(u.price);
+  if (!price) return null;
+  let long: Published['long'];
+  if (u.long_prompt !== null) {
+    const l = u.long_prompt as Row | undefined;
+    const lp = l && typeof l === 'object' && !Array.isArray(l) ? priceRow(l.price) : null;
+    if (!lp || typeof l!.above !== 'number' || !Number.isInteger(l!.above) || (l!.above as number) <= 0) return null;
+    long = { over: l!.above as number, ...lp };
+  }
+  return { model: u.model, takes_effort: u.takes_effort, effort: (u.effort as string) || null, ...price, ...(long ? { long } : {}),
+    prices_as_of: u.prices_as_of };
+}
+
+/** This app's AI from the shared file, or null (off). The same rules as shared_ai.py: version 1, an entry with ai: true,
+ * a known provider, a monthly limit of 0-1000, a key and the model the console published ("use"); an unknown tier or
+ * effort is ignored, never an error. No "use", or a malformed one, is off. */
 export function loadShared(where: string, log: (line: string) => void = () => {}): Shared | null {
   let reason = '';
   let result: Shared | null = null;
@@ -110,10 +145,14 @@ export function loadShared(where: string, log: (line: string) => void = () => {}
     else if (typeof entry.monthly_usd !== 'number' || !(entry.monthly_usd >= 0 && entry.monthly_usd <= 1000)) reason = `${SHARED_APP} has no valid monthly_usd in the AI settings file`;
     else if (typeof keys[entry.provider as string] !== 'string' || !pyStrip(keys[entry.provider as string] as string)) {
       reason = `the AI settings file has no ${entry.provider as string} key for ${SHARED_APP}`;
+    } else if (entry.use === undefined) {
+      reason = `the owner console has not published a model for ${SHARED_APP} (save its AI settings there)`;
+    } else if (!readUse(entry.use)) {
+      reason = `${SHARED_APP} has an invalid published model in the AI settings file`;
     } else {
       result = { provider: SHARED_PROVIDERS[entry.provider as string]!, model: typeof entry.model === 'string' && entry.model ? entry.model : null,
         tier: typeof entry.tier === 'string' ? entry.tier : null, effort: EFFORTS.includes(entry.effort as string) ? entry.effort as string : null,
-        monthly_usd: entry.monthly_usd, key: pyStrip(keys[entry.provider as string] as string) };
+        monthly_usd: entry.monthly_usd, key: pyStrip(keys[entry.provider as string] as string), use: readUse(entry.use)! };
     }
   }
   if (reason) log(`AI settings: ${reason}; the admin's AI is off`);
@@ -164,7 +203,9 @@ const monthStart = (now: number) => { const d = new Date(now * 1000); return new
 const dayStart = (now: number) => { const d = new Date(now * 1000); return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() / 1000; };
 
 export interface Scope { source: 'own' | 'shared'; user_id: number; paid_by: number; trusted: boolean; managed?: boolean; effort?: string | null;
-  blocked?: string; owner?: string; daily_cap?: number; pool_limit?: number }
+  blocked?: string; owner?: string; daily_cap?: number; pool_limit?: number;
+  /** On the admin's AI: the model the owner console published, priced as published. Nothing else may be called. */
+  published?: ModelInfo }
 export type AiSettings = Row & { _ai: Scope };
 export interface ModelInfo { provider: string; id: string; label: string; in: number; out: number; effort: boolean; free: boolean; long?: Model['long'] }
 
@@ -190,16 +231,19 @@ export class Ai {
     return rowsOf(await this.o.db.execute(q));
   }
 
-  /** The admin's AI from the owner console: {provider, model, monthly_usd, key, effort}, or {off: reason}. A pinned
-   * model wins over the tier. A model with no price here is off too, so its cost can always be capped. */
-  managed(): (Shared & { off?: undefined }) | { off: string } {
+  /** The admin's AI from the owner console: {provider, model, monthly_usd, key, effort, use}, or {off: reason}. The
+   * model is only ever the one the console published, and its effort the console's for that model (#927). */
+  managed(): (Shared & { model: string; off?: undefined }) | { off: string } {
     const m = loadShared(this.o.settingsFile, this.o.log);
     if (m === null) return { off: MANAGED_OFF };
-    const model = m.model || resolveModel(m.provider, m.tier, this.o.now());
-    if (!model || !MODELS.some((x) => x.provider === m.provider && x.id === model)) {
-      return { off: `The owner console picked a model Deal Hunter has no price for (${model || 'none'}).` };
-    }
-    return { ...m, model };
+    return { ...m, model: m.use.model, effort: m.use.effort || m.effort };
+  }
+
+  /** The published model as a request runs it: the console's prices, and effort only if the model takes it. */
+  private published(m: Shared & { model: string }): ModelInfo {
+    const known = MODELS.find((x) => x.provider === m.provider && x.id === m.model);
+    return { provider: m.provider, id: m.model, label: known?.label ?? m.model, in: m.use.in, out: m.use.out, effort: m.use.takes_effort,
+      free: false, ...(m.use.long ? { long: m.use.long } : {}) };
   }
 
   /** The admin's AI settings, from the shared file only: every key the database holds is blanked, and no free tier. */
@@ -225,17 +269,19 @@ export class Ai {
       const [adminAi, m] = this.adminAi(s);
       Object.assign(s, adminAi);
       const scope: Scope = { source: 'own', user_id: memberId, paid_by: memberId, trusted: true, managed: true, effort: m.off === undefined ? m.effort : null };
+      if (m.off === undefined) scope.published = this.published(m);
       if (m.off !== undefined) scope.blocked = m.off;
       return { ...s, _ai: scope };
     }
     if (s.ai_source === 'own') return { ...s, _ai: { source: 'own', user_id: memberId, paid_by: memberId, trusted: false } };
     const adminId = (await this.o.store.adminId()) ?? 0;
-    const [adminAi] = this.adminAi(await this.o.store.getSettings(adminId));
+    const [adminAi, m] = this.adminAi(await this.o.store.getSettings(adminId));
     for (const k of AI_KEYS) s[k] = adminAi[k];
     s.ai_monthly_limit = Number(user!.ai_allowance || 0);
     const owner = (await this.o.nameOf(adminId)) || 'the admin';
     const scope: Scope = { source: 'shared', user_id: memberId, paid_by: adminId, owner, trusted: true, managed: true,
       daily_cap: Math.trunc(Number(user!.ai_daily_cap || 0)), pool_limit: Number(adminAi.ai_monthly_limit || 0) };
+    if (m.off === undefined) scope.published = this.published(m);
     if (!user!.ai_shared) {
       s.ai_provider = 'off';
       scope.blocked = `${owner} hasn't shared their AI with you. Use your own key in Settings > AI.`;
@@ -296,6 +342,14 @@ export class Ai {
     const provider = 'ai_provider' in settings ? settings.ai_provider as string : 'off';
     if (!Object.hasOwn(PROVIDERS, provider)) throw new AIError(settings._ai.blocked || 'AI is off. Turn it on in Settings.');
     const model = pyStrip((settings[PROVIDERS[provider]!.model] as string) || '');
+    const sc = settings._ai;
+    if (sc.managed) {
+      // The admin's AI: only the published model, at the published price. Anything else is refused before it is sent.
+      const p = sc.published;
+      if (!p) throw new AIError(sc.blocked || MANAGED_OFF);
+      if (p.provider !== provider || p.id !== model) throw new AIError(`The owner console allows only ${p.label} here.`);
+      return { ...p };
+    }
     for (const m of MODELS) {
       if (m.provider === provider && m.id === model) {
         // Google bills nothing on a key without billing; its replies don't say which tier, so the person does.
