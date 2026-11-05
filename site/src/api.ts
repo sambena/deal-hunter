@@ -392,12 +392,12 @@ export async function api(app: FastifyInstance, options: ApiOptions): Promise<vo
       FROM deals.members u LEFT JOIN core.people p ON p.id = u.subject
       ORDER BY u.admin DESC, p.name COLLATE "C" NULLS FIRST, u.id`);
     // When each was last here: their newest browser session or phone, from the framework's sign-in records.
-    const users = rows.map((r) => {
-      const seen = app.cave.store.get('SELECT MAX(seen) AS seen FROM (SELECT seen FROM sessions WHERE subject = ? UNION ALL SELECT seen FROM devices WHERE subject = ?)',
+    const users = await Promise.all(rows.map(async (r) => {
+      const seen = await app.cave.side.get('SELECT MAX(seen) AS seen FROM (SELECT seen FROM cave_sessions WHERE subject = ? UNION ALL SELECT seen FROM cave_devices WHERE subject = ?) s',
         r.subject as string, r.subject as string);
       const { subject: _subject, ...user } = r;
-      return { ...user, name: r.name ?? '', email: r.email ?? '', last_active: seen?.seen ?? null };
-    });
+      return { ...user, name: r.name ?? '', email: r.email ?? '', last_active: seen?.seen == null ? null : Number(seen.seen) };
+    }));
     return { users, invites: [], default_watch_limit: DEFAULT_WATCH_LIMIT };
   });
 

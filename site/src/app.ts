@@ -34,6 +34,16 @@ export async function grantSpend(db: Db): Promise<void> {
 END $$`));
 }
 
+/** Live Deal Hunter keeps every row in cave-db (Library 132). Without its address it would quietly start a private
+ * PGlite in DATA_DIR, so it refuses to start instead. Only local work (the dev login, 127.0.0.1 only) and tests run
+ * on PGlite. */
+export function requireCaveDb(config: Config): void {
+  if (!config.DATABASE_URL && !config.DEV_LOGIN) {
+    throw new Error('Deal Hunter needs cave-db: set DATABASE_URL (from its db.env, written by the owner console Add app). ' +
+                    'Only local work with DEV_LOGIN=1 runs without it.');
+  }
+}
+
 export async function build(config: Config, options: BuildOptions = {}) {
   const { logger, now = () => Date.now() / 1000, apiPort = null, downloadsDir = join(config.DATA_DIR, 'downloads'), resolve, nhtsa, cpsc, net = realNet } = options;
   const clock = options.clock ?? (options.now ? { now, sleep: realClock.sleep } : realClock);
@@ -41,6 +51,9 @@ export async function build(config: Config, options: BuildOptions = {}) {
   // The built page files: vite build writes them to dist/public. The same URL works from src/ (dev) and dist/.
   const app = await createApp({
     name: NAME, slug: SLUG, config, publicDir: new URL('../dist/public/', import.meta.url), now,
+    // The framework's side data (sessions, paired phones, rate limits, the audit log) goes in Deal Hunter's cave-db
+    // schema with the rest of its data, not in a cave.db file (Library 132). An existing cave.db is copied in once.
+    sideData: 'database',
     // Finds show the shops' own photos (and Best Buy's logo, as its API terms ask), from wherever each shop keeps them.
     policy: { extend: { 'img-src': ['*'] } },
     routes: (scope) => api(scope, { now, apiPort, downloadsDir, ...(resolve ? { resolve } : {}), ...(nhtsa ? { nhtsa } : {}), ...(cpsc ? { cpsc } : {}), net, aiSettingsFile: config.AI_SETTINGS_FILE, sleep: (s) => clock.sleep(s), poller: () => holder.poller! }),

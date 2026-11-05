@@ -1,11 +1,14 @@
 // Deal Hunter's server, in-process (no ports): it starts, sends the strict page policy, signs in with the dev login,
 // and its migration makes the deals tables, which keep the Python app's rows exactly. Made-up data only.
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadConfig } from '@cougarcave/server';
+import { createHash, randomBytes } from 'node:crypto';
+import { loadConfig, Store, type Config } from '@cougarcave/server';
 import { eq, sql } from 'drizzle-orm';
 import { afterEach, describe, expect, it } from 'vitest';
-import { build } from '../src/app.js';
+import { build, requireCaveDb } from '../src/app.js';
 import { aiUsage, DEFAULT_SOURCES, listings, machines, members, SCHEMA, settings, userSettings, watches } from '../src/db/schema.js';
 
 const config = () => loadConfig({ APP_ORIGIN: 'http://127.0.0.1:8780', DEV_LOGIN: '1', DATA_DIR: ':memory:' });
@@ -36,6 +39,56 @@ async function watch(id: number, memberId: number) {
 }
 
 describe('Deal Hunter', () => {
+  it("keeps the framework's side data in the database, never in a cave.db file (Library 132)", async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'deals-side-'));
+    try {
+      app = await build(loadConfig({ APP_ORIGIN: 'http://127.0.0.1:8780', DEV_LOGIN: '1', DATA_DIR: dir }), { logger: false });
+      expect(app.cave.side.kind).toBe('database');
+      await app.inject({ url: '/auth/dev?who=owner' });
+      expect((await app.cave.side.get('SELECT count(*)::int AS n FROM cave_sessions'))?.n).toBe(1);
+      expect(() => app.cave.store.run('SELECT 1')).toThrow(/side/);
+      expect(existsSync(join(dir, 'cave.db'))).toBe(false);
+    } finally {
+      await app?.close();
+      app = undefined as unknown as typeof app;
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('copies an existing cave.db in once: someone signed in before the move is still signed in, and a sign-out sticks', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'deals-copy-'));
+    try {
+      const token = randomBytes(24).toString('base64url');
+      const now = Date.now() / 1000;
+      const old = new Store(join(dir, 'cave.db'));
+      old.run('INSERT INTO sessions (hash, sid, subject, person, auth_time, amr, created, seen, expires) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        createHash('sha256').update(token).digest('hex'), 'sid-old', '00000000-0000-4000-8000-000000000001',
+        JSON.stringify({ subject: '00000000-0000-4000-8000-000000000001', name: 'Owner (dev)', email: 'dev-owner@example.test', role: 'owner' }),
+        now, JSON.stringify(['pwd', 'mfa']), now, now, now + 86400);
+      old.close();
+      const settings = loadConfig({ APP_ORIGIN: 'http://127.0.0.1:8780', DEV_LOGIN: '1', DATA_DIR: dir });
+      const me = async () => (await app.inject({ url: '/auth/me', headers: { cookie: `cave_session=${token}` } })).json().signedIn;
+      app = await build(settings, { logger: false });
+      expect(await me()).toBe(true);
+      await app.cave.side.run('DELETE FROM cave_sessions');
+      await app.close();
+      app = await build(settings, { logger: false });  // a later start copies nothing, so the sign-out stays
+      expect(await me()).toBe(false);
+      expect(existsSync(join(dir, 'cave.db'))).toBe(true);  // left in place, the way back
+    } finally {
+      await app?.close();
+      app = undefined as unknown as typeof app;
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses to start live without cave-db; only local work with the dev login runs on PGlite', () => {
+    const live = { DATABASE_URL: undefined, DEV_LOGIN: false } as unknown as Config;
+    expect(() => requireCaveDb(live)).toThrow(/needs cave-db/);
+    expect(() => requireCaveDb({ ...live, DATABASE_URL: 'postgres://cave-db/x' } as Config)).not.toThrow();
+    expect(() => requireCaveDb({ ...live, DEV_LOGIN: true } as Config)).not.toThrow();
+  });
+
   it('is healthy and sends the strict page policy', async () => {
     app = await build(config(), { logger: false });
     const res = await app.inject({ url: '/healthz' });
