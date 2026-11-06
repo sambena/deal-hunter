@@ -7,6 +7,10 @@
 // file, never from the database or the environment; with no file or no entry it is off. Other people either use their
 // own key ("own") or the admin's AI ("shared"), within limits the admin sets per person: requests a day, and dollars a
 // month of paid AI. The admin's monthly limit covers everything run on the admin's key, by anyone.
+// The overall limit (#925): the owner console's one monthly limit for every Cougar Cave app's AI together. Before each
+// call on the admin's AI, the same transaction that holds the call's worst case reads what all apps have spent this UTC
+// month (cave-db's core.ai_month_total) and refuses past the limit; if that total can't be read, no call is made.
+// People's own keys are their own money and not in that total, so the overall limit doesn't stop them.
 // Providers: Claude (Anthropic's Messages API), OpenAI and Google Gemini, over the injected network, so tests never call a paid API.
 import { readFileSync, statSync } from 'node:fs';
 import type { Db } from '@cougarcave/server';
@@ -19,7 +23,29 @@ import type { Store } from './store.js';
 type Row = Record<string, unknown>;
 const rowsOf = (result: unknown): Row[] => (Array.isArray(result) ? result : (result as { rows?: Row[] }).rows ?? []);
 
-export class AIError extends Error {}
+/** A refusal the person reads. Most are 400; the overall limit's are 402 ai_budget and 503 ai_overall_unknown (#925). */
+export class AIError extends Error {
+  constructor(message: string, readonly status = 400, readonly code?: string) { super(message); }
+}
+
+const usdMicros = (usd: number) => Math.round(usd * 1_000_000);
+const usdText = (micros: number) => `$${(micros / 1_000_000).toFixed(4)}`;
+
+/** All Cougar Cave apps together have reached the owner's limit for the month (or would, with this call's worst case). */
+export class OverallBudget extends AIError {
+  constructor(readonly worstMicros: number, readonly leftMicros: number) {
+    super(`AI is paused: this request could cost up to ${usdText(worstMicros)}, but all Cougar Cave apps together have ${usdText(Math.max(leftMicros, 0))} left this month.`,
+      402, 'ai_budget');
+  }
+}
+
+/** The overall limit is set but what all apps have spent this month can't be read, so no call is made. */
+export class OverallUnknown extends AIError {
+  constructor() { super("AI is paused for now: the limit for all apps together can't be checked. Try again later.", 503, 'ai_overall_unknown'); }
+}
+
+/** The UTC month as cave-db's cave_ai_month views and core.ai_month_total name it, "2026-11". */
+export const monthName = (now: number): string => new Date(now * 1000).toISOString().slice(0, 7);
 
 interface Model { provider: string; id: string; family: string; gen: number[]; label: string; in: number; out: number; effort: boolean;
   long?: { over: number; in: number; out: number }; promo?: { until: string; in: number; out: number } }
@@ -85,7 +111,9 @@ export interface Published { model: string; takes_effort: boolean; effort: strin
   long?: { over: number; in: number; out: number }; prices_as_of: string }
 
 export interface Shared { provider: string; model: string | null; tier: string | null; effort: string | null; monthly_usd: number; key: string;
-  use: Published }
+  use: Published;
+  /** The owner's one limit for every app's AI together this month (#925), or null for none. */
+  overall_usd: number | null }
 
 const MODEL_NAME = /^[A-Za-z0-9_\-.:/@]{1,100}$/;
 const micros = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 1_000_000_000;
@@ -138,7 +166,12 @@ export function loadShared(where: string, log: (line: string) => void = () => {}
     const apps = file && typeof file === 'object' && !Array.isArray(file) && file.apps && typeof file.apps === 'object' && !Array.isArray(file.apps) ? file.apps as Row : {};
     const entry = apps[SHARED_APP] as Row | undefined;
     const keys = file && typeof file === 'object' && file.keys && typeof file.keys === 'object' && !Array.isArray(file.keys) ? file.keys as Row : {};
+    const overall = file && typeof file === 'object' && !Array.isArray(file) ? file.overall_monthly_usd : undefined;
     if (!file || typeof file !== 'object' || Array.isArray(file) || file.version !== 1) reason = 'the AI settings file has an unknown version';
+    // #925: absent or null is no overall limit; anything but a number from 0 to 1000 turns the AI off, never dropped.
+    else if (overall !== undefined && overall !== null && !(typeof overall === 'number' && overall >= 0 && overall <= 1000)) {
+      reason = 'the AI settings file has an invalid overall_monthly_usd';
+    }
     else if (!entry || typeof entry !== 'object' || Array.isArray(entry)) reason = `the AI settings file has no entry for ${SHARED_APP}`;
     else if (entry.ai !== true) reason = `AI is off for ${SHARED_APP} in the AI settings file`;
     else if (!Object.hasOwn(SHARED_PROVIDERS, entry.provider as string)) reason = `${SHARED_APP} has an unknown provider in the AI settings file`;
@@ -152,7 +185,8 @@ export function loadShared(where: string, log: (line: string) => void = () => {}
     } else {
       result = { provider: SHARED_PROVIDERS[entry.provider as string]!, model: typeof entry.model === 'string' && entry.model ? entry.model : null,
         tier: typeof entry.tier === 'string' ? entry.tier : null, effort: EFFORTS.includes(entry.effort as string) ? entry.effort as string : null,
-        monthly_usd: entry.monthly_usd, key: pyStrip(keys[entry.provider as string] as string), use: readUse(entry.use)! };
+        monthly_usd: entry.monthly_usd, key: pyStrip(keys[entry.provider as string] as string), use: readUse(entry.use)!,
+        overall_usd: typeof overall === 'number' ? overall : null };
     }
   }
   if (reason) log(`AI settings: ${reason}; the admin's AI is off`);
@@ -205,7 +239,9 @@ const dayStart = (now: number) => { const d = new Date(now * 1000); return new D
 export interface Scope { source: 'own' | 'shared'; user_id: number; paid_by: number; trusted: boolean; managed?: boolean; effort?: string | null;
   blocked?: string; owner?: string; daily_cap?: number; pool_limit?: number;
   /** On the admin's AI: the model the owner console published, priced as published. Nothing else may be called. */
-  published?: ModelInfo }
+  published?: ModelInfo;
+  /** On the admin's AI: the owner's limit for all apps together this month, in US dollars (#925); null or absent for none. */
+  overall?: number | null }
 export type AiSettings = Row & { _ai: Scope };
 export interface ModelInfo { provider: string; id: string; label: string; in: number; out: number; effort: boolean; free: boolean; long?: Model['long'] }
 
@@ -269,7 +305,7 @@ export class Ai {
       const [adminAi, m] = this.adminAi(s);
       Object.assign(s, adminAi);
       const scope: Scope = { source: 'own', user_id: memberId, paid_by: memberId, trusted: true, managed: true, effort: m.off === undefined ? m.effort : null };
-      if (m.off === undefined) scope.published = this.published(m);
+      if (m.off === undefined) Object.assign(scope, { published: this.published(m), overall: m.overall_usd });
       if (m.off !== undefined) scope.blocked = m.off;
       return { ...s, _ai: scope };
     }
@@ -281,7 +317,7 @@ export class Ai {
     const owner = (await this.o.nameOf(adminId)) || 'the admin';
     const scope: Scope = { source: 'shared', user_id: memberId, paid_by: adminId, owner, trusted: true, managed: true, effort: m.off === undefined ? m.effort : null,
       daily_cap: Math.trunc(Number(user!.ai_daily_cap || 0)), pool_limit: Number(adminAi.ai_monthly_limit || 0) };
-    if (m.off === undefined) scope.published = this.published(m);
+    if (m.off === undefined) Object.assign(scope, { published: this.published(m), overall: m.overall_usd });
     if (!user!.ai_shared) {
       s.ai_provider = 'off';
       scope.blocked = `${owner} hasn't shared their AI with you. Use your own key in Settings > AI.`;
@@ -389,6 +425,38 @@ export class Ai {
   }
 
   async estimate(settings: AiSettings, action: string, prompt: string, schema: object): Promise<Row> {
+    return (await this.assess(settings, action, prompt, schema)).row;
+  }
+
+  /** Microdollars every Cougar Cave app's AI has cost this UTC month (cave-db's core.ai_month_total, #925), pending
+   * calls at their worst case. OverallUnknown when it can't be read: no cave-db, or the function missing. */
+  async allBilled(db: Pick<Db, 'execute'> = this.o.db): Promise<number> {
+    let n: number;
+    try {
+      n = Number(rowsOf(await db.execute(sql`SELECT core.ai_month_total(${monthName(this.o.now())}) AS n`))[0]?.n);
+    } catch {
+      throw new OverallUnknown();
+    }
+    if (!Number.isFinite(n) || n < 0) throw new OverallUnknown();
+    return n;
+  }
+
+  /** The refusal for a paid call on the admin's AI that doesn't fit under the overall limit; null if it fits or there is none. */
+  private async overallRefusal(sc: Scope, info: ModelInfo, worst: number, db?: Pick<Db, 'execute'>): Promise<AIError | null> {
+    if (!sc.managed || info.free || sc.overall === null || sc.overall === undefined) return null;
+    const limit = usdMicros(sc.overall), worstMicros = usdMicros(worst);
+    let all: number;
+    try {
+      all = await this.allBilled(db);
+    } catch (e) {
+      if (e instanceof OverallUnknown) return e;
+      throw e;
+    }
+    return all + worstMicros > limit ? new OverallBudget(worstMicros, limit - all) : null;
+  }
+
+  /** The estimate a person sees, and the refusal to throw if the call may not run. */
+  private async assess(settings: AiSettings, action: string, prompt: string, schema: object): Promise<{ row: Row; refusal: AIError | null; worst: number }> {
     const info = this.modelInfo(settings);
     const a = ACTIONS[action]!;
     const tokensIn = estimateInputTokens(prompt, schema);
@@ -415,22 +483,50 @@ export class Ai {
       allowed = false;
       reason = `${sc.owner}'s AI budget for this month is used up. Try again next month, or use your own key.`;
     }
-    return { action, action_label: a.label, provider: info.provider, model: info.id, model_label: info.label, free: info.free,
-      typical: pyRound(typical, 5), max: pyRound(worst, 5), ...b, allowed, reason };
+    let refusal: AIError | null = allowed ? null : new AIError(reason);
+    if (allowed) {
+      refusal = await this.overallRefusal(sc, info, worst);
+      if (refusal) { allowed = false; reason = refusal.message; }
+    }
+    return { row: { action, action_label: a.label, provider: info.provider, model: info.id, model_label: info.label, free: info.free,
+      typical: pyRound(typical, 5), max: pyRound(worst, 5), ...b, allowed, reason }, refusal, worst };
+  }
+
+  /** Hold the call's worst case in deals.ai_usage, after checking the overall limit in the same transaction (#925), so
+   * cave_ai_month counts it at once for every app. Returns the row, or throws and holds nothing. Another app's call
+   * reserved at the same moment isn't seen, so two apps at once can pass the limit by at most one call's worst case each. */
+  private async reserve(settings: AiSettings, info: ModelInfo, action: string, worst: number): Promise<number> {
+    const sc = settings._ai;
+    const held = info.free ? 0.0 : worst;
+    return this.o.db.transaction(async (tx) => {
+      const refusal = await this.overallRefusal(sc, info, worst, tx);
+      if (refusal) throw refusal;
+      const [row] = rowsOf(await tx.execute(sql`INSERT INTO deals.ai_usage (at, provider, model, action, input_tokens, output_tokens, cost, member_id, paid_by)
+        VALUES (${this.o.now()}, ${info.provider}, ${info.id}, ${action}, 0, 0, ${held}, ${sc.user_id}, ${sc.paid_by}) RETURNING id`));
+      return Number(row!.id);
+    });
   }
 
   /** The gate: estimate, refuse over the limit, call, record what it billed, and read the answer. */
   async run(settings: AiSettings, action: string, prompt: string, schema: object): Promise<Row> {
     const [text, info, problem] = await this.lock.run(async () => {
-      const est = await this.estimate(settings, action, prompt, schema);
-      if (!est.allowed) throw new AIError(est.reason as string);
+      const { refusal, worst } = await this.assess(settings, action, prompt, schema);
+      if (refusal) throw refusal;
       const info = this.modelInfo(settings);
-      const [text, tokensIn, tokensOut, problem] = await this.call(settings, info, prompt, schema, ACTIONS[action]!.max_out);
+      const row = await this.reserve(settings, info, action, worst);
+      let answer: [string, number, number, string | null];
+      try {
+        answer = await this.call(settings, info, prompt, schema, ACTIONS[action]!.max_out);
+      } catch (e) {
+        // No answer, so nothing billed: let go of the hold, as a failed call left no row before.
+        await this.o.db.execute(sql`DELETE FROM deals.ai_usage WHERE id = ${row}`);
+        throw e;
+      }
+      const [text, tokensIn, tokensOut, problem] = answer;
       // Record before parsing: a cut-off or refused answer is still billed.
       const spent = info.free ? 0.0 : cost(info, tokensIn, tokensOut);
-      const sc = settings._ai;
-      await this.o.db.execute(sql`INSERT INTO deals.ai_usage (at, provider, model, action, input_tokens, output_tokens, cost, member_id, paid_by)
-        VALUES (${this.o.now()}, ${info.provider}, ${info.id}, ${action}, ${tokensIn}, ${tokensOut}, ${spent}, ${sc.user_id}, ${sc.paid_by})`);
+      await this.o.db.execute(sql`UPDATE deals.ai_usage SET at = ${this.o.now()}, input_tokens = ${tokensIn}, output_tokens = ${tokensOut},
+        cost = ${spent} WHERE id = ${row}`);
       return [text, info, problem] as const;
     });
     if (problem) throw new AIError(problem);

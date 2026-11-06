@@ -426,7 +426,7 @@ export async function api(app: FastifyInstance, options: ApiOptions): Promise<vo
     try {
       return ai.withChoice(await ai.settingsFor(m.id), body.provider, body.model);
     } catch (e) {
-      if (e instanceof AIError) throw fail(400, e.message);
+      if (e instanceof AIError) throw fail(e.status, e.message, e.code);
       throw e;
     }
   };
@@ -535,12 +535,12 @@ export async function api(app: FastifyInstance, options: ApiOptions): Promise<vo
   const radarGear = async (m: Member) => (await store.listMachines(m.id)).filter((g) =>
     !PARTS_KINDS.has((g.kind as string) || 'pc') && !RADAR_SKIP.has((g.kind as string) || 'pc') && truthy(g.model));
 
-  /** An AIError is the person's to read: 400 with its words, as the Python app answered. */
+  /** An AIError is the person's to read: 400 with its words, as the Python app answered (the overall limit's: 402, 503). */
   const aiRun = async (settings: AiSettings, action: string, prompt: string, schema: object) => {
     try {
       return await ai.run(settings, action, prompt, schema);
     } catch (e) {
-      if (e instanceof AIError) throw fail(400, e.message);
+      if (e instanceof AIError) throw fail(e.status, e.message, e.code);
       throw e;
     }
   };
@@ -551,7 +551,7 @@ export async function api(app: FastifyInstance, options: ApiOptions): Promise<vo
     try {
       return await ai.estimate(settings, body.action as string, prompt, schema);
     } catch (e) {
-      if (e instanceof AIError) throw fail(400, e.message);
+      if (e instanceof AIError) throw fail(e.status, e.message, e.code);
       throw e;
     }
   });

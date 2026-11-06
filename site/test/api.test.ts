@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DEV_MEMBER, DEV_OWNER, loadConfig } from '@cougarcave/server';
 import { sql } from 'drizzle-orm';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { listenApiPort } from '../src/api-port.js';
 import { build, grantSpend } from '../src/app.js';
 import { loadShared } from '../src/ai.js';
@@ -499,7 +499,8 @@ describe("the owner console's AI settings file", () => {
 
   it('turns the admin AI on only for a complete entry', () => {
     expect(read(ok)).toEqual({ provider: 'claude', model: null, tier: 'turbo', effort: null, monthly_usd: 1000, key: 'made-up',
-      use: { model: 'claude-haiku-5-5', takes_effort: true, effort: null, in: 0.1, out: 0.5, long: { over: 100000, in: 0.5, out: 2.5 }, prices_as_of: '2026-11-03' } });
+      use: { model: 'claude-haiku-5-5', takes_effort: true, effort: null, in: 0.1, out: 0.5, long: { over: 100000, in: 0.5, out: 2.5 }, prices_as_of: '2026-11-03' },
+      overall_usd: null });
     expect(loadShared(join(tmpdir(), 'dh-no-such-file.json'))).toBeNull();
     expect(read('{not json')).toBeNull();
     expect(read({ ...ok, version: 2 })).toBeNull();
@@ -620,6 +621,140 @@ describe('the model the owner console published (#927)', () => {
     const got = (await app.cave.db.execute(sql`SELECT model, cost FROM deals.ai_usage`)) as unknown as { rows?: unknown[] };
     // $4 and $20 a million, twice the listed price.
     expect((got.rows ?? (got as unknown as unknown[])).map((r: unknown) => ({ ...(r as object) }))).toEqual([{ model: 'claude-sonnet-5-5', cost: (1000 * 4 + 100 * 20) / 1e6 }]);
+  });
+});
+
+describe('the overall AI limit for all Cougar Cave apps together (#925)', { timeout: 60_000 }, () => {
+  // cave-db's core.ai_month_total, the same body as cougar-auth's scripts/cave_db.py (and @cougarcave/server 1.2.4's
+  // local copy): the sum of every readable cave_ai_month view for one month.
+  const AI_MONTH_TOTAL = `
+    CREATE OR REPLACE FUNCTION core.ai_month_total(wanted text) RETURNS bigint
+    LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog AS $fn$
+    DECLARE
+      s name;
+      part bigint;
+      total bigint := 0;
+    BEGIN
+      IF wanted IS NULL OR wanted !~ '^[0-9]{4}-[0-9]{2}$' THEN
+        RAISE EXCEPTION 'month must be YYYY-MM';
+      END IF;
+      FOR s IN SELECT n.nspname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+                WHERE c.relname = 'cave_ai_month' AND c.relkind = 'v'
+                  AND has_table_privilege(c.oid, 'SELECT') AND has_schema_privilege(n.oid, 'USAGE') LOOP
+        EXECUTE format('SELECT COALESCE(SUM(billed_micros), 0)::bigint FROM %I.cave_ai_month WHERE month = $1', s)
+          INTO part USING wanted;
+        total := total + part;
+      END LOOP;
+      RETURN total;
+    END
+    $fn$;`;
+  const file = join(tmpdir(), `dh-overall-${process.pid}.json`);
+  const use = { model: 'claude-haiku-5-5', takes_effort: true, effort: '', prices_as_of: '2026-11-03', long_prompt: null,
+    price: { input: 100_000, output: 500_000, cache_write: 125_000, cache_read: 10_000 } };
+  const publish = (overall: unknown) => writeFileSync(file, JSON.stringify({ version: 1, keys: { anthropic: 'made-up-anthropic-key' },
+    ...(overall === undefined ? {} : { overall_monthly_usd: overall }),
+    apps: { deals: { ai: true, provider: 'anthropic', monthly_usd: 5, use } } }));
+  afterAll(() => rmSync(file, { force: true }));
+
+  const rows = (r: unknown) => ((r as { rows?: unknown[] }).rows ?? (r as unknown[])).map((x) => ({ ...(x as object) })) as Record<string, unknown>[];
+  let sent = 0;
+  let during: Record<string, unknown>[] = [];
+  /** Claude as a stand-in: answers, and notes what deals.cave_ai_month showed while the call was out. */
+  const net: Net = async () => {
+    sent++;
+    during = rows(await app.cave.db.execute(sql`SELECT month, billed_micros FROM deals.cave_ai_month`));
+    return { status: 200, body: Buffer.from(JSON.stringify({ content: [{ type: 'text', text: '{}' }], usage: { input_tokens: 1000, output_tokens: 100 }, stop_reason: 'end_turn' })) };
+  };
+  const tune = async (who: 'owner' | 'member' = 'owner') => call(await devCookie(who), 'POST', '/api/ai/tune-watch',
+    { watch: { name: 'RTX', query: 'rtx 3080', kind: 'item' }, instructions: 'cheaper' });
+  const usage = async () => rows(await app.cave.db.execute(sql`SELECT cost, input_tokens, output_tokens FROM deals.ai_usage ORDER BY id`));
+
+  /** Deal Hunter with cave-db's total, and another app that has spent `otherUsd` this month. */
+  let running = false;
+  beforeEach(() => { running = false; });
+  async function begin(overall: unknown, otherUsd: number | null, provider: Net = net) {
+    if (running) await app.close();
+    running = true;
+    publish(overall);
+    sent = 0;
+    during = [];
+    await start({ net: provider }, 'ai.db', file);
+    await app.cave.db.execute(sql`DELETE FROM deals.ai_usage`);
+    if (otherUsd === null) return;
+    await app.cave.db.execute(sql.raw(AI_MONTH_TOTAL));
+    const month = new Date(clock * 1000).toISOString().slice(0, 7);
+    await app.cave.db.execute(sql.raw('CREATE SCHEMA other_app'));
+    await app.cave.db.execute(sql.raw(`CREATE VIEW other_app.cave_ai_month AS
+      SELECT 'kitchen'::text AS app, '${month}'::text AS month, ${Math.round(otherUsd * 1e6)}::bigint AS billed_micros, 3::bigint AS calls
+      UNION ALL SELECT 'kitchen', '1999-01', 999000000, 9`));
+  }
+
+  it('reads the limit from the top of the settings file; a bad one turns the AI off', () => {
+    for (const [given, got] of [[20, 20], [0, 0], [1000, 1000], [null, null], [undefined, null]] as const) {
+      publish(given);
+      expect(loadShared(file)?.overall_usd).toBe(got);
+    }
+    for (const bad of [-1, 1000.01, '20', true, {}]) {
+      publish(bad);
+      expect(loadShared(file)).toBeNull();
+    }
+  });
+
+  it("runs a call that fits, holding its worst case in the month's total while it is out", async () => {
+    await begin(1, 0.5);
+    const res = await tune();
+    expect(res.statusCode).toBe(200);
+    expect(sent).toBe(1);
+    // While the call was out, Deal Hunter's own cave_ai_month already counted it at its worst case (more than it cost).
+    expect(during).toHaveLength(1);
+    expect(Number(during[0]!.billed_micros)).toBeGreaterThan(Math.round(1000 * 0.1 + 100 * 0.5));
+    // Afterwards, what it actually cost.
+    expect(await usage()).toEqual([{ cost: (1000 * 0.1 + 100 * 0.5) / 1e6, input_tokens: 1000, output_tokens: 100 }]);
+  });
+
+  it('pauses every call on the admin\'s AI once all apps together would pass the limit', async () => {
+    await begin(1, 0.9999);
+    const est = await call(await devCookie('owner'), 'POST', '/api/ai/estimate', { action: 'judge', listing_id: 1 });
+    expect(est.statusCode).toBe(200);
+    expect(est.json()).toMatchObject({ allowed: false, reason: expect.stringMatching(/all Cougar Cave apps together/) });
+    for (const who of ['owner', 'member'] as const) {
+      const res = await tune(who);
+      expect([res.statusCode, res.json().error]).toEqual([402, 'ai_budget']);
+      expect(res.json().message).toMatch(/^AI is paused: .*all Cougar Cave apps together have \$0\.0001 left this month\.$/);
+    }
+    // A limit of 0 pauses it with nothing spent anywhere.
+    await begin(0, 0);
+    expect((await tune()).statusCode).toBe(402);
+    expect(sent).toBe(0);
+    expect(await usage()).toEqual([]);
+    // Control: the same spend, no overall limit, and the call runs.
+    await begin(null, 0.9999);
+    expect((await tune()).statusCode).toBe(200);
+    expect(sent).toBe(1);
+  });
+
+  it("refuses rather than guesses when the total can't be read", async () => {
+    // No core.ai_month_total (cave-db setup not run since #925, or no cave-db): with a limit set, nothing is called.
+    await begin(20, null);
+    const res = await tune();
+    expect([res.statusCode, res.json().error, res.json().message])
+      .toEqual([503, 'ai_overall_unknown', "AI is paused for now: the limit for all apps together can't be checked. Try again later."]);
+    expect(sent).toBe(0);
+    expect(await usage()).toEqual([]);
+    // A total that reads as nonsense is refused the same way.
+    await app.cave.db.execute(sql.raw(`CREATE OR REPLACE FUNCTION core.ai_month_total(wanted text) RETURNS bigint LANGUAGE sql AS 'SELECT -1::bigint'`));
+    expect((await tune()).statusCode).toBe(503);
+    expect(sent).toBe(0);
+    // Control: the same broken check with no overall limit, and the call runs.
+    await begin(null, null);
+    expect((await tune()).statusCode).toBe(200);
+    expect(sent).toBe(1);
+  });
+
+  it('lets go of the hold when the provider never answers', async () => {
+    await begin(1, 0.5, async () => { throw new NetError('made-up connection failure'); });
+    expect((await tune()).statusCode).toBe(400);
+    expect(await usage()).toEqual([]);
   });
 });
 
