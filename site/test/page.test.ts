@@ -55,6 +55,8 @@ describe('the page', () => {
     // No fetch of its own anywhere in the script, and no saved request to send again: the kit does both.
     expect([...SCRIPT.matchAll(/\bfetch\(/g)].length).toBe(0);
     expect(SCRIPT).not.toContain('sessionStorage');
+    // Back from a whole-page confirm, the page says how the change went (the kit shows nothing itself).
+    expect(SCRIPT).toContain('document.addEventListener("cave-resumed"');
   });
 
   it('signs in through Cougar Cave only: the kit bar and card, no own account form', () => {
