@@ -16,6 +16,8 @@ main 086f112). No app code changes; the UI package is left as it was.
 added at start) and sends it as `id_token_hint` at sign-out. The bump also brings what Deal Hunter had not taken yet:
 
 - 1.2.3: a late logout notice no longer ends a sign-in made since (#905).
+- 1.2.4 also has #957: `createApp` refuses an invalid `aiSpendView` option before opening storage. Deal Hunter passes
+  `aiSpendView: 'app'`, which is valid.
 - 1.2.4: the owner's overall AI limit in the framework's AI helper (#925). Deal Hunter keeps its own AI ledger
   (`aiSpendView: 'app'`) and already checks the overall limit itself, so nothing changes in what it spends. The
   framework now makes `core.ai_month_total` in the local test database at start, so the one test that needs it
