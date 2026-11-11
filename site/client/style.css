@@ -177,3 +177,6 @@ dialog#review-dialog::backdrop { background: var(--wa-color-overlay-modal); }
 /* Signed out: the kit's sign-in card, centred under the bar. */
 #signin { display: block; max-width: 28rem; margin: 10vh auto 0; padding: 0 16px; }
 #signin[hidden] { display: none; }
+
+/* Switched off in People: one plain sentence in the middle of the page. */
+.dh-off { max-width: 36rem; margin: 4rem auto; padding: 0 16px; text-align: center; font-size: 1.05rem; }

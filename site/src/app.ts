@@ -2,9 +2,9 @@
 // settings and /healthz; this file names the app and adds its API (api.ts).
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createApp, type Config, type Db } from '@cougarcave/server';
+import { createApp, DEV_OWNER, type Config, type Db } from '@cougarcave/server';
 import { sql } from 'drizzle-orm';
-import { api, type ApiOptions, pinNeedsCode } from './api.js';
+import { api, type ApiOptions } from './api.js';
 import { type Clock, type Net, realClock, realNet, Sources } from './logic/sources.js';
 import { Poller } from './poller.js';
 import { Store } from './store.js';
@@ -67,10 +67,11 @@ export async function build(config: Config, options: BuildOptions = {}) {
     aiSpendView: 'app',
     // Finds show the shops' own photos (and Best Buy's logo, as its API terms ask), from wherever each shop keeps them.
     policy: { extend: { 'img-src': ['*'] } },
-    routes: (scope) => api(scope, { now, apiPort, downloadsDir, ...(resolve ? { resolve } : {}), ...(nhtsa ? { nhtsa } : {}), ...(cpsc ? { cpsc } : {}), net, aiSettingsFile: config.AI_SETTINGS_FILE, sleep: (s) => clock.sleep(s), poller: () => holder.poller! }),
+    routes: (scope) => api(scope, { now, apiPort, downloadsDir, ...(resolve ? { resolve } : {}), ...(nhtsa ? { nhtsa } : {}), ...(cpsc ? { cpsc } : {}), net, aiSettingsFile: config.AI_SETTINGS_FILE,
+      // The framework's owner list (the dev login's owner too, as createApp does); framework 1.3.0 reads the owner console's.
+      owners: config.DEV_LOGIN ? [...config.OWNERS, DEV_OWNER.subject] : config.OWNERS, sleep: (s) => clock.sleep(s), poller: () => holder.poller! }),
     ...(logger === false ? { logger } : {}),
   });
-  app.addHook('onRequest', pinNeedsCode);
   holder.poller = new Poller(app.cave.db, new Store(app.cave.db, now), new Sources(net, clock).all, net, clock, (line) => app.log.error(line));
   app.decorate('poller', holder.poller);
   app.addHook('onClose', async () => holder.poller?.stop());

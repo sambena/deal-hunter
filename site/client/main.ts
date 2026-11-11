@@ -19,5 +19,13 @@ function show(account: unknown): void {
 
 bar.addEventListener('cave-session', (event) => show((event as CustomEvent<{ account: unknown }>).detail.account));
 if (bar.loaded) show(bar.account);
+// Switched off in Deal Hunter's People: say so, with who can switch it on, instead of the app or the sign-in card.
+const off = document.getElementById('dh-off') as HTMLElement;
+document.addEventListener('dh-switched-off', (event) => {
+  for (const el of parts) el.hidden = true;
+  signin.hidden = true;
+  (document.getElementById('dh-off-text') as HTMLElement).textContent = (event as CustomEvent<{ message: string }>).detail.message;
+  off.hidden = false;
+});
 // Any API call that comes back 401 (the session ended elsewhere) brings the sign-in card back.
 document.addEventListener('cave-signed-out', () => { bar.account = null; show(null); });
