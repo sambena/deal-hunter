@@ -77,6 +77,8 @@ export interface ApiOptions {
   net: Net;
   /** The owner console's shared AI settings file (AI_SETTINGS_FILE). */
   aiSettingsFile: string;
+  /** Who the owner of Cougar Cave is, for People (the owner's admin can't be taken away or switched off). */
+  owners?: readonly string[];
   /** Waits between retries of a busy AI provider; tests pass a fake clock's. */
   sleep?: (seconds: number) => Promise<void>;
   /** The checks (poller.ts); made after the app, so given as a getter. */
@@ -114,6 +116,7 @@ export async function api(app: FastifyInstance, options: ApiOptions): Promise<vo
     ...(options.sleep ? { sleep: options.sleep } : {}), log: (line) => app.log.info(line) });
   const resolve = options.resolve ?? resolveHost;
   app.decorateRequest('member', null);
+  const isOwnerSubject = (subject: string) => (options.owners ?? []).includes(subject);
 
   // ---- who is asking ------------------------------------------------------------------------------------------
 
@@ -142,6 +145,7 @@ export async function api(app: FastifyInstance, options: ApiOptions): Promise<vo
     if (member.disabled) {
       // 403, not 401: a 401 brings back the sign-in card, and signing in again lands here again.
       const message = switchedOff(await adminNames());
+      if (path === '/download/android') return reply.code(403).type('text/plain; charset=utf-8').send(message);
       return sendFixable(reply, new Fixable(403, 'switched_off', message, { kind: 'ask_owner', ask: 'Switch my Deal Hunter account back on' }));
     }
     if (privileged(path)) {
@@ -418,7 +422,8 @@ export async function api(app: FastifyInstance, options: ApiOptions): Promise<vo
       const seen = await app.cave.side.get('SELECT MAX(seen) AS seen FROM (SELECT seen FROM cave_sessions WHERE subject = ? UNION ALL SELECT seen FROM cave_devices WHERE subject = ?) s',
         r.subject as string, r.subject as string);
       const { subject: _subject, ...user } = r;
-      return { ...user, name: r.name ?? '', email: r.email ?? '', last_active: seen?.seen == null ? null : Number(seen.seen) };
+      return { ...user, name: r.name ?? '', email: r.email ?? '', last_active: seen?.seen == null ? null : Number(seen.seen),
+        ...(isOwnerSubject(r.subject as string) ? { owner: true } : {}) };
     }));
     return { users, invites: [], default_watch_limit: DEFAULT_WATCH_LIMIT };
   });
@@ -426,8 +431,11 @@ export async function api(app: FastifyInstance, options: ApiOptions): Promise<vo
   route('PUT', `/api/admin/users/${ID}`, async (req, body, _p, m) => {
     requireAdmin(m);
     const uid = id(req);
-    const [target] = await store.query(sql`SELECT id FROM deals.members WHERE id = ${uid}`);
+    const [target] = await store.query(sql`SELECT id, subject FROM deals.members WHERE id = ${uid}`);
     if (!target) throw fail(404, 'not found');
+    if (isOwnerSubject(target.subject as string) && ((('admin' in body) && !truthy(body.admin)) || truthy(body.disabled))) {
+      throw fail(400, 'The owner of Cougar Cave is always an admin here.', 'owner');
+    }
     const set = (column: string, value: unknown) => app.cave.db.execute(sql`UPDATE deals.members SET ${sql.raw(column)} = ${value} WHERE id = ${uid}`);
     if ('disabled' in body) {
       if (uid === m.id) throw fail(400, "you can't disable yourself");

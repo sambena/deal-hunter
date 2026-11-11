@@ -308,6 +308,39 @@ describe('signing in', () => {
     expect((await call(member, 'GET', '/api/admin/users')).statusCode).toBe(403);
   });
 
+  it("won't take the owner's admin away or switch the owner off, beside doing it to someone else", async () => {
+    await start();
+    const owner = await session(DEV_OWNER.subject, ['pwd', 'mfa']);
+    const lee = recorded.ids.lee!;
+    await call(owner, 'PUT', `/api/admin/users/${lee}`, { admin: true });
+    const member = await session(DEV_MEMBER.subject, ['pwd', 'mfa']);
+    const users = (await call(member, 'GET', '/api/admin/users')).json().users as { id: number; owner?: boolean }[];
+    const ownerId = users.find((u) => u.owner)!.id;
+    for (const body of [{ admin: false }, { disabled: true }]) {
+      const res = await call(member, 'PUT', `/api/admin/users/${ownerId}`, body);
+      expect([res.statusCode, res.json().message]).toEqual([400, 'The owner of Cougar Cave is always an admin here.']);
+    }
+    expect((await call(member, 'PUT', `/api/admin/users/${ownerId}`, { watch_limit: 3 })).statusCode).toBe(200);
+  });
+
+  it('asks a password-only admin to confirm before a Home Assistant import, beside reading the devices', async () => {
+    await start();
+    const pwdOnly = await session(DEV_OWNER.subject, ['pwd']);
+    const res = await call(pwdOnly, 'POST', '/api/import/ha', { devices: [] });
+    expect([res.statusCode, res.json().error]).toEqual([403, 'needs_confirm']);
+    expect((await call(await session(DEV_OWNER.subject, ['pwd', 'mfa']), 'POST', '/api/import/ha', { devices: [] })).statusCode).toBe(200);
+  });
+
+  it('saves the whole admin settings form unchanged from a password-only sign-in, but not one changed shared value', async () => {
+    await start();
+    const pwdOnly = await session(DEV_OWNER.subject, ['pwd']);
+    const settings = (await call(pwdOnly, 'GET', '/api/state')).json().settings as Record<string, unknown>;
+    const form = Object.fromEntries(Object.entries(settings).filter(([k, v]) => typeof v !== 'boolean' || !k.endsWith('_key')));
+    expect((await call(pwdOnly, 'PUT', '/api/settings', form)).statusCode).toBe(200);
+    const changed = await call(pwdOnly, 'PUT', '/api/settings', { ...form, reddit_subs: ['somewhere-else'] });
+    expect([changed.statusCode, changed.json().error]).toEqual([403, 'needs_confirm']);
+  });
+
   it('makes the owner of Cougar Cave an admin on their next visit, even if the row says otherwise', async () => {
     await start();
     await app.cave.db.execute(sql`UPDATE deals.members SET admin = false, disabled = true WHERE subject = ${DEV_OWNER.subject}`);

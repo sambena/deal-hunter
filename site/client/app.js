@@ -119,26 +119,36 @@ async function api(method, path, body) {
   return data;
 }
 
-// "Confirm it's you" (Den Library 175, rule 4). Sign-in with the second factor, back to this page, then the change the
-// admin made is sent again, with what they typed, and the tab they were on comes back.
+// "Confirm it's you" (Den Library 175, rule 4). Sign in with the second factor, back to this page, then the change the
+// admin made is sent again, with what they typed, and the tab they were on comes back. Tried once: if the sign-in still
+// didn't use the code, the page says so instead of going round again.
 const PENDING = "dh-confirm-pending";
+const RETRY_PATH = /^\/api\/(admin\/|import\/ha$|settings$)/;
+let replaying = false;
 async function confirmThenRetry(method, path, body, message) {
-  if (!await ask("Confirm it's you", message, "Confirm it's me")) return false;
-  try { sessionStorage.setItem(PENDING, JSON.stringify({ method, path, body: body || {}, tab: location.hash.slice(1) })); } catch {}
+  if (replaying) return false;  // already confirmed once for this change: api() shows why it still can't be saved
+  if (!RETRY_PATH.test(path) || !await ask("Confirm it's you", message, "Confirm it's me")) return false;
+  try { sessionStorage.setItem(PENDING, JSON.stringify({ method, path, body: body || {}, tab: location.hash.slice(1), who: state.me?.id, at: Date.now() })); } catch {}
   location.href = `/auth/login?confirm=1&next=${encodeURIComponent(location.pathname)}`;
   return true;
 }
 async function retryAfterConfirm() {
   let pending = null;
   try { pending = JSON.parse(sessionStorage.getItem(PENDING) || "null"); sessionStorage.removeItem(PENDING); } catch {}
-  if (!pending || !/^\/api\//.test(pending.path)) return;
+  // Only the change this person made just before confirming (an abandoned one isn't sent hours later).
+  if (!pending || !RETRY_PATH.test(pending.path) || pending.who !== state.me?.id || Date.now() - (pending.at || 0) > 15 * 60_000) return;
   if (pending.tab) showTab(pending.tab);
+  replaying = true;
   try {
     await api(pending.method, pending.path, pending.body);
     toast("Saved");
     await refresh();
     if (pending.tab === "admin") fillPeople();
-  } catch (err) { toast(err.message, true); }
+  } catch (err) {
+    toast(/confirm it's you/i.test(err.message)
+      ? "Not saved: that sign-in didn't use your authenticator code. Sign out of Cougar Cave, sign in with your code, then make the change again."
+      : err.message, true);
+  } finally { replaying = false; }
 }
 
 // The page policy allows no inline styles, so the parts drawn as HTML carry their colours, photos and widths as data
@@ -185,7 +195,7 @@ async function fillPeople() {
           <span class="muted">today ${u.ai_today} of</span> <input class="ai-cap" type="number" min="0" value="${u.ai_daily_cap}" title="requests a day"><br>
           <span class="muted">${usd(u.ai_spent)} of $</span><input class="ai-allowance" type="number" min="0" step="0.5" value="${u.ai_allowance}" title="paid AI a month, US $"> <span class="muted">a month</span>`}</td>
         <td>${u.last_active ? ago(u.last_active) : "never"}</td>
-        <td class="row">${u.id === state.me.id ? '<span class="muted">you</span>' : `
+        <td class="row">${u.id === state.me.id ? '<span class="muted">you</span>' : u.owner ? '<span class="muted">owner</span>' : `
           <button type="button" class="small" data-act="${u.role === "admin" ? "unadmin" : "admin"}">${u.role === "admin" ? "Remove admin" : "Make admin"}</button>
           ${u.role === "admin" ? "" : `<button type="button" class="small ${u.disabled ? "" : "danger"}" data-act="${u.disabled ? "enable" : "disable"}">${u.disabled ? "Switch on" : "Switch off"}</button>`}`}</td>
       </tr>`).join("")}
