@@ -114,6 +114,16 @@ async function api(method, path, body) {
   }
 }
 
+// Back from a whole-page "Confirm it's you" (the pop-up was blocked): the kit has put the tab back, refilled what was
+// typed and sent the change again; say how it went and redraw.
+document.addEventListener("cave-resumed", async e => {
+  const { path, ok } = e.detail || {};
+  if (!/^\/api\/(admin\/|import\/ha$|settings$)/.test(path || "")) return;
+  toast(ok ? "Saved" : "Not saved: this needs you to confirm it's you with your authenticator code.", !ok);
+  try { await refresh(); } catch {}
+  if (path.startsWith("/api/admin/")) fillPeople();
+});
+
 // The page policy allows no inline styles, so the parts drawn as HTML carry their colours, photos and widths as data
 // attributes, and this sets them through the CSSOM as each part is added to the page.
 function paint(root) {
