@@ -151,11 +151,11 @@ function call(cookie: string, method: string, url: string, body?: unknown) {
 
 // ---- the same answers as the Python app ------------------------------------------------------------------------
 
-/** People's has_password is retired, and last_active now comes from the framework's sign-in records. */
+/** People's has_password is retired, last_active now comes from the framework's sign-in records, and owner is new. */
 function comparable(r: Req, body: unknown): unknown {
   const b = structuredClone(body) as Record<string, unknown>;
   if (r.url === '/api/admin/users' && Array.isArray(b.users)) {
-    for (const u of b.users as Record<string, unknown>[]) { delete u.has_password; delete u.last_active; }
+    for (const u of b.users as Record<string, unknown>[]) { delete u.has_password; delete u.last_active; delete u.owner; }
   }
   return b;
 }

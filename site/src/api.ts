@@ -433,7 +433,7 @@ export async function api(app: FastifyInstance, options: ApiOptions): Promise<vo
     const uid = id(req);
     const [target] = await store.query(sql`SELECT id, subject FROM deals.members WHERE id = ${uid}`);
     if (!target) throw fail(404, 'not found');
-    if (isOwnerSubject(target.subject as string) && ((('admin' in body) && !truthy(body.admin)) || truthy(body.disabled))) {
+    if (uid !== m.id && isOwnerSubject(target.subject as string) && ((('admin' in body) && !truthy(body.admin)) || truthy(body.disabled))) {
       throw fail(400, 'The owner of Cougar Cave is always an admin here.', 'owner');
     }
     const set = (column: string, value: unknown) => app.cave.db.execute(sql`UPDATE deals.members SET ${sql.raw(column)} = ${value} WHERE id = ${uid}`);
