@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createApp, type Config, type Db } from '@cougarcave/server';
 import { sql } from 'drizzle-orm';
-import { api, type ApiOptions, pinNeedsCode } from './api.js';
+import { api, type ApiOptions } from './api.js';
 import { type Clock, type Net, realClock, realNet, Sources } from './logic/sources.js';
 import { Poller } from './poller.js';
 import { Store } from './store.js';
@@ -70,7 +70,6 @@ export async function build(config: Config, options: BuildOptions = {}) {
     routes: (scope) => api(scope, { now, apiPort, downloadsDir, ...(resolve ? { resolve } : {}), ...(nhtsa ? { nhtsa } : {}), ...(cpsc ? { cpsc } : {}), net, aiSettingsFile: config.AI_SETTINGS_FILE, sleep: (s) => clock.sleep(s), poller: () => holder.poller! }),
     ...(logger === false ? { logger } : {}),
   });
-  app.addHook('onRequest', pinNeedsCode);
   holder.poller = new Poller(app.cave.db, new Store(app.cave.db, now), new Sources(net, clock).all, net, clock, (line) => app.log.error(line));
   app.decorate('poller', holder.poller);
   app.addHook('onClose', async () => holder.poller?.stop());

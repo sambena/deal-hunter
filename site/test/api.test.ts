@@ -232,24 +232,21 @@ describe('signing in', () => {
     expect((await call('', 'GET', '/download/android')).statusCode).toBe(401);
   });
 
-  it('refuses an admin whose sign-in lacked both factors on every route; a member signed in that way still works', async () => {
+  it("lets an admin in with a password alone; only a change to People needs a confirmed sign-in, with a fix", async () => {
     await start();
+    const lee = recorded.ids.lee!;
     const pwdOnly = await session(DEV_OWNER.subject, ['pwd']);
-    const codeOnly = await session(DEV_OWNER.subject, ['mfa']);
     const both = await session(DEV_OWNER.subject, ['pwd', 'mfa']);
-    const member = await session(DEV_MEMBER.subject, ['pwd']);
     for (const [method, url] of [['GET', '/api/state'], ['GET', '/api/listings'], ['GET', '/api/me'], ['POST', '/api/listings/mark-seen'],
-      ['GET', '/download/android']] as const) {
-      for (const cookie of [pwdOnly, codeOnly]) {
-        const res = await call(cookie, method, url, method === 'POST' ? {} : undefined);
-        expect([url, res.statusCode, res.json().error]).toEqual([url, 403, 'needs_both_factors']);
-        expect(res.json().message).toMatch(/password and your authenticator code in the same sign-in/);
-      }
-      if (url !== '/download/android') {
-        expect([url, (await call(both, method, url, method === 'POST' ? {} : undefined)).statusCode]).toEqual([url, 200]);
-        expect([url, (await call(member, method, url, method === 'POST' ? {} : undefined)).statusCode]).toEqual([url, 200]);
-      }
+      ['GET', '/api/admin/users']] as const) {
+      expect([url, (await call(pwdOnly, method, url, method === 'POST' ? {} : undefined)).statusCode]).toEqual([url, 200]);
     }
+    const res = await call(pwdOnly, 'PUT', `/api/admin/users/${lee}`, { watch_limit: 4 });
+    expect([res.statusCode, res.json().error, res.json().fix?.kind]).toEqual([403, 'needs_confirm', 'confirm']);
+    expect(res.json().message).toMatch(/confirm it's you once/);
+    expect(res.json().message).not.toMatch(/private window|cookies/i);
+    expect(res.json().fix.href).toMatch(/^\/auth\/login\?confirm=1&next=/);
+    expect((await call(both, 'PUT', `/api/admin/users/${lee}`, { watch_limit: 4 })).statusCode).toBe(200);
   });
 
   it("shows when each person was last here from the framework's sign-in records in cave-db", async () => {
@@ -266,43 +263,72 @@ describe('signing in', () => {
     expect(after.find((u) => u.id === lee)!.last_active).toBe(T0 + 500);
   });
 
-  it('refuses a change to People or the shared settings unless the sign-in is under an hour old; reading is fine', async () => {
+  it('asks no age of a confirmed sign-in; an admin changing only their own settings needs no confirm', async () => {
     await start();
     const lee = recorded.ids.lee!;
-    const old = await session(DEV_OWNER.subject, ['pwd', 'mfa'], T0 - 3601);
-    const fresh = await session(DEV_OWNER.subject, ['pwd', 'mfa'], T0 - 3599);
-    const stale = await call(old, 'PUT', '/api/settings', { poll_minutes: 25 });
-    expect([stale.statusCode, stale.json().error]).toEqual([403, 'needs_recent_signin']);
-    expect(stale.json().message).toMatch(/your last Cougar Cave sign-in was 60 minutes ago/);
-    expect((await call(old, 'PUT', `/api/admin/users/${lee}`, { watch_limit: 4 })).json().error).toBe('needs_recent_signin');
-    expect((await call(old, 'GET', '/api/admin/users')).statusCode).toBe(200);
-    expect((await call(old, 'GET', '/api/state')).statusCode).toBe(200);
-    expect((await call(fresh, 'PUT', '/api/settings', { poll_minutes: 25 })).statusCode).toBe(200);
-    expect((await call(fresh, 'PUT', `/api/admin/users/${lee}`, { watch_limit: 4 })).statusCode).toBe(200);
-    // A member's own settings aren't privileged: an old sign-in may change them.
-    const memberOld = await session(DEV_MEMBER.subject, ['pwd'], T0 - 3600);
+    const weekOld = await session(DEV_OWNER.subject, ['pwd', 'mfa'], T0 - 6 * 86400);
+    expect((await call(weekOld, 'PUT', '/api/settings', { poll_minutes: 25 })).statusCode).toBe(200);
+    expect((await call(weekOld, 'PUT', `/api/admin/users/${lee}`, { watch_limit: 4 })).statusCode).toBe(200);
+    const pwdOnly = await session(DEV_OWNER.subject, ['pwd']);
+    const shared = await call(pwdOnly, 'PUT', '/api/settings', { poll_minutes: 30 });
+    expect([shared.statusCode, shared.json().error]).toEqual([403, 'needs_confirm']);
+    // The page sends the whole form: an unchanged shared value beside a personal change is not a shared change.
+    expect((await call(pwdOnly, 'PUT', '/api/settings', { poll_minutes: 25, zip_code: '00004', focus: 'cars' })).statusCode).toBe(200);
+    const memberOld = await session(DEV_MEMBER.subject, ['pwd'], T0 - 6 * 86400);
     expect((await call(memberOld, 'PUT', '/api/settings', { zip_code: '00003' })).statusCode).toBe(200);
   });
 
-  it('keeps People to the admin, and asks a member for both factors first, as the Python app did', async () => {
+  it('keeps People to admins, whatever the sign-in, beside the admin reading it', async () => {
     await start();
-    const memberBoth = await session(DEV_MEMBER.subject, ['pwd', 'mfa']);
-    const memberPwd = await session(DEV_MEMBER.subject, ['pwd']);
-    const res = await call(memberBoth, 'GET', '/api/admin/users');
-    expect([res.statusCode, res.json().message]).toEqual([403, 'only the admin can do that']);
-    expect((await call(memberPwd, 'GET', '/api/admin/users')).json().error).toBe('needs_both_factors');
+    for (const amr of [['pwd'], ['pwd', 'mfa']]) {
+      const res = await call(await session(DEV_MEMBER.subject, amr), 'GET', '/api/admin/users');
+      expect([res.statusCode, res.json().message]).toEqual([403, 'only the admin can do that']);
+    }
     expect((await call(await devCookie('owner'), 'GET', '/api/admin/users')).statusCode).toBe(200);
   });
 
-  it('turns a disabled person away at once, and lets them back when re-enabled', async () => {
+  it('switches admin on and off for other people in People, keeping at least one and never yourself', async () => {
+    await start();
+    const owner = await session(DEV_OWNER.subject, ['pwd', 'mfa']);
+    const lee = recorded.ids.lee!;
+    const member = await devCookie('member');
+    expect((await call(member, 'GET', '/api/admin/users')).statusCode).toBe(403);
+    expect((await call(owner, 'PUT', `/api/admin/users/${lee}`, { admin: true })).statusCode).toBe(200);
+    expect((await call(member, 'GET', '/api/admin/users')).statusCode).toBe(200);
+    expect((await call(member, 'GET', '/api/state')).json().me.role).toBe('admin');
+    // Someone who isn't an admin can't make themselves one.
+    const kimSession = await session(KIM, ['pwd', 'mfa']);
+    const kim = (await call(kimSession, 'GET', '/api/me')).json().id as number;
+    const self = await call(kimSession, 'PUT', `/api/admin/users/${kim}`, { admin: true });
+    expect([self.statusCode, self.json().message]).toEqual([403, 'only the admin can do that']);
+    const ownerId = (await call(owner, 'GET', '/api/me')).json().id as number;
+    const own = await call(owner, 'PUT', `/api/admin/users/${ownerId}`, { admin: false });
+    expect([own.statusCode, own.json().message]).toEqual([400, "You can't take away your own admin: ask another admin to."]);
+    expect((await call(owner, 'PUT', `/api/admin/users/${lee}`, { admin: false })).statusCode).toBe(200);
+    expect((await call(member, 'GET', '/api/admin/users')).statusCode).toBe(403);
+  });
+
+  it('makes the owner of Cougar Cave an admin on their next visit, even if the row says otherwise', async () => {
+    await start();
+    await app.cave.db.execute(sql`UPDATE deals.members SET admin = false, disabled = true WHERE subject = ${DEV_OWNER.subject}`);
+    const owner = await session(DEV_OWNER.subject, ['pwd']);
+    const res = await call(owner, 'GET', '/api/state');
+    expect([res.statusCode, res.json().me.role]).toEqual([200, 'admin']);
+    expect((await call(owner, 'GET', '/api/admin/users')).statusCode).toBe(200);
+  });
+
+  it('tells a switched-off person so at once, and lets them back when switched on', async () => {
     await start();
     const owner = await devCookie('owner');
     const member = await devCookie('member');
     const lee = recorded.ids.lee!;
     expect((await call(member, 'GET', '/api/state')).statusCode).toBe(200);
     expect((await call(owner, 'PUT', `/api/admin/users/${lee}`, { disabled: true })).statusCode).toBe(200);
+    // One sentence saying so, with who can switch it on: a 403, so the page never brings back the sign-in card.
     const res = await call(member, 'GET', '/api/state');
-    expect([res.statusCode, res.json().error]).toEqual([401, 'signed_out']);
+    expect([res.statusCode, res.json().error]).toEqual([403, 'switched_off']);
+    expect(res.json().message).toMatch(/^Your Deal Hunter account is switched off\. .+ can switch it on again in Deal Hunter's People screen\.$/);
+    expect(res.json().fix?.kind).toBe('ask_owner');
     expect((await call(owner, 'GET', '/api/state')).statusCode).toBe(200);
     expect((await call(owner, 'PUT', `/api/admin/users/${lee}`, { disabled: false })).statusCode).toBe(200);
     expect((await call(member, 'GET', '/api/state')).statusCode).toBe(200);
@@ -315,7 +341,7 @@ describe('signing in', () => {
     expect(res.statusCode).toBe(200);
     expect(res.json().watches).toEqual([]);
     const [row] = (await app.cave.db.execute(sql`SELECT * FROM deals.members WHERE subject = ${someone}`) as unknown as { rows: Record<string, unknown>[] }).rows;
-    expect(row).toMatchObject({ admin: false, disabled: false, watch_limit: 10, ai_shared: true, ai_daily_cap: 20 });
+    expect(row).toMatchObject({ admin: false, disabled: false, watch_limit: 10, ai_shared: true, ai_daily_cap: 20, ai_allowance: 1 });
   });
 
   it('says the old sign-in is gone, signed in or not', async () => {
@@ -356,33 +382,32 @@ function onApiPort(server: Server, method: string, path: string, headers: Record
 }
 
 describe('phones', () => {
-  it('pairs only from a sign-in that used a code, as before', async () => {
+  it('pairs a phone from a password-only sign-in, for anyone', async () => {
     await start();
-    const pwdOnly = await session(DEV_MEMBER.subject, ['pwd']);
-    const res = await call(pwdOnly, 'POST', '/auth/devices/code', {});
-    expect([res.statusCode, res.json().error]).toEqual([403, 'needs_recent_signin']);
-    expect((await call(await session(DEV_MEMBER.subject, ['mfa']), 'POST', '/auth/devices/code', {})).statusCode).toBe(201);
+    for (const subject of [DEV_MEMBER.subject, DEV_OWNER.subject]) {
+      expect((await call(await session(subject, ['pwd']), 'POST', '/auth/devices/code', {})).statusCode).toBe(201);
+    }
   });
 
-  it("an admin's phone works on ordinary routes but not privileged ones", async () => {
+  it("an admin's phone works on ordinary routes; People and shared settings say to use a browser", async () => {
     await start();
     const phone = await pairPhone(await devCookie('owner'));
     const bearer = { authorization: `Bearer ${phone}` };
     expect((await app.inject({ url: '/api/state', headers: bearer })).statusCode).toBe(200);
     const people = await app.inject({ url: '/api/admin/users', headers: bearer });
-    expect([people.statusCode, people.json().error]).toEqual([403, 'needs_both_factors']);
+    expect([people.statusCode, people.json().error]).toEqual([403, 'browser_needed']);
     const settings = await app.inject({ method: 'PUT', url: '/api/settings', headers: { ...bearer, 'x-cave-request': '1' }, payload: { poll_minutes: 9 } });
-    expect([settings.statusCode, settings.json().error]).toEqual([403, 'needs_both_factors']);
+    expect([settings.statusCode, settings.json().error]).toEqual([403, 'browser_needed']);
   });
 
-  it("a disabled person's phone gets no_access (it stays paired), beside their working phone before", async () => {
+  it("a switched-off person's phone gets switched_off (it stays paired), beside their working phone before", async () => {
     await start();
     const phone = await pairPhone(await devCookie('member'));
     const bearer = { authorization: `Bearer ${phone}` };
     expect((await app.inject({ url: '/api/state', headers: bearer })).statusCode).toBe(200);
     await call(await devCookie('owner'), 'PUT', `/api/admin/users/${recorded.ids.lee}`, { disabled: true });
     const res = await app.inject({ url: '/api/state', headers: bearer });
-    expect([res.statusCode, res.json().error]).toEqual([403, 'no_access']);
+    expect([res.statusCode, res.json().error]).toEqual([403, 'switched_off']);
   });
 
   describe('on the API port', () => {

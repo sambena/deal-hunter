@@ -75,6 +75,9 @@ export const MEMBER_KEYS = new Set(['zip_code', 'local_radius_miles', 'junk_term
 export const MEMBER_READS = new Set(['sources_enabled', 'poll_minutes', 'check_mode', 'check_times', 'check_timezone']);
 
 export const DEFAULT_WATCH_LIMIT = 10;   // for people who join; the admin has none
+/** Dollars a month of the admin's paid AI a new member starts with: Cougar Cave's $1 default allowance (Library 175, C).
+ * Paid AI only runs when the member presses an AI button, and the overall monthly limit still applies. */
+export const DEFAULT_AI_ALLOWANCE = 1;
 
 const WATCH_FIELDS = ['name', 'query', 'exclude', 'min_price', 'max_price', 'condition', 'include_auctions', 'sources',
   'enabled', 'notes', 'machine_id', 'keep_cheapest', 'color', 'kind', 'year_min', 'year_max', 'max_miles', 'category',
@@ -158,7 +161,8 @@ export class Store {
     const found = await this.member(subject);
     if (found) return found;
     // Checked first, so the id sequence isn't spent on every request; two first requests at once both land on the row.
-    await this.db.execute(sql`INSERT INTO deals.members (subject, created_at, watch_limit) VALUES (${subject}, ${this.now()}, ${DEFAULT_WATCH_LIMIT})
+    await this.db.execute(sql`INSERT INTO deals.members (subject, created_at, watch_limit, ai_allowance)
+      VALUES (${subject}, ${this.now()}, ${DEFAULT_WATCH_LIMIT}, ${DEFAULT_AI_ALLOWANCE})
       ON CONFLICT (subject) DO NOTHING`);
     return (await this.member(subject))!;
   }

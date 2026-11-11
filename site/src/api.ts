@@ -1,16 +1,17 @@
 // Deal Hunter's API: the Python app's routes (../server.py), with the same answers, on the framework's sign-in.
 // - Everyone is a member, by their Cougar Cave subject. Someone with access to Deal Hunter who signs in for the first
 //   time gets a member row with the limits a newly invited friend had.
-// - An admin's browser session that didn't use both a password and a code is refused on every route, as the Python app
-//   refused such an admin's sign-in. A phone can only be paired from a sign-in that used a code (as before), so an
-//   admin's phone works on ordinary routes; privileged ones need a browser.
-// - Privileged routes (People, the shared settings) need both factors, and for a change a sign-in from the last
-//   five minutes.
+// - A password is enough for everyone (Den Library 175). The owner of Cougar Cave is always an admin; other admins
+//   are switched on in People.
+// - Privileged routes (People, the HA import, the shared settings) are for admins, from a browser. A change there needs
+//   a confirmed sign-in (one that used the second factor; no age check). Without one the answer is needs_confirm with
+//   a "Confirm it's me" fix, and the page sends the same request again afterwards.
+// - A member switched off in People is told so in one sentence, with who can switch them on: never the sign-in card.
 // - Errors are the framework's {error, message}; the message is the Python app's own text.
 // - The AI (ai.ts) runs only when someone presses an AI button, through one gate that prices each request first.
 import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { bothFactors, isFresh, people, Refusal, type Session } from '@cougarcave/server';
+import { people, Refusal, type Session } from '@cougarcave/server';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { sql } from 'drizzle-orm';
 import { AIError, type AiSettings, Ai, PROVIDERS, REVIEW_MAX } from './ai.js';
@@ -26,18 +27,30 @@ import { cleanTimes } from './logic/schedule.js';
 import * as specs from './logic/specs.js';
 import { decodeVin, type Get, LookupFailed, nhtsaGet, recalls as vehicleRecalls } from './logic/vehicles.js';
 import { BlockedURL as DiscordBlocked, DiscordRefused, type Poller } from './poller.js';
-import { AI_PROVIDERS, DEFAULT_WATCH_LIMIT, DEVICE_KINDS, DeviceNotFound, type Member, PARTS_KINDS, SECRET_KEYS, Store } from './store.js';
+import { AI_PROVIDERS, DEFAULT_SETTINGS, DEFAULT_WATCH_LIMIT, DEVICE_KINDS, USER_KEYS, DeviceNotFound, type Member, PARTS_KINDS, SECRET_KEYS, Store } from './store.js';
 
 /** The admin's AI is managed in the owner console, so the admin can't set it here (ai.py's AI_KEYS and the limit). */
 const ADMIN_MANAGED_AI = new Set(['ai_provider', 'anthropic_api_key', 'claude_model', 'openai_api_key', 'openai_model', 'gemini_api_key', 'gemini_model', 'gemini_free_tier', 'ai_monthly_limit']);
 
-const OWNER_FACTORS = 'Admin sign-in needs your password and your authenticator code in the same sign-in. This '
-  + "browser's Cougar Cave session may have started with a code only. Sign in from a private window, "
-  + "or clear this browser's cookies for the sign-in service, then try again.";
-const NEEDS_BOTH = 'This needs a Cougar Cave sign-in that used both your password and your authenticator code. '
-  + 'Sign out, then use Sign in with Cougar Cave.';
-const stale = (age: number) => `For this change, sign in again: your last Cougar Cave sign-in was ${Math.floor(age / 60)} minutes ago. `
-  + 'Sign out, then use Sign in with Cougar Cave from a private window so it asks for your password and code.';
+/** The trust decision, as framework 1.2.9 will give it (cougar-cave-ui item 1114: isOwner, isConfirmed, confirmHref).
+ * Until Deal Hunter takes that version: the owner is the framework's owner role (its owner list), and confirmed is a
+ * browser sign-in that used the second factor, with no age check. */
+export const isOwner = (s: Session | null | undefined) => s?.person.role === 'owner';
+export const isConfirmed = (s: Session | null | undefined) => s?.kind === 'browser' && (s.amr ?? []).includes('mfa');
+export const confirmHref = (next: string) => `/auth/login?confirm=1&next=${encodeURIComponent(next)}`;
+/** What the page needs to put a refusal right: kind "confirm" (sign in with the second factor, then the same request
+ * again) or "ask_owner" (say who to ask). The framework's Refusal gains this field in 1.2.9. */
+export interface Fix { kind: 'confirm' | 'ask_owner'; label?: string; href?: string; ask?: string }
+const NEEDS_CONFIRM = "Changing this needs you to confirm it's you once, with your authenticator code. "
+  + 'It then counts until you sign out.';
+const BROWSER_NEEDED = 'Open Deal Hunter in a browser for this: People and the shared settings are not on phones.';
+/** A refusal with a fix, sent as {error, message, fix} (the framework's Refusal carries one from 1.2.9). */
+class Fixable extends Error {
+  constructor(readonly status: number, readonly code: string, message: string, readonly fix: Fix) { super(message); }
+}
+const sendFixable = (reply: FastifyReply, f: Fixable) => reply.code(f.status).send({ error: f.code, message: f.message, fix: f.fix });
+const needsConfirm = () => new Fixable(403, 'needs_confirm', NEEDS_CONFIRM, { kind: 'confirm', label: "Confirm it's me", href: confirmHref('/') });
+const switchedOff = (admins: string) => `Your Deal Hunter account is switched off. ${admins} can switch it on again in Deal Hunter's People screen.`;
 const OWN_LOGIN_OFF = "Deal Hunter's own sign-in is off. Sign in with Cougar Cave.";
 const BAD_VALUE = 'bad request: a value sent was the wrong type or format';
 const ANDROID_APK = 'deal-hunter.apk';
@@ -90,16 +103,6 @@ function queryParams(url: string): Params {
   return out;
 }
 
-/** Python's pairing rule, kept: a PIN for a phone needs a browser sign-in that used an authenticator code (amr has
- * "mfa"), on top of the framework's own "recent sign-in". So an admin's phone always comes from a sign-in an admin
- * could make. Added on the whole app (app.ts), since the pairing routes are the framework's. */
-export async function pinNeedsCode(req: FastifyRequest): Promise<void> {
-  if (req.method !== 'POST' || req.url.split('?')[0] !== '/auth/devices/code') return;
-  if (req.session?.kind === 'browser' && !(req.session.amr ?? []).includes('mfa')) {
-    throw fail(403, 'Adding a phone needs a recent Cougar Cave sign-in. Sign in again, then add the phone.', 'needs_recent_signin');
-  }
-}
-
 export async function api(app: FastifyInstance, options: ApiOptions): Promise<void> {
   const store = new Store(app.cave.db, options.now);
   /** A member's name from Cougar Cave, for "Pat's AI". */
@@ -114,39 +117,50 @@ export async function api(app: FastifyInstance, options: ApiOptions): Promise<vo
 
   // ---- who is asking ------------------------------------------------------------------------------------------
 
-  /** Python's _is_privileged: People and the HA import for anyone, and all of an admin's settings. */
-  const privileged = (method: string, path: string, member: Member) =>
-    path.startsWith('/api/admin/') || path.startsWith('/api/import/ha') || (method === 'PUT' && path === '/api/settings' && member.admin);
+  /** People and the HA import (both admin only). An admin's change to the shared settings is checked in its route. */
+  const privileged = (path: string) => path.startsWith('/api/admin/') || path.startsWith('/api/import/ha');
 
-  app.addHook('onRequest', async (req) => {
+  /** Who can switch a member back on, by name: "Sam", "Sam or Pat", or "An admin" when nobody has a name. */
+  const adminNames = async () => {
+    const rows = await store.query(sql`SELECT p.name FROM deals.members u LEFT JOIN core.people p ON p.id = u.subject
+      WHERE u.admin AND NOT u.disabled ORDER BY u.id`);
+    const names = [...new Set(rows.map((r) => String(r.name ?? '').trim()).filter(Boolean))];
+    return names.length ? names.join(' or ') : 'An admin';
+  };
+
+  app.addHook('onRequest', async (req, reply) => {
     const path = req.url.split('?')[0]!;
     if (!path.startsWith('/api/') && path !== '/download/android') return;
     const session = req.session;
     if (!session) return;   // signedIn routes answer 401 themselves
-    const member = await store.memberFor(session.person.subject);
-    if (member.disabled) {
-      if (session.kind === 'device') throw fail(403, 'This account has no access to Deal Hunter.', 'no_access');
-      throw fail(401, 'Sign in to Deal Hunter');
+    let member = await store.memberFor(session.person.subject);
+    // The owner of Cougar Cave is always an admin here, and can't be switched off (Library 175, rule 2).
+    if (isOwner(session) && (!member.admin || member.disabled)) {
+      await store.query(sql`UPDATE deals.members SET admin = true, disabled = false, watch_limit = NULL WHERE id = ${member.id}`);
+      member = { ...member, admin: true, disabled: false, watch_limit: null };
     }
-    if (member.admin && session.kind === 'browser' && !bothFactors(session)) throw fail(403, OWNER_FACTORS, 'needs_both_factors');
-    if (privileged(req.method, path, member)) {
-      if (!bothFactors(session)) throw fail(403, NEEDS_BOTH, 'needs_both_factors');
-      const age = options.now() - (session.authTime ?? 0);
-      // A recent sign-in: an hour by default, or as the owner console sets it for every app (the framework's isFresh).
-      if (req.method !== 'GET' && !isFresh(session, options.now())) throw fail(403, stale(age), 'needs_recent_signin');
+    if (member.disabled) {
+      // 403, not 401: a 401 brings back the sign-in card, and signing in again lands here again.
+      const message = switchedOff(await adminNames());
+      return sendFixable(reply, new Fixable(403, 'switched_off', message, { kind: 'ask_owner', ask: 'Switch my Deal Hunter account back on' }));
+    }
+    if (privileged(path)) {
+      if (session.kind === 'device') throw fail(403, BROWSER_NEEDED, 'browser_needed');
+      if (req.method !== 'GET' && !isConfirmed(session)) return sendFixable(reply, needsConfirm());
     }
     req.member = member;
   });
 
   /** A route with the Python app's handling: signed in, its body and query as Python read them, a wrong value as 400. */
   const route = (method: 'GET' | 'POST' | 'PUT' | 'DELETE', url: string, handler: Handler) => {
-    app.route({ method, url, config: { signedIn: true }, handler: async (req) => {
+    app.route({ method, url, config: { signedIn: true }, handler: async (req, reply) => {
       const raw = req.body;
       if (raw !== undefined && raw !== null && (typeof raw !== 'object' || Array.isArray(raw))) throw fail(400, BAD_VALUE);
       try {
         return await handler(req, (raw ?? {}) as Record<string, unknown>, queryParams(req.url), req.member!);
       } catch (e) {
         if (e instanceof BadValue) throw fail(400, BAD_VALUE);
+        if (e instanceof Fixable) return sendFixable(reply, e);
         throw e;
       }
     } });
@@ -330,7 +344,7 @@ export async function api(app: FastifyInstance, options: ApiOptions): Promise<vo
 
   // ---- settings and the person ---------------------------------------------------------------------------------
 
-  route('PUT', '/api/settings', async (_req, body, _p, m) => {
+  route('PUT', '/api/settings', async (req, body, _p, m) => {
     // Blank secret fields in the form mean "keep the current value". The admin's AI is the owner console's.
     const changes: Record<string, unknown> = Object.fromEntries(Object.entries(body).filter(([k, v]) =>
       !(SECRET_KEYS.has(k) && pyIn(v, '', null, true)) && !(m.admin && ADMIN_MANAGED_AI.has(k))));
@@ -342,8 +356,16 @@ export async function api(app: FastifyInstance, options: ApiOptions): Promise<vo
       changes.sizes = Object.fromEntries(['department', 'shoe', 'top', 'pants'].filter((k) => truthy(sizes[k]))
         .map((k) => [k, [...pySplit(String(sizes[k] === true ? 'True' : sizes[k])).join(' ')].slice(0, 20).join('')]));
     }
-    // Addresses the server will fetch: Discord only for webhooks, and public addresses only for members.
     const current = await store.getSettings(m.id);
+    // The admin's change to a shared setting (sources and their keys, checks, Reddit subs...) needs a confirmed sign-in;
+    // their own settings (area, focus, sizes...) don't. The page sends the whole form, so only a changed value counts.
+    const sharedChange = m.admin && Object.entries(changes).some(([k, v]) => k in DEFAULT_SETTINGS && !USER_KEYS.has(k)
+      && JSON.stringify(v) !== JSON.stringify(current[k]));
+    if (sharedChange && !isConfirmed(req.session)) {
+      if (req.session?.kind === 'device') throw fail(403, BROWSER_NEEDED, 'browser_needed');
+      throw needsConfirm();
+    }
+    // Addresses the server will fetch: Discord only for webhooks, and public addresses only for members.
     try {
       if (truthy(changes.discord_webhook) && changes.discord_webhook !== current.discord_webhook) checkDiscord(String(changes.discord_webhook));
       for (const [key, what] of [['ha_url', 'Home Assistant address']] as const) {
@@ -410,6 +432,18 @@ export async function api(app: FastifyInstance, options: ApiOptions): Promise<vo
     if ('disabled' in body) {
       if (uid === m.id) throw fail(400, "you can't disable yourself");
       await set('disabled', truthy(body.disabled));   // checked on every request, so it takes effect at once
+    }
+    if ('admin' in body) {
+      // Admins see People and change the shared settings. The owner of Cougar Cave is always one (made so on each visit).
+      if (uid === m.id && !truthy(body.admin)) throw fail(400, "You can't take away your own admin: ask another admin to.");
+      if (!truthy(body.admin)) {
+        const [left] = await store.query(sql`SELECT COUNT(*)::int AS n FROM deals.members WHERE admin AND NOT disabled AND id <> ${uid}`);
+        if (Number(left?.n ?? 0) < 1) throw fail(400, 'Deal Hunter needs at least one admin: make someone else an admin first.');
+      }
+      await set('admin', truthy(body.admin));
+      // An admin has no watch limit (People shows ∞); someone who stops being one gets a new friend's limit back.
+      if (truthy(body.admin)) await set('watch_limit', null);
+      else await app.cave.db.execute(sql`UPDATE deals.members SET watch_limit = ${DEFAULT_WATCH_LIMIT} WHERE id = ${uid} AND watch_limit IS NULL`);
     }
     if ('watch_limit' in body) await set('watch_limit', pyIn(body.watch_limit, null, '') ? null : Math.max(0, pyInt(body.watch_limit)));
     // Their use of the admin's AI: allowed at all, requests a day, and dollars a month of paid models.

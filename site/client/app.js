@@ -106,8 +106,39 @@ async function api(method, path, body) {
   const data = await res.json().catch(() => ({}));
   // Signed out (the session ended here or elsewhere): main.ts brings back the Cougar Cave sign-in card.
   if (res.status === 401) { document.dispatchEvent(new CustomEvent("cave-signed-out")); throw new Error("Please sign in"); }
+  // Switched off in People: main.ts shows the one sentence saying so (who can switch it on), never the sign-in card.
+  if (res.status === 403 && data.error === "switched_off") {
+    document.dispatchEvent(new CustomEvent("dh-switched-off", { detail: { message: data.message } }));
+    throw new Error(data.message);
+  }
+  // An admin change from a sign-in that didn't use the second factor: confirm once, then the same change is sent again.
+  if (res.status === 403 && data.error === "needs_confirm" && data.fix?.kind === "confirm" && write) {
+    if (await confirmThenRetry(method, path, body, data.message)) return new Promise(() => {});  // the page is leaving
+  }
   if (!res.ok) throw new Error(data.message || data.error || `HTTP ${res.status}`);  // {error: code, message}
   return data;
+}
+
+// "Confirm it's you" (Den Library 175, rule 4). Sign-in with the second factor, back to this page, then the change the
+// admin made is sent again, with what they typed, and the tab they were on comes back.
+const PENDING = "dh-confirm-pending";
+async function confirmThenRetry(method, path, body, message) {
+  if (!await ask("Confirm it's you", message, "Confirm it's me")) return false;
+  try { sessionStorage.setItem(PENDING, JSON.stringify({ method, path, body: body || {}, tab: location.hash.slice(1) })); } catch {}
+  location.href = `/auth/login?confirm=1&next=${encodeURIComponent(location.pathname)}`;
+  return true;
+}
+async function retryAfterConfirm() {
+  let pending = null;
+  try { pending = JSON.parse(sessionStorage.getItem(PENDING) || "null"); sessionStorage.removeItem(PENDING); } catch {}
+  if (!pending || !/^\/api\//.test(pending.path)) return;
+  if (pending.tab) showTab(pending.tab);
+  try {
+    await api(pending.method, pending.path, pending.body);
+    toast("Saved");
+    await refresh();
+    if (pending.tab === "admin") fillPeople();
+  } catch (err) { toast(err.message, true); }
 }
 
 // The page policy allows no inline styles, so the parts drawn as HTML carry their colours, photos and widths as data
@@ -145,7 +176,7 @@ async function fillPeople() {
   $("#people-list").innerHTML = `<div class="table-wrap"><table class="people">
       <tr><th>Person</th><th>Watches</th><th>Your AI</th><th>Last active</th><th></th></tr>
       ${users.map(u => `<tr data-id="${u.id}">
-        <td><b>${esc(u.name || "Not signed in here yet")}</b>${u.role === "admin" ? ' <span class="pill">admin</span>' : ""}${u.disabled ? ' <span class="pill">disabled</span>' : ""}<br>
+        <td><b>${esc(u.name || "Not signed in here yet")}</b>${u.role === "admin" ? ' <span class="pill">admin</span>' : ""}${u.disabled ? ' <span class="pill">switched off</span>' : ""}<br>
           <span class="muted">${esc(u.email)}</span></td>
         <td>${u.watches} of ${u.role === "admin" ? "∞" : `<input class="limit" type="number" min="0" value="${u.watch_limit ?? ""}" placeholder="∞">`}</td>
         <td>${u.role === "admin" ? usd(u.ai_spent) : `
@@ -154,8 +185,9 @@ async function fillPeople() {
           <span class="muted">today ${u.ai_today} of</span> <input class="ai-cap" type="number" min="0" value="${u.ai_daily_cap}" title="requests a day"><br>
           <span class="muted">${usd(u.ai_spent)} of $</span><input class="ai-allowance" type="number" min="0" step="0.5" value="${u.ai_allowance}" title="paid AI a month, US $"> <span class="muted">a month</span>`}</td>
         <td>${u.last_active ? ago(u.last_active) : "never"}</td>
-        <td class="row">${u.role === "admin" ? "" : `
-          <button type="button" class="small ${u.disabled ? "" : "danger"}" data-act="${u.disabled ? "enable" : "disable"}">${u.disabled ? "Enable" : "Disable"}</button>`}</td>
+        <td class="row">${u.id === state.me.id ? '<span class="muted">you</span>' : `
+          <button type="button" class="small" data-act="${u.role === "admin" ? "unadmin" : "admin"}">${u.role === "admin" ? "Remove admin" : "Make admin"}</button>
+          ${u.role === "admin" ? "" : `<button type="button" class="small ${u.disabled ? "" : "danger"}" data-act="${u.disabled ? "enable" : "disable"}">${u.disabled ? "Switch on" : "Switch off"}</button>`}`}</td>
       </tr>`).join("")}
     </table></div>`;
 }
@@ -165,8 +197,15 @@ $("#people-list").addEventListener("click", async e => {
   if (!btn) return;
   const act = btn.dataset.act;
   const id = btn.closest("tr[data-id]").dataset.id;
-  if (act === "disable" && !await ask("Disable this person?", "They're signed out everywhere and can't sign in until you enable them.", "Disable person", "danger")) return;
-  await api("PUT", `/api/admin/users/${id}`, { disabled: act === "disable" });
+  if (act === "disable" && !await ask("Switch this person off?", "They can't use Deal Hunter until you switch them on again. Their watches are kept.", "Switch off", "danger")) return;
+  try {
+    if (act === "admin" || act === "unadmin") {
+      await api("PUT", `/api/admin/users/${id}`, { admin: act === "admin" });
+      toast(act === "admin" ? "Now an admin" : "No longer an admin");
+    } else {
+      await api("PUT", `/api/admin/users/${id}`, { disabled: act === "disable" });
+    }
+  } catch (err) { toast(err.message, true); }
   fillPeople();
 });
 
@@ -1511,15 +1550,18 @@ $("#test-discord").addEventListener("click", e => busy(e.target, async () => {
 
 // main.ts calls this once someone is signed in (again after signing back in).
 let started = false;
+let switchedOff = false;
+document.addEventListener("dh-switched-off", () => { switchedOff = true; });
 export async function start() {
   showAppLinks();
-  try { await refresh(); } catch (err) { toast(err.message, true); return; }  // e.g. an admin sign-in without both factors
+  try { await refresh(); } catch (err) { if (!switchedOff) toast(err.message, true); return; }
   if (started) return;
   started = true;
   let tab = location.hash.slice(1);
   if (!tab) try { tab = localStorage.getItem("tab") || "finds"; } catch { tab = "finds"; }
   if (tab === "settings" && !location.hash) tab = "finds";  // remembered from when Settings was a tab
   showTab(tab);
+  retryAfterConfirm();
   setInterval(async () => {
     if ($("#dh-main").hidden) return;  // signed out: the sign-in card is showing
     await refresh();
