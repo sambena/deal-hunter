@@ -735,7 +735,9 @@ describe('the overall AI limit for all Cougar Cave apps together (#925)', { time
 
   it("refuses rather than guesses when the total can't be read", async () => {
     // No core.ai_month_total (cave-db setup not run since #925, or no cave-db): with a limit set, nothing is called.
+    // Server 1.2.4 and later make the function in the local database at start, so take it away here.
     await begin(20, null);
+    await app.cave.db.execute(sql.raw('DROP FUNCTION IF EXISTS core.ai_month_total(text)'));
     const res = await tune();
     expect([res.statusCode, res.json().error, res.json().message])
       .toEqual([503, 'ai_overall_unknown', "AI is paused for now: the limit for all apps together can't be checked. Try again later."]);
