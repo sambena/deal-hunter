@@ -119,9 +119,11 @@ async function api(method, path, body) {
 document.addEventListener("cave-resumed", async e => {
   const { path, ok } = e.detail || {};
   if (!/^\/api\/(admin\/|import\/ha$|settings$)/.test(path || "")) return;
-  toast(ok ? "Saved" : "Not saved: this needs you to confirm it's you with your authenticator code.", !ok);
-  try { await refresh(); } catch {}
-  if (path.startsWith("/api/admin/")) fillPeople();
+  toast(ok ? "Saved" : "That change didn't save. Please try it again.", !ok);
+  try {
+    await refresh();
+    if (path.startsWith("/api/admin/")) await fillPeople();
+  } catch (err) { toast(err.message, true); }
 });
 
 // The page policy allows no inline styles, so the parts drawn as HTML carry their colours, photos and widths as data
