@@ -1,6 +1,7 @@
 // Deal Hunter's page: the Python app's static/app.js, moved onto the framework. Signing in, the account menu and phones
 // are the kit's (main.ts); the page policy allows no inline styles, so colours, photos and widths are set by paint().
 
+import { api as caveApi, ApiError } from "/cave/cave-ui.js";
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 let state = { watches: [], machines: [], settings: {}, poller: {} };
@@ -96,59 +97,21 @@ const CATEGORIES = ["cpu", "motherboard", "ram", "gpu", "storage", "psu", "coole
 
 // ---- helpers ------------------------------------------------------------------
 
+// The kit's api(): X-Cave-Request, {error, message, fix}, a 401 brings back the sign-in card (main.ts), and a change that
+// needs "Confirm it's you" is confirmed in a small window and sent again, so the page stays as it was.
 async function api(method, path, body) {
-  const write = method !== "GET";  // the server only accepts JSON writes, marked as the page's own (X-Cave-Request)
-  const res = await fetch(path, {
-    method,
-    headers: write ? { "Content-Type": "application/json", "X-Cave-Request": "1" } : {},
-    body: write ? JSON.stringify(body || {}) : undefined,
-  });
-  const data = await res.json().catch(() => ({}));
-  // Signed out (the session ended here or elsewhere): main.ts brings back the Cougar Cave sign-in card.
-  if (res.status === 401) { document.dispatchEvent(new CustomEvent("cave-signed-out")); throw new Error("Please sign in"); }
-  // Switched off in People: main.ts shows the one sentence saying so (who can switch it on), never the sign-in card.
-  if (res.status === 403 && data.error === "switched_off") {
-    document.dispatchEvent(new CustomEvent("dh-switched-off", { detail: { message: data.message } }));
-    throw new Error(data.message);
-  }
-  // An admin change from a sign-in that didn't use the second factor: confirm once, then the same change is sent again.
-  if (res.status === 403 && data.error === "needs_confirm" && data.fix?.kind === "confirm" && write) {
-    if (await confirmThenRetry(method, path, body, data.message)) return new Promise(() => {});  // the page is leaving
-  }
-  if (!res.ok) throw new Error(data.message || data.error || `HTTP ${res.status}`);  // {error: code, message}
-  return data;
-}
-
-// "Confirm it's you" (Den Library 175, rule 4). Sign in with the second factor, back to this page, then the change the
-// admin made is sent again, with what they typed, and the tab they were on comes back. Tried once: if the sign-in still
-// didn't use the code, the page says so instead of going round again.
-const PENDING = "dh-confirm-pending";
-const RETRY_PATH = /^\/api\/(admin\/|import\/ha$|settings$)/;
-let replaying = false;
-async function confirmThenRetry(method, path, body, message) {
-  if (replaying) return false;  // already confirmed once for this change: api() shows why it still can't be saved
-  if (!RETRY_PATH.test(path) || !await ask("Confirm it's you", message, "Confirm it's me")) return false;
-  try { sessionStorage.setItem(PENDING, JSON.stringify({ method, path, body: body || {}, tab: location.hash.slice(1), who: state.me?.id, at: Date.now() })); } catch {}
-  location.href = `/auth/login?confirm=1&next=${encodeURIComponent(location.pathname)}`;
-  return true;
-}
-async function retryAfterConfirm() {
-  let pending = null;
-  try { pending = JSON.parse(sessionStorage.getItem(PENDING) || "null"); sessionStorage.removeItem(PENDING); } catch {}
-  // Only the change this person made just before confirming (an abandoned one isn't sent hours later).
-  if (!pending || !RETRY_PATH.test(pending.path) || pending.who !== state.me?.id || Date.now() - (pending.at || 0) > 15 * 60_000) return;
-  if (pending.tab) showTab(pending.tab);
-  replaying = true;
+  const write = method !== "GET";  // the server only accepts JSON writes
   try {
-    await api(pending.method, pending.path, pending.body);
-    toast("Saved");
-    await refresh();
-    if (pending.tab === "admin") fillPeople();
+    return await caveApi(path, { method, ...(write ? { body: body || {} } : {}) });
   } catch (err) {
-    toast(/confirm it's you/i.test(err.message)
-      ? "Not saved: that sign-in didn't use your authenticator code. Sign out of Cougar Cave, sign in with your code, then make the change again."
-      : err.message, true);
-  } finally { replaying = false; }
+    if (!(err instanceof ApiError)) throw err;
+    if (err.status === 401) throw new Error("Please sign in");
+    // Switched off in People: main.ts shows the one sentence saying so (who can switch it on), never the sign-in card.
+    if (err.code === "switched_off") document.dispatchEvent(new CustomEvent("dh-switched-off", { detail: { message: err.message } }));
+    // Cancelled, or the sign-in still didn't use the code.
+    if (err.code === "needs_confirm") throw new Error("Not saved: this needs you to confirm it's you with your authenticator code.");
+    throw new Error(err.message);
+  }
 }
 
 // The page policy allows no inline styles, so the parts drawn as HTML carry their colours, photos and widths as data
@@ -1571,7 +1534,6 @@ export async function start() {
   if (!tab) try { tab = localStorage.getItem("tab") || "finds"; } catch { tab = "finds"; }
   if (tab === "settings" && !location.hash) tab = "finds";  // remembered from when Settings was a tab
   showTab(tab);
-  retryAfterConfirm();
   setInterval(async () => {
     if ($("#dh-main").hidden) return;  // signed out: the sign-in card is showing
     await refresh();

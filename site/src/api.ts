@@ -1,17 +1,17 @@
 // Deal Hunter's API: the Python app's routes (../server.py), with the same answers, on the framework's sign-in.
 // - Everyone is a member, by their Cougar Cave subject. Someone with access to Deal Hunter who signs in for the first
 //   time gets a member row with the limits a newly invited friend had.
-// - A password is enough for everyone (Den Library 175). The owner of Cougar Cave is always an admin; other admins
-//   are switched on in People.
+// - A password is enough for everyone (Den Library 175). The owner of Cougar Cave (the framework's isOwner) is always
+//   an admin; other admins are switched on in People.
 // - Privileged routes (People, the HA import, the shared settings) are for admins, from a browser. A change there needs
 //   a confirmed sign-in (one that used the second factor; no age check). Without one the answer is needs_confirm with
-//   a "Confirm it's me" fix, and the page sends the same request again afterwards.
+//   a "Confirm it's me" fix; the kit's api() confirms in a small window and sends the same request again.
 // - A member switched off in People is told so in one sentence, with who can switch them on: never the sign-in card.
 // - Errors are the framework's {error, message}; the message is the Python app's own text.
 // - The AI (ai.ts) runs only when someone presses an AI button, through one gate that prices each request first.
 import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { people, Refusal, type Session } from '@cougarcave/server';
+import { confirmHref, isConfirmed, isOwner, ownerSource, people, Refusal, type Session } from '@cougarcave/server';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { sql } from 'drizzle-orm';
 import { AIError, type AiSettings, Ai, PROVIDERS, REVIEW_MAX } from './ai.js';
@@ -32,24 +32,10 @@ import { AI_PROVIDERS, DEFAULT_SETTINGS, DEFAULT_WATCH_LIMIT, DEVICE_KINDS, USER
 /** The admin's AI is managed in the owner console, so the admin can't set it here (ai.py's AI_KEYS and the limit). */
 const ADMIN_MANAGED_AI = new Set(['ai_provider', 'anthropic_api_key', 'claude_model', 'openai_api_key', 'openai_model', 'gemini_api_key', 'gemini_model', 'gemini_free_tier', 'ai_monthly_limit']);
 
-/** The trust decision, as framework 1.2.9 will give it (cougar-cave-ui item 1114: isOwner, isConfirmed, confirmHref).
- * Until Deal Hunter takes that version: the owner is the framework's owner role (its owner list), and confirmed is a
- * browser sign-in that used the second factor, with no age check. */
-export const isOwner = (s: Session | null | undefined) => s?.person.role === 'owner';
-export const isConfirmed = (s: Session | null | undefined) => s?.kind === 'browser' && (s.amr ?? []).includes('mfa');
-export const confirmHref = (next: string) => `/auth/login?confirm=1&next=${encodeURIComponent(next)}`;
-/** What the page needs to put a refusal right: kind "confirm" (sign in with the second factor, then the same request
- * again) or "ask_owner" (say who to ask). The framework's Refusal gains this field in 1.2.9. */
-export interface Fix { kind: 'confirm' | 'ask_owner'; label?: string; href?: string; ask?: string }
 const NEEDS_CONFIRM = "Changing this needs you to confirm it's you once, with your authenticator code. "
   + 'It then counts until you sign out.';
 const BROWSER_NEEDED = 'Open Deal Hunter in a browser for this: People and the shared settings are not on phones.';
-/** A refusal with a fix, sent as {error, message, fix} (the framework's Refusal carries one from 1.2.9). */
-class Fixable extends Error {
-  constructor(readonly status: number, readonly code: string, message: string, readonly fix: Fix) { super(message); }
-}
-const sendFixable = (reply: FastifyReply, f: Fixable) => reply.code(f.status).send({ error: f.code, message: f.message, fix: f.fix });
-const needsConfirm = () => new Fixable(403, 'needs_confirm', NEEDS_CONFIRM, { kind: 'confirm', label: "Confirm it's me", href: confirmHref('/') });
+const needsConfirm = () => new Refusal(403, 'needs_confirm', NEEDS_CONFIRM, {}, { kind: 'confirm', label: "Confirm it's me", href: confirmHref('/auth/confirmed') });
 const switchedOff = (admins: string) => `Your Deal Hunter account is switched off. ${admins} can switch it on again in Deal Hunter's People screen.`;
 const OWN_LOGIN_OFF = "Deal Hunter's own sign-in is off. Sign in with Cougar Cave.";
 const BAD_VALUE = 'bad request: a value sent was the wrong type or format';
@@ -77,7 +63,7 @@ export interface ApiOptions {
   net: Net;
   /** The owner console's shared AI settings file (AI_SETTINGS_FILE). */
   aiSettingsFile: string;
-  /** Who the owner of Cougar Cave is, for People (the owner's admin can't be taken away or switched off). */
+  /** The app's OWNERS setting, used for other people in People only until cave-db has core.owners. */
   owners?: readonly string[];
   /** Waits between retries of a busy AI provider; tests pass a fake clock's. */
   sleep?: (seconds: number) => Promise<void>;
@@ -116,7 +102,9 @@ export async function api(app: FastifyInstance, options: ApiOptions): Promise<vo
     ...(options.sleep ? { sleep: options.sleep } : {}), log: (line) => app.log.info(line) });
   const resolve = options.resolve ?? resolveHost;
   app.decorateRequest('member', null);
-  const isOwnerSubject = (subject: string) => (options.owners ?? []).includes(subject);
+  // The framework's owner list (cave-db core.owners; the OWNERS setting until cave-db has it), for other people in People.
+  const owners = ownerSource(app.cave.db, options.owners ?? [], { now: options.now });
+  const isOwnerSubject = (subject: string) => owners.isOwner(subject);
 
   // ---- who is asking ------------------------------------------------------------------------------------------
 
@@ -146,25 +134,24 @@ export async function api(app: FastifyInstance, options: ApiOptions): Promise<vo
       // 403, not 401: a 401 brings back the sign-in card, and signing in again lands here again.
       const message = switchedOff(await adminNames());
       if (path === '/download/android') return reply.code(403).type('text/plain; charset=utf-8').send(message);
-      return sendFixable(reply, new Fixable(403, 'switched_off', message, { kind: 'ask_owner', ask: 'Switch my Deal Hunter account back on' }));
+      throw new Refusal(403, 'switched_off', message, {}, { kind: 'ask_owner', label: 'Ask an admin', ask: 'Switch my Deal Hunter account back on' });
     }
     if (privileged(path)) {
       if (session.kind === 'device') throw fail(403, BROWSER_NEEDED, 'browser_needed');
-      if (req.method !== 'GET' && !isConfirmed(session)) return sendFixable(reply, needsConfirm());
+      if (req.method !== 'GET' && !isConfirmed(session)) throw needsConfirm();
     }
     req.member = member;
   });
 
   /** A route with the Python app's handling: signed in, its body and query as Python read them, a wrong value as 400. */
   const route = (method: 'GET' | 'POST' | 'PUT' | 'DELETE', url: string, handler: Handler) => {
-    app.route({ method, url, config: { signedIn: true }, handler: async (req, reply) => {
+    app.route({ method, url, config: { signedIn: true }, handler: async (req) => {
       const raw = req.body;
       if (raw !== undefined && raw !== null && (typeof raw !== 'object' || Array.isArray(raw))) throw fail(400, BAD_VALUE);
       try {
         return await handler(req, (raw ?? {}) as Record<string, unknown>, queryParams(req.url), req.member!);
       } catch (e) {
         if (e instanceof BadValue) throw fail(400, BAD_VALUE);
-        if (e instanceof Fixable) return sendFixable(reply, e);
         throw e;
       }
     } });
@@ -423,7 +410,7 @@ export async function api(app: FastifyInstance, options: ApiOptions): Promise<vo
         r.subject as string, r.subject as string);
       const { subject: _subject, ...user } = r;
       return { ...user, name: r.name ?? '', email: r.email ?? '', last_active: seen?.seen == null ? null : Number(seen.seen),
-        ...(isOwnerSubject(r.subject as string) ? { owner: true } : {}) };
+        ...(await isOwnerSubject(r.subject as string) ? { owner: true } : {}) };
     }));
     return { users, invites: [], default_watch_limit: DEFAULT_WATCH_LIMIT };
   });
@@ -433,7 +420,7 @@ export async function api(app: FastifyInstance, options: ApiOptions): Promise<vo
     const uid = id(req);
     const [target] = await store.query(sql`SELECT id, subject FROM deals.members WHERE id = ${uid}`);
     if (!target) throw fail(404, 'not found');
-    if (uid !== m.id && isOwnerSubject(target.subject as string) && ((('admin' in body) && !truthy(body.admin)) || truthy(body.disabled))) {
+    if (uid !== m.id && await isOwnerSubject(target.subject as string) && ((('admin' in body) && !truthy(body.admin)) || truthy(body.disabled))) {
       throw fail(400, 'The owner of Cougar Cave is always an admin here.', 'owner');
     }
     const set = (column: string, value: unknown) => app.cave.db.execute(sql`UPDATE deals.members SET ${sql.raw(column)} = ${value} WHERE id = ${uid}`);
