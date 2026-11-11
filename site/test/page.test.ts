@@ -46,14 +46,15 @@ describe('the page', () => {
       .toEqual(['POST /api/api-key', 'GET /api/tokens', 'GET /api/nope']);
   });
 
-  it("marks every write as the page's own (X-Cave-Request) and reads the framework's error message", () => {
+  it("sends every request through the kit's api() (X-Cave-Request, the framework's error, confirm and carry on)", () => {
+    expect(SCRIPT).toContain('import { api as caveApi, ApiError } from "/cave/cave-ui.js";');
     const helper = SCRIPT.slice(SCRIPT.indexOf('async function api('), SCRIPT.indexOf('\n}\n', SCRIPT.indexOf('async function api(')));
-    expect(helper).toMatch(/headers: write \? \{ "Content-Type": "application\/json", "X-Cave-Request": "1" \}/);
-    expect(helper).toContain('data.message || data.error');
-    expect(helper).toContain('new CustomEvent("cave-signed-out")');   // a 401 shows the sign-in card, not a reload
+    expect(helper).toContain('await caveApi(path, { method');
+    expect(helper).toContain('"switched_off"');   // the one sentence, never the sign-in card
     expect(helper).not.toContain('location.reload');
-    // Every request goes through that helper: no other fetch in the script.
-    expect([...SCRIPT.matchAll(/\bfetch\(/g)].length).toBe(1);
+    // No fetch of its own anywhere in the script, and no saved request to send again: the kit does both.
+    expect([...SCRIPT.matchAll(/\bfetch\(/g)].length).toBe(0);
+    expect(SCRIPT).not.toContain('sessionStorage');
   });
 
   it('signs in through Cougar Cave only: the kit bar and card, no own account form', () => {
